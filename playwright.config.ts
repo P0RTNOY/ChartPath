@@ -18,7 +18,7 @@ export default defineConfig({
     },
     {
       name: 'tablet-chromium',
-      use: { ...devices['iPad Pro 11'] },
+      use: { ...devices['iPad Pro 11'], browserName: 'chromium' },
     },
   ],
   webServer: {

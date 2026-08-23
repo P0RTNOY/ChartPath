@@ -15,6 +15,7 @@
     "lint": "pnpm -r --if-present lint",
     "mobile": "pnpm --filter @chartpath/mobile start",
     "mobile:web": "pnpm --filter @chartpath/mobile web",
+    "screenshots:web": "node scripts/capture-screenshots.mjs",
     "test:e2e:web": "playwright test",
     "web:e2e:serve": "pnpm --filter @chartpath/mobile export:web && serve apps/mobile/dist -l 4173",
     "test": "pnpm -r --if-present test",
