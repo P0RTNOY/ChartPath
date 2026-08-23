@@ -111,9 +111,105 @@ describe('identifier-based graders', () => {
       ),
     ).toMatchObject({ correct: false, score: 0, feedbackCode: 'answer-kind-mismatch' });
   });
+
+  it('grades every capstone stage independently and rejects a missing stage', () => {
+    const rubric = {
+      kind: 'capstone',
+      steps: [
+        {
+          id: 'context',
+          rubric: { kind: 'selection', expectedIds: ['weekly-up'], mode: 'exact' },
+        },
+        {
+          id: 'management',
+          rubric: {
+            kind: 'decision',
+            acceptedDecisions: ['no-trade'],
+            requiredReasonIds: ['no-position'],
+          },
+        },
+      ],
+    } as const;
+    const complete = gradeAnswer(rubric, {
+      kind: 'capstone',
+      stepAnswers: [
+        { stepId: 'context', answer: { kind: 'selection', selectedIds: ['weekly-up'] } },
+        {
+          stepId: 'management',
+          answer: { kind: 'decision', decision: 'no-trade', reasonIds: ['no-position'] },
+        },
+      ],
+    });
+    const incomplete = gradeAnswer(rubric, {
+      kind: 'capstone',
+      stepAnswers: [
+        { stepId: 'context', answer: { kind: 'selection', selectedIds: ['weekly-up'] } },
+      ],
+    });
+    expect(complete).toMatchObject({ correct: true, score: 1, feedbackCode: 'correct' });
+    expect(incomplete).toMatchObject({
+      correct: false,
+      score: 0.5,
+      feedbackCode: 'capstone-incomplete',
+    });
+    const malformed = gradeAnswer(rubric, {
+      kind: 'capstone',
+      stepAnswers: [
+        { stepId: 'context', answer: { kind: 'selection', selectedIds: ['weekly-up'] } },
+        { stepId: 'context', answer: { kind: 'selection', selectedIds: ['weekly-up'] } },
+        {
+          stepId: 'management',
+          answer: { kind: 'decision', decision: 'no-trade', reasonIds: ['no-position'] },
+        },
+        { stepId: 'unexpected', answer: { kind: 'multiple-choice', optionId: 'x' } },
+      ],
+    });
+    expect(malformed).toMatchObject({
+      correct: false,
+      score: 0,
+      feedbackCode: 'invalid-capstone-steps',
+    });
+  });
 });
 
 describe('chart graders', () => {
+  it('grades label coordinates by label identity and chart tolerance', () => {
+    const rubric = {
+      kind: 'label-placement',
+      targets: [
+        { labelId: 'high', target: { candleIndex: 2, price: 110 } },
+        { labelId: 'low', target: { candleIndex: 2, price: 90 } },
+      ],
+      tolerance: { horizontal: 0.12, vertical: 0.12 },
+    } as const;
+    expect(
+      gradeAnswer(
+        rubric,
+        {
+          kind: 'label-placement',
+          placements: [
+            { labelId: 'high', anchor: { candleIndex: 2, price: 110 } },
+            { labelId: 'low', anchor: { candleIndex: 2, price: 90 } },
+          ],
+        },
+        context,
+      ).correct,
+    ).toBe(true);
+    expect(
+      gradeAnswer(
+        rubric,
+        {
+          kind: 'label-placement',
+          placements: [
+            { labelId: 'high', anchor: { candleIndex: 2, price: 90 } },
+            { labelId: 'low', anchor: { candleIndex: 2, price: 110 } },
+          ],
+        },
+        context,
+      ).correct,
+    ).toBe(false);
+  });
+
   it('matches all point targets once and rejects unrelated extra points', () => {
     const rubric = {
       kind: 'point',
@@ -329,6 +425,13 @@ describe('risk and decision graders', () => {
         reasonIds: ['confirmation-missing'],
       }).correct,
     ).toBe(true);
+    expect(
+      gradeAnswer(rubric, {
+        kind: 'decision',
+        decision: 'wait',
+        reasonIds: ['confirmation-missing', 'outcome-was-profitable'],
+      }),
+    ).toMatchObject({ correct: false, feedbackCode: 'decision-reason-missing' });
   });
 });
 

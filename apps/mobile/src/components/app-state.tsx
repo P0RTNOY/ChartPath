@@ -24,9 +24,13 @@ export function LoadingState({ label = 'טוענים את מסלול הלמיד�
 export function ErrorState({
   message,
   onRetry,
+  secondaryActionLabel,
+  onSecondaryAction,
 }: {
   readonly message: string;
   readonly onRetry: () => void;
+  readonly secondaryActionLabel?: string;
+  readonly onSecondaryAction?: () => void;
 }) {
   const theme = useTheme();
   return (
@@ -44,6 +48,11 @@ export function ErrorState({
         <Button fullWidth onPress={onRetry}>
           ניסיון נוסף
         </Button>
+        {secondaryActionLabel && onSecondaryAction ? (
+          <Button fullWidth onPress={onSecondaryAction} variant="danger">
+            {secondaryActionLabel}
+          </Button>
+        ) : undefined}
       </View>
     </Screen>
   );

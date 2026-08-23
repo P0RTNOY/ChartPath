@@ -15,7 +15,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from '@/components/app-state';
 import { Glyph, IconBubble } from '@/components/glyph';
 import { TopBar } from '@/components/top-bar';
-import { unitLessons, units } from '@/data/catalog';
+import { isLessonUnlocked, isUnitUnlocked, unitLessons, units } from '@/data/catalog';
 import { useLearning } from '@/state/learning';
 
 export function generateStaticParams() {
@@ -40,6 +40,16 @@ export default function UnitScreen() {
       <Screen>
         <TopBar back title="יחידה לא נמצאה" />
         <EmptyState message="ייתכן שהתוכן עודכן. חזרו למפת הלמידה." title="אין יחידה כזו" />
+      </Screen>
+    );
+  if (!isUnitUnlocked(unit.id, learning.snapshot.projections.lessonProgress))
+    return (
+      <Screen>
+        <TopBar back title="יחידה נעולה" />
+        <EmptyState
+          message="השלימו את היחידה הקודמת כדי לפתוח את השלב הבא במסלול."
+          title="היחידה עדיין נעולה"
+        />
       </Screen>
     );
   const contained = unitLessons(unit.id);
@@ -73,9 +83,7 @@ export default function UnitScreen() {
         <Heading level={2}>שיעורים ביחידה</Heading>
         {contained.map((lesson, index) => {
           const state = progress[lesson.id];
-          const locked = lesson.prerequisiteLessonIds.some(
-            (id) => progress[id]?.status !== 'completed',
-          );
+          const locked = !isLessonUnlocked(lesson.id, progress);
           const isComplete = state?.status === 'completed';
           return (
             <Card

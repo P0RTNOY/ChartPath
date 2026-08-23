@@ -270,7 +270,7 @@ export const exercises05To08: readonly ContentExercise[] = [
         misconceptionId: 'misconception.volume-as-verdict',
       },
       {
-        answerId: 'price-pattern-alone',
+        feedbackCode: 'selection-mismatch',
         explanationHe: 'גם צורה נאה אינה מספיקה: נדרשים הקשר, מבנה וכלל אישור שנקבע לפני התוצאה.',
         misconceptionId: 'misconception.pattern-without-context',
       },
@@ -428,6 +428,11 @@ export const exercises05To08: readonly ContentExercise[] = [
     promptHe:
       'בתרשים הסינתטי שלוש פסגות דומות מופיעות בתוך טווח, ללא מגמת עלייה קודמת, והפסגה הימנית טרם הושלמה. כיצד יש לסווג את תווית “ראש וכתפיים עליון” בנר ההחלטה?',
     interactionType: 'decision',
+    options: [
+      { id: 'reject-pattern', labelHe: 'לדחות את התווית בשלב זה' },
+      { id: 'wait-for-right-shoulder', labelHe: 'להמתין לכתף ימין ואז לסחור מייד' },
+      { id: 'accept-three-peaks', labelHe: 'לקבל את התווית כי נצפו שלוש פסגות' },
+    ],
     chartSpec: chart(
       'u05-reversal-e01',
       50501,
@@ -459,15 +464,6 @@ export const exercises05To08: readonly ContentExercise[] = [
         explanationHe:
           'שלוש פסגות לבדן הן דמיון חזותי. בלי מגמה קודמת ורכיב ימני מושלם אין בסיס לתווית היפוך.',
         misconceptionId: 'misconception.pattern-without-context',
-      },
-      {
-        answerId: 'missing-prior-uptrend',
-        explanationHe: 'זהו נימוק הכרחי: מבנה היפוך חייב להתייחס למהלך קודם שאותו הוא עשוי להפוך.',
-        misconceptionId: 'misconception.missing-prior-trend',
-      },
-      {
-        answerId: 'right-shoulder-incomplete',
-        explanationHe: 'המתנה להשלמת הרכיב מונעת תיוג בדיעבד על סמך מידע שטרם הופיע.',
       },
     ],
     misconceptionIds: [
@@ -661,16 +657,10 @@ export const exercises05To08: readonly ContentExercise[] = [
       'הנקודה המבוקשת היא שפל התגובה המפריד בין שתי הפסגות. דמיון בגובה הפסגות אינו מספיק; רק שבירה מוגדרת של השפל הביניים מוסיפה את אישור המבנה.',
     alternativeExplanations: [
       {
-        answerId: 'second-peak',
+        feedbackCode: 'point-outside-tolerance',
         explanationHe:
-          'הפסגה השנייה משלימה מועמד חזותי אך אינה קו האישור. יש לסמן את השפל שבין הפסגות.',
+          'הפסגה השנייה אינה קו האישור, ושפל קטן סמוך אינו מפריד את הפסגות. סמנו את שפל התגובה העמוק והמשמעותי שבמרכז המבנה.',
         misconceptionId: 'misconception.confirmation-as-entry',
-      },
-      {
-        answerId: 'nearby-minor-low',
-        explanationHe:
-          'שפל קטן סמוך אינו מפריד את שתי הפסגות. חזרו לתגובה העמוקה והמשמעותית שבמרכז המבנה.',
-        misconceptionId: 'misconception.pattern-without-context',
       },
     ],
     misconceptionIds: [
@@ -699,6 +689,12 @@ export const exercises05To08: readonly ContentExercise[] = [
     promptHe:
       'מלבן סינתטי מופיע אחרי מגמת עלייה, אך טרם הייתה יציאה תקפה. מהי ההחלטה המדויקת בנר ההחלטה?',
     interactionType: 'decision',
+    options: [
+      { id: 'wait-for-breakout', labelHe: 'להמתין ליציאה תקפה ולאישור' },
+      { id: 'insufficient-direction', labelHe: 'אין עדיין מספיק ראיות לכיוון' },
+      { id: 'trade-up-prior-trend', labelHe: 'לסחור מעלה כי המגמה הקודמת עלתה' },
+      { id: 'trade-down-long-range', labelHe: 'לסחור מטה כי הטווח נמשך זמן רב' },
+    ],
     chartSpec: chart(
       'u05-reversal-e05',
       50505,
@@ -735,11 +731,6 @@ export const exercises05To08: readonly ContentExercise[] = [
         answerId: 'trade-down-long-range',
         explanationHe: 'טווח ממושך עשוי להעלות אפשרות היפוך, אך גם היא זקוקה לאישור יציאה.',
         misconceptionId: 'misconception.pattern-without-context',
-      },
-      {
-        answerId: 'rectangle-direction-unconfirmed',
-        explanationHe: 'זהו הנימוק הקובע: צורת המלבן לבדה אינה מכריעה כיוון.',
-        misconceptionId: 'misconception.forced-trade',
       },
     ],
     misconceptionIds: [
@@ -809,7 +800,7 @@ export const exercises05To08: readonly ContentExercise[] = [
         misconceptionId: 'misconception.bias-as-confirmation',
       },
       {
-        answerId: 'symmetrical-neutral-guarantee',
+        feedbackCode: 'selection-mismatch',
         explanationHe:
           'סימטרי אינו מבטיח ניטרליות או המשך; הוא מתאר התכווצות שהכיוון שלה טרם הוכרע.',
         misconceptionId: 'misconception.pattern-without-context',
@@ -999,18 +990,9 @@ export const exercises05To08: readonly ContentExercise[] = [
       'מקביליות מתארת ערוץ, התכנסות של שני גבולות עולים מתארת טריז עולה, והתרחבות בין שיאים גבוהים לשפלים נמוכים מתארת מבנה מתרחב. יהלום דורש מעבר ברור מהתרחבות להתכווצות; התאמת קווים בדיעבד אינה מספיקה.',
     alternativeExplanations: [
       {
-        answerId: 'channel-as-wedge',
-        explanationHe: 'שיפוע עולה משותף לשני המבנים; ההבדל הוא מקביליות לעומת התכנסות.',
-      },
-      {
-        answerId: 'broadening-as-diamond',
+        feedbackCode: 'sequence-order-mismatch',
         explanationHe:
-          'התרחבות לבדה אינה יהלום. נדרש גם שלב התכווצות ברור וגבולות שניתן היה לזהות בזמן אמת.',
-        misconceptionId: 'misconception.pattern-without-context',
-      },
-      {
-        answerId: 'forced-diamond',
-        explanationHe: 'דחיית תווית כפויה עדיפה על ציור קווים שמסבירים רק את העבר.',
+          'ערוץ נשאר מקביל וטריז מתכנס. התרחבות לבדה אינה יהלום: נדרש אחריה גם שלב התכווצות ברור שניתן היה לזהות בזמן אמת.',
         misconceptionId: 'misconception.pattern-without-context',
       },
     ],
@@ -1145,14 +1127,9 @@ export const exercises05To08: readonly ContentExercise[] = [
       'פער רגיל נמצא לרוב בתוך טווח, פער פריצה יוצא ממבנה ונשמר, פער המשך מופיע באמצע מהלך, ופער מיצוי נבחן רק אחרי מהלך בוגר ותגובה מהירה נגדו. הסיווג נובע מהרצף ולא מצורת הפתיחה לבדה.',
     alternativeExplanations: [
       {
-        answerId: 'continuation-vs-exhaustion',
+        feedbackCode: 'sequence-order-mismatch',
         explanationHe:
-          'שני הפערים עשויים להיראות דומים בפתיחה. המיקום במגמה וההמשך לאחר הפער הם שמבדילים ביניהם.',
-      },
-      {
-        answerId: 'common-vs-breakaway',
-        explanationHe:
-          'פער בתוך טווח ללא שינוי מבני שונה מפער שיוצא מרמה משמעותית ונשמר מחוץ למבנה.',
+          'פער בתוך טווח שונה מפער שיוצא ממבנה ונשמר. פערי המשך ומיצוי עשויים להיראות דומים בפתיחה; המיקום במגמה וההמשך אחריהם מבדילים ביניהם.',
       },
     ],
     misconceptionIds: [],
@@ -1178,6 +1155,12 @@ export const exercises05To08: readonly ContentExercise[] = [
     promptHe:
       'נכס סינתטי נמצא במגמה עולה בוגרת ופותח בפער גדול עם מחזור חריג. עדיין לא נחשף אף נר אחרי הפתיחה. האם זה פער המשך או פער מיצוי?',
     interactionType: 'decision',
+    options: [
+      { id: 'wait-for-follow-through', labelHe: 'להמתין לתגובת המחיר לאחר הפער' },
+      { id: 'insufficient-post-gap-data', labelHe: 'אין מספיק ראיות לסיווג כעת' },
+      { id: 'continuation-large-gap', labelHe: 'זהו פער המשך בגלל גודל הפער' },
+      { id: 'exhaustion-high-volume', labelHe: 'זהו פער מיצוי בגלל המחזור החריג' },
+    ],
     chartSpec: chart(
       'u06-breakouts-e02',
       60702,
@@ -1212,11 +1195,6 @@ export const exercises05To08: readonly ContentExercise[] = [
         explanationHe:
           'מחזור חריג ומהלך בוגר מעלים אפשרות מיצוי אך אינם מאשרים אותה לפני תגובת המחיר.',
         misconceptionId: 'misconception.future-information-leak',
-      },
-      {
-        answerId: 'needs-post-gap-follow-through',
-        explanationHe: 'זהו הנימוק הנדרש: ההמשך שלאחר הפער הוא מידע שטרם נצפה.',
-        misconceptionId: 'misconception.forced-trade',
       },
     ],
     misconceptionIds: ['misconception.future-information-leak', 'misconception.forced-trade'],
@@ -1283,7 +1261,7 @@ export const exercises05To08: readonly ContentExercise[] = [
         misconceptionId: 'misconception.future-information-leak',
       },
       {
-        answerId: 'volume-alone-valid',
+        feedbackCode: 'selection-mismatch',
         explanationHe: 'סף מחזור יכול להיות רכיב בכלל, אך אינו מחליף את תנאי המחיר והזמן.',
         misconceptionId: 'misconception.volume-as-verdict',
       },
@@ -1309,7 +1287,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['breakouts.rules', 'breakouts.failure', 'risk.invalidation-execution'],
     difficulty: 4,
     promptHe:
-      'השוו שלוש דרכי כניסה — במעבר תוך־יומי, בסגירה, ובבדיקה חוזרת — ואז בחרו את התכנית שמגדירה גם את הכשל הראשון: סגירה חזרה עמוק בתוך הטווח ושבירת המבנה הקצר.',
+      'בכל חלון חשיפה בחרו את הניתוח הנוכחי על סמך הנרות הגלויים בלבד. בחלון ההחלטה בחרו את תכנית הכניסה שמבדילה בין מעבר תוך־יומי, סגירה ובדיקה חוזרת, ומגדירה כלל כשל מראש.',
     interactionType: 'multiple-choice',
     options: [
       {

@@ -79,7 +79,7 @@ function Segmented<T extends string>({
             style={{
               backgroundColor: selected ? theme.colors.surface : 'transparent',
               borderRadius: 10,
-              minHeight: 40,
+              minHeight: 44,
               minWidth: 65,
               paddingHorizontal: 10,
               paddingVertical: 9,
@@ -100,12 +100,33 @@ export default function SettingsScreen() {
   const learning = useLearning();
   const [confirmReset, setConfirmReset] = useState(false);
   const [working, setWorking] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const reset = async () => {
+    setWorking(true);
+    setResetError(null);
+    try {
+      await learning.resetData();
+      router.replace('/onboarding');
+    } catch (error) {
+      setResetError(error instanceof Error ? error.message : 'האיפוס נכשל. נסו שוב.');
+    } finally {
+      setWorking(false);
+    }
+  };
   if (learning.status === 'loading') return <LoadingState />;
   if (learning.status === 'error' || !learning.snapshot)
     return (
       <ErrorState
-        message={learning.error ?? 'שגיאה בטעינת ההגדרות'}
+        message={resetError ?? learning.error ?? 'שגיאה בטעינת ההגדרות'}
         onRetry={() => void learning.reload()}
+        onSecondaryAction={() => {
+          if (!confirmReset) {
+            setConfirmReset(true);
+            return;
+          }
+          void reset();
+        }}
+        secondaryActionLabel={confirmReset ? 'אישור מחיקה ואיפוס' : 'איפוס נתונים פגומים'}
       />
     );
   const settings = learning.snapshot.settings;
@@ -117,12 +138,6 @@ export default function SettingsScreen() {
       setWorking(false);
     }
   };
-  const reset = async () => {
-    setWorking(true);
-    await learning.resetData();
-    router.replace('/onboarding');
-  };
-
   return (
     <MainScreen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
       <TopBar subtitle="התאמה אישית, נגישות ונתונים" title="הגדרות" />
@@ -239,6 +254,10 @@ export default function SettingsScreen() {
           <UiText color="textMuted" variant="bodySmall">
             הניסיונות, ההתקדמות וההגדרות נשמרים מקומית במכשיר. אין חשבון ואין סנכרון ענן.
           </UiText>
+          <UiText color="textMuted" variant="caption">
+            גיבוי האפליקציה מושבת ב־Android. ב־iOS ייתכן שנתוני הלימוד המקומיים ייכללו בגיבוי המכשיר
+            או iCloud, לפי הגדרות המערכת.
+          </UiText>
           {!confirmReset ? (
             <Button fullWidth onPress={() => setConfirmReset(true)} variant="danger">
               איפוס כל הנתונים
@@ -257,6 +276,7 @@ export default function SettingsScreen() {
                     ביטול
                   </Button>
                 </View>
+                {resetError ? <UiText color="danger">{resetError}</UiText> : undefined}
               </View>
             </Card>
           )}
@@ -265,19 +285,23 @@ export default function SettingsScreen() {
 
       <View style={{ alignItems: 'center', gap: 10, paddingVertical: 12 }}>
         <BrandMark size={38} />
-        <LtrText align="center" color="textMuted" variant="caption">
-          ChartPath • {contentVersion.id}
-        </LtrText>
+        {__DEV__ ? (
+          <Pressable
+            accessibilityHint="לחיצה ארוכה פותחת כלי בדיקה למפתחים"
+            accessibilityLabel={`ChartPath ${contentVersion.id}`}
+            delayLongPress={800}
+            onLongPress={() => router.push('/catalog?developer=1')}
+          >
+            <LtrText align="center" color="textMuted" variant="caption">
+              ChartPath • {contentVersion.id}
+            </LtrText>
+          </Pressable>
+        ) : (
+          <LtrText align="center" color="textMuted" variant="caption">
+            ChartPath • {contentVersion.id}
+          </LtrText>
+        )}
         <Badge tone="neutral">תוכן לימודי בלבד</Badge>
-        <Pressable
-          accessibilityLabel="פתיחת קטלוג המפתחים"
-          onLongPress={() => router.push('/catalog')}
-          onPress={() => router.push('/catalog')}
-        >
-          <UiText color="textMuted" variant="caption">
-            קטלוג רכיבים ותוכן
-          </UiText>
-        </Pressable>
       </View>
     </MainScreen>
   );

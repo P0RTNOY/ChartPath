@@ -1,6 +1,8 @@
 import { generatePriceSeries, generateSemanticAnnotations } from '@chartpath/chart-engine';
+import type { AnswerRubric, TradeDecision } from '@chartpath/domain';
 
 import { catalog as bundledCatalog } from './catalog.js';
+import { EXPECTED_ANNOTATION_FINGERPRINTS } from './expected-chart-annotations.js';
 import { contentCatalogSchema } from './schemas.js';
 import { WORKFLOW_STEP_IDS, type ContentCatalog, type ExactSourceReference } from './types.js';
 
@@ -112,7 +114,23 @@ const uncertaintyDecisions = new Set(['wait', 'reject', 'no-trade', 'insufficien
 const hebrewPattern = /[\u0590-\u05ff]/;
 
 function stable(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`)
+      .join(',')}}`;
   return JSON.stringify(value);
+}
+
+function annotationFingerprint(value: unknown): string {
+  const input = stable(value);
+  let hash = 2_166_136_261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 function add(issues: ValidationIssue[], code: string, path: string, message: string): void {
@@ -286,6 +304,9 @@ function validateGraph(nodes: readonly GraphNode[], path: string, issues: Valida
 }
 
 function rubricAllowsUncertainty(rubric: ContentCatalog['exercises'][number]['rubric']): boolean {
+  if (rubric.kind === 'capstone') {
+    return rubric.steps.some((step) => rubricAllowsUncertainty(step.rubric));
+  }
   if (rubric.kind === 'decision') {
     return rubric.acceptedDecisions.some((answer) => uncertaintyDecisions.has(answer));
   }
@@ -298,6 +319,89 @@ function rubricAllowsUncertainty(rubric: ContentCatalog['exercises'][number]['ru
     return rubric.expectedIds.some((answer) => /wait|reject|no-trade|insufficient/.test(answer));
   }
   return false;
+}
+
+function incorrectFeedbackCodes(rubric: AnswerRubric): readonly string[] {
+  switch (rubric.kind) {
+    case 'multiple-choice':
+      return ['option-not-accepted'];
+    case 'selection':
+      return ['selection-mismatch'];
+    case 'sequence':
+      return ['sequence-order-mismatch'];
+    case 'point':
+      return ['point-outside-tolerance'];
+    case 'zone':
+      return ['zone-overlap-too-small'];
+    case 'line':
+      return ['line-outside-tolerance'];
+    case 'risk':
+      return ['risk-value-outside-tolerance'];
+    case 'label-placement':
+      return ['label-placement-mismatch'];
+    case 'decision':
+      return ['decision-not-accepted', 'decision-reason-missing'];
+    case 'capstone':
+      return ['capstone-incomplete', 'capstone-step-mismatch'];
+  }
+}
+
+function reachableAtomicAlternativeIds(
+  rubric: Exclude<AnswerRubric, { readonly kind: 'capstone' }>,
+  options: readonly { readonly id: string }[] | undefined,
+  reasonOptions: readonly { readonly id: string }[] | undefined,
+  decisionOptionMap: Readonly<Record<string, TradeDecision>> | undefined,
+): readonly string[] {
+  const optionIds = options?.map((option) => option.id) ?? [];
+  switch (rubric.kind) {
+    case 'multiple-choice':
+      return optionIds.filter((id) => !rubric.acceptedOptionIds.includes(id));
+    case 'selection':
+      return rubric.mode === 'contains' || rubric.allowExtraSelections === true
+        ? []
+        : optionIds.filter((id) => !rubric.expectedIds.includes(id));
+    case 'decision': {
+      const wrongDecisions = Object.entries(decisionOptionMap ?? {})
+        .filter(([, decision]) => !rubric.acceptedDecisions.includes(decision))
+        .map(([id]) => id);
+      const requiredReasons = new Set(rubric.requiredReasonIds ?? []);
+      const wrongReasons =
+        rubric.allowExtraReasons === true
+          ? []
+          : (reasonOptions?.map((option) => option.id) ?? []).filter(
+              (id) => !requiredReasons.has(id),
+            );
+      return [...wrongDecisions, ...wrongReasons];
+    }
+    case 'sequence':
+    case 'point':
+    case 'zone':
+    case 'line':
+    case 'risk':
+    case 'label-placement':
+      return [];
+  }
+}
+
+function reachableAlternativeAnswerIds(
+  exercise: ContentCatalog['exercises'][number],
+): readonly string[] {
+  if (exercise.rubric.kind !== 'capstone') {
+    return reachableAtomicAlternativeIds(
+      exercise.rubric,
+      exercise.options,
+      exercise.reasonOptions,
+      exercise.decisionOptionMap,
+    );
+  }
+  return (exercise.capstoneSteps ?? []).flatMap((step) =>
+    reachableAtomicAlternativeIds(
+      step.rubric,
+      step.options,
+      step.reasonOptions,
+      step.decisionOptionMap,
+    ),
+  );
 }
 
 function validateCurriculumLinks(catalog: ContentCatalog, issues: ValidationIssue[]): void {
@@ -418,6 +522,153 @@ function validateCurriculumLinks(catalog: ContentCatalog, issues: ValidationIssu
       `exercises.${exercise.id}.sourceReferences`,
       issues,
     );
+    const decisionEntries = [
+      ...(exercise.rubric.kind === 'decision'
+        ? [
+            {
+              path: `exercises.${exercise.id}`,
+              rubric: exercise.rubric,
+              options: exercise.reasonOptions,
+              decisionOptions: exercise.options,
+              decisionOptionMap: exercise.decisionOptionMap,
+            },
+          ]
+        : []),
+      ...(exercise.capstoneSteps ?? [])
+        .filter((step) => step.rubric.kind === 'decision')
+        .map((step) => ({
+          path: `exercises.${exercise.id}.capstoneSteps.${step.id}`,
+          rubric: step.rubric as Extract<AnswerRubric, { kind: 'decision' }>,
+          options: step.reasonOptions,
+          decisionOptions: step.options,
+          decisionOptionMap: step.decisionOptionMap,
+        })),
+    ];
+    for (const entry of decisionEntries) {
+      const mappedIds = Object.keys(entry.decisionOptionMap ?? {});
+      const authoredDecisionIds = new Set(entry.decisionOptions?.map((option) => option.id) ?? []);
+      if (mappedIds.length < 2) {
+        add(
+          issues,
+          'insufficient-decision-options',
+          entry.path,
+          'Decision exercises need at least two explicitly mapped choices.',
+        );
+      }
+      if (mappedIds.some((id) => !authoredDecisionIds.has(id))) {
+        add(
+          issues,
+          'unresolved-decision-option',
+          entry.path,
+          'Every mapped decision ID must resolve to an authored option.',
+        );
+      }
+      const mappedDecisions = new Set(Object.values(entry.decisionOptionMap ?? {}));
+      if (entry.rubric.acceptedDecisions.some((decision) => !mappedDecisions.has(decision))) {
+        add(
+          issues,
+          'unreachable-accepted-decision',
+          entry.path,
+          'Every accepted domain decision needs a reachable authored choice.',
+        );
+      }
+      const required = new Set(entry.rubric.requiredReasonIds ?? []);
+      const optionIds = entry.options?.map((option) => option.id) ?? [];
+      if (required.size === 0) continue;
+      if (new Set(optionIds).size !== optionIds.length)
+        add(issues, 'duplicate-reason-option', entry.path, 'Decision reason IDs must be unique.');
+      if ([...required].some((id) => !optionIds.includes(id)))
+        add(
+          issues,
+          'missing-required-reason-option',
+          entry.path,
+          'Every required reason needs an authored Hebrew option.',
+        );
+      if (!optionIds.some((id) => !required.has(id)))
+        add(
+          issues,
+          'reason-answer-key-leak',
+          entry.path,
+          'Decision reasons need at least one plausible authored distractor.',
+        );
+    }
+    if (exercise.rubric.kind === 'capstone') {
+      if (exercise.options?.length) {
+        add(
+          issues,
+          'unused-capstone-options',
+          `exercises.${exercise.id}`,
+          'Capstone choices must belong to a rendered workflow step.',
+        );
+      }
+      for (const step of exercise.capstoneSteps ?? []) {
+        const optionIds = step.options?.map((option) => option.id) ?? [];
+        const requiredIds =
+          step.rubric.kind === 'selection'
+            ? step.rubric.expectedIds
+            : step.rubric.kind === 'multiple-choice'
+              ? step.rubric.acceptedOptionIds
+              : step.rubric.kind === 'sequence'
+                ? step.rubric.expectedOrder
+                : [];
+        if (requiredIds.length === 0) continue;
+        const stepPath = `exercises.${exercise.id}.capstoneSteps.${step.id}`;
+        if (new Set(optionIds).size !== optionIds.length) {
+          add(issues, 'duplicate-capstone-option', stepPath, 'Capstone option IDs must be unique.');
+        }
+        if (requiredIds.some((id) => !optionIds.includes(id))) {
+          add(
+            issues,
+            'missing-capstone-rubric-choice',
+            stepPath,
+            'Every capstone rubric choice must resolve to an authored learner-visible option.',
+          );
+        }
+        if (step.rubric.kind !== 'sequence' && !optionIds.some((id) => !requiredIds.includes(id))) {
+          add(
+            issues,
+            'capstone-answer-key-leak',
+            stepPath,
+            'Capstone choice stages need at least one authored distractor.',
+          );
+        }
+      }
+    }
+    const reachableAnswerIds = new Set(reachableAlternativeAnswerIds(exercise));
+    const reachableFeedbackCodes = new Set(incorrectFeedbackCodes(exercise.rubric));
+    for (const [index, alternative] of exercise.alternativeExplanations.entries()) {
+      const path = `exercises.${exercise.id}.alternativeExplanations[${index}]`;
+      if (
+        Number(alternative.answerId !== undefined) +
+          Number(alternative.feedbackCode !== undefined) !==
+        1
+      ) {
+        add(
+          issues,
+          'invalid-alternative-feedback-match',
+          path,
+          'Exactly one answerId or feedbackCode match key is required.',
+        );
+      }
+      if (alternative.answerId && !reachableAnswerIds.has(alternative.answerId)) {
+        add(
+          issues,
+          exercise.rubric.kind === 'capstone'
+            ? 'unreachable-capstone-feedback'
+            : 'unreachable-alternative-feedback',
+          path,
+          'Answer-specific feedback must target a rendered choice that can make the submission incorrect.',
+        );
+      }
+      if (alternative.feedbackCode && !reachableFeedbackCodes.has(alternative.feedbackCode)) {
+        add(
+          issues,
+          'unreachable-alternative-feedback-code',
+          path,
+          'Feedback-code alternative must target an incorrect outcome emitted by this rubric.',
+        );
+      }
+    }
   }
   for (const draft of catalog.draftLessons) {
     for (const skillId of draft.skillIds) {
@@ -542,34 +793,52 @@ function validateRubricCutoff(
 ): void {
   const cutoff = exercise.chartSpec?.decisionCandleIndex;
   if (cutoff === undefined) return;
-  const rubric = exercise.rubric;
-  const path = `exercises.${exercise.id}.rubric`;
-  if (rubric.kind === 'point' && rubric.targets.some((target) => target.candleIndex > cutoff)) {
-    add(
-      issues,
-      'future-rubric-target',
-      path,
-      'Point target uses a candle after the decision cutoff.',
-    );
-  }
-  if (rubric.kind === 'zone' && rubric.target.endCandleIndex > cutoff) {
-    add(
-      issues,
-      'future-rubric-target',
-      path,
-      'Zone target uses a candle after the decision cutoff.',
-    );
-  }
-  if (
-    rubric.kind === 'line' &&
-    (rubric.target.start.candleIndex > cutoff || rubric.target.end.candleIndex > cutoff)
-  ) {
-    add(
-      issues,
-      'future-rubric-target',
-      path,
-      'Line target uses a candle after the decision cutoff.',
-    );
+  const rubrics =
+    exercise.rubric.kind === 'capstone'
+      ? exercise.rubric.steps.map((step) => ({
+          path: `exercises.${exercise.id}.rubric.steps.${step.id}`,
+          rubric: step.rubric,
+        }))
+      : [{ path: `exercises.${exercise.id}.rubric`, rubric: exercise.rubric }];
+  for (const { path, rubric } of rubrics) {
+    if (rubric.kind === 'point' && rubric.targets.some((target) => target.candleIndex > cutoff)) {
+      add(
+        issues,
+        'future-rubric-target',
+        path,
+        'Point target uses a candle after the decision cutoff.',
+      );
+    }
+    if (rubric.kind === 'zone' && rubric.target.endCandleIndex > cutoff) {
+      add(
+        issues,
+        'future-rubric-target',
+        path,
+        'Zone target uses a candle after the decision cutoff.',
+      );
+    }
+    if (
+      rubric.kind === 'line' &&
+      (rubric.target.start.candleIndex > cutoff || rubric.target.end.candleIndex > cutoff)
+    ) {
+      add(
+        issues,
+        'future-rubric-target',
+        path,
+        'Line target uses a candle after the decision cutoff.',
+      );
+    }
+    if (
+      rubric.kind === 'label-placement' &&
+      rubric.targets.some((target) => target.target.candleIndex > cutoff)
+    ) {
+      add(
+        issues,
+        'future-rubric-target',
+        path,
+        'Label target uses a candle after the decision cutoff.',
+      );
+    }
   }
 }
 
@@ -603,6 +872,21 @@ function validateChartReproduction(catalog: ContentCatalog, issues: ValidationIs
           'unreproducible-annotations',
           path,
           'The same chart produced different semantic annotations.',
+        );
+      const expectedFingerprint = EXPECTED_ANNOTATION_FINGERPRINTS[exercise.id];
+      if (!expectedFingerprint)
+        add(
+          issues,
+          'missing-expected-annotations',
+          path,
+          'Reviewed chart is missing an editorial annotation fingerprint.',
+        );
+      else if (annotationFingerprint(firstAnnotations) !== expectedFingerprint)
+        add(
+          issues,
+          'expected-annotations-mismatch',
+          path,
+          'Generated semantic annotations no longer match the editorially approved chart.',
         );
       if (firstCandles.length !== spec.candleCount)
         add(
@@ -678,10 +962,19 @@ function validateQuotas(catalog: ContentCatalog, issues: ValidationIssue[]): voi
       'exercises',
       `Expected at least 10 risk/position-size records, received ${riskCount}.`,
     );
-  const noTrade = catalog.exercises.filter(
-    (exercise) =>
-      exercise.rubric.kind === 'decision' && exercise.rubric.acceptedDecisions.includes('no-trade'),
-  ).length;
+  const noTrade = catalog.exercises.reduce((count, exercise) => {
+    if (exercise.rubric.kind === 'decision')
+      return count + (exercise.rubric.acceptedDecisions.includes('no-trade') ? 1 : 0);
+    if (exercise.rubric.kind === 'capstone')
+      return (
+        count +
+        exercise.rubric.steps.filter(
+          (step) =>
+            step.rubric.kind === 'decision' && step.rubric.acceptedDecisions.includes('no-trade'),
+        ).length
+      );
+    return count;
+  }, 0);
   if (noTrade < 2)
     add(
       issues,
@@ -718,6 +1011,26 @@ function validateCapstone(catalog: ContentCatalog, issues: ValidationIssue[]): v
       `exercises.${capstone.id}`,
       'Capstone stages must be graded independently with more than one rubric family.',
     );
+  if (capstone.rubric.kind !== 'capstone') {
+    add(
+      issues,
+      'capstone-runtime-rubric',
+      `exercises.${capstone.id}.rubric`,
+      'A learner-facing capstone must use the aggregate capstone rubric.',
+    );
+  } else if (
+    stable(capstone.rubric.steps.map((step) => step.id)) !== stable(stepIds) ||
+    capstone.rubric.steps.some(
+      (step, index) => step.rubric.kind !== capstone.capstoneSteps?.[index]?.rubric.kind,
+    )
+  ) {
+    add(
+      issues,
+      'capstone-runtime-step-mismatch',
+      `exercises.${capstone.id}.rubric`,
+      'The aggregate capstone rubric must mirror every authored workflow stage.',
+    );
+  }
 }
 
 function computeCounts(catalog: ContentCatalog): ValidationCounts {

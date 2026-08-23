@@ -29,6 +29,10 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
   page,
 }) => {
   await beginFreshGuest(page, 15);
+  await page.goto('/learn/lesson-u01-chart-data');
+  await expect(page.getByRole('heading', { name: 'השיעור עדיין נעול' })).toBeVisible();
+  await expect(page.getByText(/מקמו על הנר העולה/)).toHaveCount(0);
+  await page.goto('/home');
   await page.getByRole('button', { name: 'התחלת השיעור' }).click();
   await expect(page.getByRole('heading', { name: 'תרחישים, לא נבואות' })).toBeVisible();
   await page.getByRole('button', { name: 'התחלת השיעור' }).click();
@@ -46,7 +50,15 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
     ],
     'לתרגיל הבא',
   );
-  await answerExercise(page, ['אין מספיק ראיות להעריך את הטענה בחלון ההחלטה.'], 'לתרגיל הבא');
+  await answerExercise(
+    page,
+    [
+      'אין מספיק ראיות להעריך את הטענה בחלון ההחלטה.',
+      'הבהירות נוצרה רק לאחר חשיפת התוצאה',
+      'לא הוגדר כלל זיהוי ואישור מראש',
+    ],
+    'לתרגיל הבא',
+  );
   await answerExercise(
     page,
     [

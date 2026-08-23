@@ -1,3 +1,4 @@
+import { generateChart } from '@chartpath/chart-engine';
 import type { ChartScenario, ChartSpec, JsonValue } from '@chartpath/domain';
 
 import { sourceRefs } from './source.js';
@@ -69,6 +70,22 @@ const common = {
   contentVersionId: CONTENT_VERSION_ID,
   isRiskOrPositionSize: false,
 };
+
+const candleLabelChartSpec = chart('u01-chart-data-e01', 10101, 'range', {
+  candleCount: 40,
+  decisionCandleIndex: 39,
+});
+const candleLabelChart = generateChart(candleLabelChartSpec);
+const candleLabelCandidates = candleLabelChart.candles.slice(
+  Math.floor(candleLabelChart.candles.length * 0.25),
+);
+const labeledBullishCandle = candleLabelCandidates.find((candle) => candle.close > candle.open);
+const labeledBearishCandle = candleLabelCandidates.find((candle) => candle.close < candle.open);
+if (!labeledBullishCandle || !labeledBearishCandle) {
+  throw new Error(
+    'The authored candle-label chart must contain one rising and one falling candle.',
+  );
+}
 
 /**
  * Reviewed beta exercises for lessons 1–4 in canonical curriculum order.
@@ -415,47 +432,56 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u01-chart-data-e01',
     skillIds: ['data.ohlcv'],
     difficulty: 1,
-    promptHe:
-      'על הגרף מסומנים נר עולה ונר יורד. בחרו את כל מיקומי התוויות הנכונים עבור פתיחה, שיא, שפל וסגירה.',
+    promptHe: 'מקמו על הנר העולה והנר היורד את תוויות הפתיחה, השיא, השפל והסגירה במקום המתאים.',
     interactionType: 'selection',
     options: [
-      { id: 'high-top', labelHe: 'השיא נמצא בקצה העליון של הצל.' },
-      { id: 'low-bottom', labelHe: 'השפל נמצא בקצה התחתון של הצל.' },
-      { id: 'bull-open-lower', labelHe: 'בנר עולה הפתיחה היא בקצה התחתון של הגוף.' },
-      { id: 'bull-close-upper', labelHe: 'בנר עולה הסגירה היא בקצה העליון של הגוף.' },
-      { id: 'bear-open-upper', labelHe: 'בנר יורד הפתיחה היא בקצה העליון של הגוף.' },
-      { id: 'bear-close-lower', labelHe: 'בנר יורד הסגירה היא בקצה התחתון של הגוף.' },
-      { id: 'bull-high-body', labelHe: 'בנר עולה השיא תמיד זהה לסגירה.' },
-      { id: 'bear-low-body', labelHe: 'בנר יורד השפל תמיד זהה לסגירה.' },
+      { id: 'high-top', labelHe: 'שיא — נר עולה' },
+      { id: 'low-bottom', labelHe: 'שפל — נר עולה' },
+      { id: 'bull-open-lower', labelHe: 'פתיחה — נר עולה' },
+      { id: 'bull-close-upper', labelHe: 'סגירה — נר עולה' },
+      { id: 'bear-open-upper', labelHe: 'פתיחה — נר יורד' },
+      { id: 'bear-close-lower', labelHe: 'סגירה — נר יורד' },
     ],
-    chartSpec: chart('u01-chart-data-e01', 10101, 'range', {
-      candleCount: 40,
-      decisionCandleIndex: 39,
-    }),
+    chartSpec: candleLabelChartSpec,
     rubric: {
-      kind: 'selection',
-      expectedIds: [
-        'high-top',
-        'low-bottom',
-        'bull-open-lower',
-        'bull-close-upper',
-        'bear-open-upper',
-        'bear-close-lower',
+      kind: 'label-placement',
+      targets: [
+        {
+          labelId: 'high-top',
+          target: { candleIndex: labeledBullishCandle.index, price: labeledBullishCandle.high },
+        },
+        {
+          labelId: 'low-bottom',
+          target: { candleIndex: labeledBullishCandle.index, price: labeledBullishCandle.low },
+        },
+        {
+          labelId: 'bull-open-lower',
+          target: { candleIndex: labeledBullishCandle.index, price: labeledBullishCandle.open },
+        },
+        {
+          labelId: 'bull-close-upper',
+          target: { candleIndex: labeledBullishCandle.index, price: labeledBullishCandle.close },
+        },
+        {
+          labelId: 'bear-open-upper',
+          target: { candleIndex: labeledBearishCandle.index, price: labeledBearishCandle.open },
+        },
+        {
+          labelId: 'bear-close-lower',
+          target: { candleIndex: labeledBearishCandle.index, price: labeledBearishCandle.close },
+        },
       ],
-      mode: 'exact',
-      allowExtraSelections: false,
+      tolerance: { horizontal: 0.04, vertical: 0.015 },
+      decisionCandleIndex: 39,
       misconceptionIds: ['misconception.pattern-without-context'],
     },
     explanationHe:
       'הגוף מחבר פתיחה וסגירה, והצללים מגיעים לשיא ולשפל. כיוון הגוף קובע איזה קצה הוא פתיחה ואיזה סגירה; צבע לבדו אינו נחוץ.',
     alternativeExplanations: [
       {
-        answerId: 'bull-high-body',
-        explanationHe: 'צל עליון יכול להמשיך מעל הסגירה, ולכן השיא אינו בהכרח קצה הגוף.',
-      },
-      {
-        answerId: 'bear-low-body',
-        explanationHe: 'צל תחתון יכול להמשיך מתחת לסגירה, ולכן השפל אינו בהכרח קצה הגוף.',
+        feedbackCode: 'label-placement-mismatch',
+        explanationHe:
+          'השיא והשפל נמצאים בקצות הצללים, לא בהכרח בקצות הגוף. בנר עולה הפתיחה היא קצה הגוף התחתון; בנר יורד הסגירה היא הקצה התחתון.',
       },
     ],
     misconceptionIds: ['misconception.pattern-without-context'],
@@ -758,7 +784,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     skillIds: ['structure.dow-trends'],
     difficulty: 2,
     promptHe:
-      'השבועי מציג שיאים ושפלים עולים, היומי נמצא בתיקון יורד, ובשעתי יש תנודה עולה קצרה. איזו תווית נכונה לכל שכבה?',
+      'בחנו את שלושת התרשימים הנפרדים — שבועי, יומי ושעתי — וסווגו את כיוון השכבה הראשית, המשנית והקצרה.',
     interactionType: 'multiple-choice',
     options: [
       {
@@ -848,12 +874,9 @@ export const exercises01To04: readonly ContentExercise[] = [
       'הסדר המסורתי הוא איסוף, השתתפות ציבורית והפצה. אלה תוויות פרשניות להבנת שינוי בציפיות, ולא שלבים שקל לאמת בזמן אמת או אותות פעולה עצמאיים.',
     alternativeExplanations: [
       {
-        answerId: 'distribution-before-participation',
-        explanationHe: 'הפצה מתוארת לאחר התרחבות ההשתתפות, לא לפניה.',
-      },
-      {
-        answerId: 'certain-phase-label',
-        explanationHe: 'מחיר גבוה לבדו אינו מוכיח שהשוק נמצא בהפצה.',
+        feedbackCode: 'sequence-order-mismatch',
+        explanationHe:
+          'הפצה מתוארת לאחר התרחבות ההשתתפות, לא לפניה; וגם מחיר גבוה לבדו אינו מוכיח שהשוק נמצא בשלב הפצה.',
         misconceptionId: 'misconception.outcome-bias',
       },
     ],
@@ -977,13 +1000,10 @@ export const exercises01To04: readonly ContentExercise[] = [
       'מגמה עולה ניתנת לתיאור כרצף שיאים ושפלים עולים. הסימון נעשה לפי נקודות נדנדה משמעותיות, לא לפי כל נר שזז בכיוון הנגדי.',
     alternativeExplanations: [
       {
-        answerId: 'minor-noise-selected',
-        explanationHe: 'בחירת כל תנודה זעירה מערבבת רעש עם נקודת נדנדה משמעותית.',
+        feedbackCode: 'point-outside-tolerance',
+        explanationHe:
+          'בחירת כל תנודה זעירה מערבבת רעש עם נקודת נדנדה משמעותית. הגדרת מגמה דורשת לסמן גם שיאים וגם שפלים מרכזיים.',
         misconceptionId: 'misconception.pattern-without-context',
-      },
-      {
-        answerId: 'only-highs-selected',
-        explanationHe: 'הגדרת מגמה דורשת לבחון גם את השיאים וגם את השפלים.',
       },
     ],
     misconceptionIds: ['misconception.pattern-without-context'],
@@ -1095,13 +1115,10 @@ export const exercises01To04: readonly ContentExercise[] = [
       'תגובות מחיר מתרכזות בטווח ולא בהכרח באגורה אחת. אזור שימושי מכסה את רוב התגובות הרלוונטיות, אך נשאר צר מספיק כדי להבחין בין החזקה לשבירה.',
     alternativeExplanations: [
       {
-        answerId: 'razor-thin-line',
-        explanationHe: 'קו דק מדי הופך תנודה רגילה לפריצת שווא מדומה.',
+        feedbackCode: 'zone-overlap-too-small',
+        explanationHe:
+          'קו דק מדי הופך תנודה רגילה לפריצת שווא מדומה, ואזור רחב מדי אינו מספק גבול החלטה שימושי. חפשו טווח צר שמכסה את אשכול התגובות.',
         misconceptionId: 'misconception.level-as-exact-price',
-      },
-      {
-        answerId: 'overwide-zone',
-        explanationHe: 'אזור רחב שמכסה חלק גדול מהתרשים אינו מספק גבול החלטה שימושי.',
       },
     ],
     misconceptionIds: ['misconception.level-as-exact-price'],
@@ -1277,18 +1294,10 @@ export const exercises01To04: readonly ContentExercise[] = [
       'במגמה עולה קו הבסיס מחבר שפלים עולים. שתי נקודות מאפשרות קו ונגיעה נוספת בוחנת שימושיות; קו הערוץ מועבר במקביל דרך השיאים, בלי לסובב את קו הבסיס כדי להתאים לפתיל חריג.',
     alternativeExplanations: [
       {
-        answerId: 'line-through-prices',
-        explanationHe: 'קו שעובר דרך מרכז המחיר במקום מתחת לשפלים אינו מייצג את קו הבסיס המבוקש.',
-        misconceptionId: 'misconception.pattern-without-context',
-      },
-      {
-        answerId: 'nonparallel-channel',
+        feedbackCode: 'line-outside-tolerance',
         explanationHe:
-          'קו ערוץ צריך להיות מקביל לקו המגמה; שינוי הזווית יוצר שני קווים שאינם ערוץ.',
-      },
-      {
-        answerId: 'fit-single-wick',
-        explanationHe: 'התאמה לפתיל חריג יחיד עלולה לעוות קו שמייצג טוב יותר את רוב המבנה.',
+          'קו הבסיס צריך לעבור מתחת לשפלים המשמעותיים ולא במרכז המחיר; קו הערוץ נשאר מקביל ואין לעוות את שניהם כדי להתאים לפתיל חריג יחיד.',
+        misconceptionId: 'misconception.pattern-without-context',
       },
     ],
     misconceptionIds: ['misconception.pattern-without-context'],

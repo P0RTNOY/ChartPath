@@ -535,6 +535,50 @@ export function gradeAnswer(
       return gradeLine(rubric, answer as LineAnswer, context);
     case 'risk':
       return gradeRisk(rubric, answer as Extract<ExerciseAnswer, { kind: 'risk' }>);
+    case 'label-placement': {
+      if (rubric.targets.length === 0) return invalid('invalid-rubric');
+      const placementAnswer = answer as Extract<ExerciseAnswer, { kind: 'label-placement' }>;
+      const expectedIds = new Set(rubric.targets.map((target) => target.labelId));
+      const placementIds = placementAnswer.placements.map((placement) => placement.labelId);
+      if (
+        expectedIds.size !== rubric.targets.length ||
+        new Set(placementIds).size !== placementIds.length
+      ) {
+        return invalid('invalid-label-placement');
+      }
+      let matched = 0;
+      for (const target of rubric.targets) {
+        const placement = placementAnswer.placements.find(
+          (candidate) => candidate.labelId === target.labelId,
+        );
+        if (!placement) continue;
+        const pointResult = gradePoint(
+          {
+            kind: 'point',
+            targets: [target.target],
+            tolerance: rubric.tolerance,
+            matching: 'all',
+            decisionCandleIndex: rubric.decisionCandleIndex,
+          },
+          { kind: 'point', points: [placement.anchor] },
+          context,
+        );
+        if (pointResult.correct) matched += 1;
+      }
+      const extras = placementIds.filter((id) => !expectedIds.has(id)).length;
+      const correct = matched === rubric.targets.length && extras === 0;
+      return result(
+        correct,
+        matched / rubric.targets.length,
+        correct ? 'correct' : 'label-placement-mismatch',
+        [
+          { key: 'matchedLabels', value: matched },
+          { key: 'requiredLabels', value: rubric.targets.length },
+          { key: 'extraLabels', value: extras },
+        ],
+        rubric.misconceptionIds,
+      );
+    }
     case 'decision': {
       if (rubric.acceptedDecisions.length === 0) return invalid('invalid-rubric');
       const decisionAnswer = answer as Extract<ExerciseAnswer, { kind: 'decision' }>;
@@ -544,16 +588,69 @@ export function gradeAnswer(
       const matchedReasons = [...requiredReasons].filter((reason) =>
         actualReasons.has(reason),
       ).length;
-      const reasonsCorrect = matchedReasons === requiredReasons.size;
+      const extraReasons = [...actualReasons].filter(
+        (reason) => !requiredReasons.has(reason),
+      ).length;
+      const reasonsCorrect =
+        matchedReasons === requiredReasons.size &&
+        (rubric.allowExtraReasons === true || extraReasons === 0);
       const correct = accepted && reasonsCorrect;
       const reasonScore = requiredReasons.size === 0 ? 1 : matchedReasons / requiredReasons.size;
-      const score = accepted ? 0.7 + 0.3 * reasonScore : 0;
+      const extraPenalty = rubric.allowExtraReasons === true ? 0 : Math.min(1, extraReasons * 0.25);
+      const score = accepted ? (0.7 + 0.3 * reasonScore) * (1 - extraPenalty) : 0;
       return result(
         correct,
         score,
         correct ? 'correct' : accepted ? 'decision-reason-missing' : 'decision-not-accepted',
-        [{ key: 'matchedReasons', value: matchedReasons }],
+        [
+          { key: 'matchedReasons', value: matchedReasons },
+          { key: 'extraReasons', value: extraReasons },
+        ],
         rubric.misconceptionIds,
+      );
+    }
+    case 'capstone': {
+      if (rubric.steps.length === 0) return invalid('invalid-rubric');
+      const capstoneAnswer = answer as Extract<ExerciseAnswer, { kind: 'capstone' }>;
+      const requiredStepIds = new Set(rubric.steps.map((step) => step.id));
+      const submittedStepIds = capstoneAnswer.stepAnswers.map((step) => step.stepId);
+      if (
+        new Set(submittedStepIds).size !== submittedStepIds.length ||
+        submittedStepIds.some((stepId) => !requiredStepIds.has(stepId))
+      ) {
+        return invalid('invalid-capstone-steps');
+      }
+      const answerByStep = new Map(
+        capstoneAnswer.stepAnswers.map((stepAnswer) => [stepAnswer.stepId, stepAnswer.answer]),
+      );
+      const stepResults = rubric.steps.map((step) => {
+        const stepAnswer = answerByStep.get(step.id);
+        return stepAnswer ? gradeAnswer(step.rubric, stepAnswer, context) : undefined;
+      });
+      const completedSteps = stepResults.filter((stepResult) => stepResult !== undefined).length;
+      const correctSteps = stepResults.filter((stepResult) => stepResult?.correct).length;
+      const score =
+        stepResults.reduce((sum, stepResult) => sum + (stepResult?.score ?? 0), 0) /
+        rubric.steps.length;
+      const correct = correctSteps === rubric.steps.length;
+      const misconceptions = unique([
+        ...(rubric.misconceptionIds ?? []),
+        ...stepResults.flatMap((stepResult) => stepResult?.misconceptionIds ?? []),
+      ]);
+      return result(
+        correct,
+        score,
+        correct
+          ? 'correct'
+          : completedSteps < rubric.steps.length
+            ? 'capstone-incomplete'
+            : 'capstone-step-mismatch',
+        [
+          { key: 'completedSteps', value: completedSteps },
+          { key: 'correctSteps', value: correctSteps },
+          { key: 'requiredSteps', value: rubric.steps.length },
+        ],
+        misconceptions,
       );
     }
   }

@@ -103,7 +103,7 @@ function assertChartAnchor(value: unknown, field: string): void {
   assertFiniteRange(value.price, `${field}.price`, -1_000_000_000_000, 1_000_000_000_000);
 }
 
-function assertAnswer(value: unknown): void {
+function assertAnswer(value: unknown, allowCapstone = true): void {
   if (!isObject(value) || typeof value.kind !== 'string') {
     fail('attempt.answer must be a discriminated answer object.');
   }
@@ -194,7 +194,53 @@ function assertAnswer(value: unknown): void {
       if (value.reasonIds !== undefined) {
         assertStringArray(value.reasonIds, 'attempt.answer.reasonIds');
       }
+      if (value.optionId !== undefined) {
+        assertNonEmptyString(value.optionId, 'attempt.answer.optionId');
+      }
       break;
+    case 'label-placement': {
+      if (
+        !Array.isArray(value.placements) ||
+        value.placements.length === 0 ||
+        value.placements.length > 200
+      ) {
+        fail('attempt.answer.placements must be a non-empty bounded array.');
+      }
+      const labelIds = new Set<string>();
+      value.placements.forEach((placement, index) => {
+        if (!isObject(placement)) fail(`attempt.answer.placements[${index}] must be an object.`);
+        assertNonEmptyString(placement.labelId, `attempt.answer.placements[${index}].labelId`);
+        if (labelIds.has(placement.labelId)) {
+          fail(`attempt.answer.placements contains duplicate label ${placement.labelId}.`);
+        }
+        labelIds.add(placement.labelId);
+        assertChartAnchor(placement.anchor, `attempt.answer.placements[${index}].anchor`);
+      });
+      break;
+    }
+    case 'capstone': {
+      if (!allowCapstone) fail('attempt.answer cannot contain a nested capstone answer.');
+      if (
+        !Array.isArray(value.stepAnswers) ||
+        value.stepAnswers.length === 0 ||
+        value.stepAnswers.length > 32
+      ) {
+        fail('attempt.answer.stepAnswers must be a non-empty bounded array.');
+      }
+      const stepIds = new Set<string>();
+      value.stepAnswers.forEach((stepAnswer, index) => {
+        if (!isObject(stepAnswer)) {
+          fail(`attempt.answer.stepAnswers[${index}] must be an object.`);
+        }
+        assertNonEmptyString(stepAnswer.stepId, `attempt.answer.stepAnswers[${index}].stepId`);
+        if (stepIds.has(stepAnswer.stepId)) {
+          fail(`attempt.answer.stepAnswers contains duplicate step ${stepAnswer.stepId}.`);
+        }
+        stepIds.add(stepAnswer.stepId);
+        assertAnswer(stepAnswer.answer, false);
+      });
+      break;
+    }
     default:
       fail(`attempt.answer kind ${value.kind} is unsupported.`);
   }

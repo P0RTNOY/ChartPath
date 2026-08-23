@@ -3,6 +3,26 @@ import { z } from 'zod';
 const nonEmpty = z.string().trim().min(1);
 const id = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/i);
 const editorialStatusSchema = z.enum(['draft', 'reviewed', 'published']);
+const tradeDecisionSchema = z.enum([
+  'trade',
+  'wait',
+  'reject',
+  'no-trade',
+  'insufficient-evidence',
+]);
+const alternativeExplanationSchema = z
+  .strictObject({
+    answerId: id.optional(),
+    feedbackCode: id.optional(),
+    explanationHe: nonEmpty,
+    explanationEn: nonEmpty.optional(),
+    misconceptionId: id.optional(),
+  })
+  .refine(
+    (value) =>
+      Number(value.answerId !== undefined) + Number(value.feedbackCode !== undefined) === 1,
+    { message: 'Exactly one of answerId or feedbackCode is required.' },
+  );
 
 export const sourceReferenceSchema = z.strictObject({
   sourceId: id,
@@ -50,7 +70,7 @@ const toleranceSchema = z.strictObject({
   vertical: z.number().positive().max(1),
 });
 
-export const answerRubricSchema = z.discriminatedUnion('kind', [
+export const atomicAnswerRubricSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     ...baseRubricShape,
     kind: z.literal('multiple-choice'),
@@ -116,6 +136,37 @@ export const answerRubricSchema = z.discriminatedUnion('kind', [
       .array(z.enum(['trade', 'wait', 'reject', 'no-trade', 'insufficient-evidence']))
       .min(1),
     requiredReasonIds: z.array(id).optional(),
+    allowExtraReasons: z.boolean().optional(),
+  }),
+  z.strictObject({
+    ...baseRubricShape,
+    kind: z.literal('label-placement'),
+    targets: z
+      .array(
+        z.strictObject({
+          labelId: id,
+          target: anchorSchema,
+        }),
+      )
+      .min(1),
+    tolerance: toleranceSchema,
+    decisionCandleIndex: z.number().int().nonnegative().optional(),
+  }),
+]);
+
+export const answerRubricSchema = z.discriminatedUnion('kind', [
+  ...atomicAnswerRubricSchema.options,
+  z.strictObject({
+    ...baseRubricShape,
+    kind: z.literal('capstone'),
+    steps: z
+      .array(
+        z.strictObject({
+          id,
+          rubric: atomicAnswerRubricSchema,
+        }),
+      )
+      .min(1),
   }),
 ]);
 
@@ -198,6 +249,7 @@ export const exerciseSchema = z.strictObject({
     'line',
     'risk',
     'decision',
+    'capstone',
     'label-placement',
     'timeframe-comparison',
     'mistake-diagnosis',
@@ -206,20 +258,15 @@ export const exerciseSchema = z.strictObject({
   options: z
     .array(z.strictObject({ id, labelHe: nonEmpty, labelEn: nonEmpty.optional() }))
     .optional(),
+  reasonOptions: z
+    .array(z.strictObject({ id, labelHe: nonEmpty, labelEn: nonEmpty.optional() }))
+    .optional(),
+  decisionOptionMap: z.record(id, tradeDecisionSchema).optional(),
   chartSpec: chartSpecSchema,
   rubric: answerRubricSchema,
   explanationHe: nonEmpty,
   explanationEn: nonEmpty.optional(),
-  alternativeExplanations: z
-    .array(
-      z.strictObject({
-        answerId: id,
-        explanationHe: nonEmpty,
-        explanationEn: nonEmpty.optional(),
-        misconceptionId: id.optional(),
-      }),
-    )
-    .min(1),
+  alternativeExplanations: z.array(alternativeExplanationSchema).min(1),
   misconceptionIds,
   hints: z
     .array(
@@ -277,7 +324,14 @@ export const exerciseSchema = z.strictObject({
         ]),
         promptHe: nonEmpty,
         promptEn: nonEmpty.optional(),
-        rubric: answerRubricSchema,
+        rubric: atomicAnswerRubricSchema,
+        options: z
+          .array(z.strictObject({ id, labelHe: nonEmpty, labelEn: nonEmpty.optional() }))
+          .optional(),
+        reasonOptions: z
+          .array(z.strictObject({ id, labelHe: nonEmpty, labelEn: nonEmpty.optional() }))
+          .optional(),
+        decisionOptionMap: z.record(id, tradeDecisionSchema).optional(),
       }),
     )
     .optional(),

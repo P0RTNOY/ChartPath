@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { generateChart } from '@chartpath/chart-engine';
+import type { ContentExercise } from '@chartpath/content';
 import type {
   ChartAnchor,
   ChartZone,
@@ -16,6 +17,8 @@ import { Button, Card, LtrText, UiText, useTheme } from '@chartpath/ui';
 
 import { Glyph } from './glyph';
 import { OhlcvChart } from './ohlcv-chart';
+import { CapstoneInteraction, type CapstoneExercise } from './capstone-interaction';
+import { stablePresentationOrder } from '../data/presentation-order';
 
 export interface ExerciseInteractionProps {
   readonly exercise: Exercise;
@@ -50,6 +53,8 @@ function OptionGrid({
         return (
           <Card
             accessibilityLabel={`${option.labelHe}${option.labelEn ? `, ${option.labelEn}` : ''}`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
             disabled={disabled}
             key={option.id}
             onPress={() => onSelect(option.id)}
@@ -101,43 +106,131 @@ function OptionGrid({
   );
 }
 
-function DecisionInteraction(props: ExerciseInteractionProps) {
-  const fallback: readonly ExerciseOption[] = [
-    { id: 'trade', labelHe: 'יש תרחיש תקף', labelEn: 'Trade scenario' },
-    { id: 'wait', labelHe: 'להמתין לאישור', labelEn: 'Wait' },
-    { id: 'no-trade', labelHe: 'אין עסקה', labelEn: 'No trade' },
-    { id: 'insufficient-evidence', labelHe: 'אין מספיק ראיות', labelEn: 'Insufficient evidence' },
-  ];
-  const options = props.exercise.options?.length ? props.exercise.options : fallback;
+const fallbackDecisionOptions: readonly ExerciseOption[] = [
+  { id: 'trade', labelHe: 'יש תרחיש תקף', labelEn: 'Trade scenario' },
+  { id: 'wait', labelHe: 'להמתין לאישור', labelEn: 'Wait' },
+  { id: 'reject', labelHe: 'לדחות את התרחיש', labelEn: 'Reject' },
+  { id: 'no-trade', labelHe: 'אין עסקה', labelEn: 'No trade' },
+  {
+    id: 'insufficient-evidence',
+    labelHe: 'אין מספיק ראיות',
+    labelEn: 'Insufficient evidence',
+  },
+];
+
+const tradeDecisions = new Set<TradeDecision>([
+  'trade',
+  'wait',
+  'reject',
+  'no-trade',
+  'insufficient-evidence',
+]);
+
+function decisionForOption(
+  id: string,
+  authoredMap: Readonly<Record<string, TradeDecision>> | undefined,
+): TradeDecision | undefined {
   return (
-    <OptionGrid
-      disabled={props.disabled ?? false}
-      onSelect={(id) =>
-        props.onChange({
-          kind: 'decision',
-          decision: id as TradeDecision,
-          reasonIds:
-            props.exercise.rubric.kind === 'decision'
-              ? props.exercise.rubric.requiredReasonIds
-              : undefined,
-        })
-      }
-      options={options}
-      selectedId={answerOptionId(props.answer)}
-    />
+    authoredMap?.[id] ??
+    (tradeDecisions.has(id as TradeDecision) ? (id as TradeDecision) : undefined)
+  );
+}
+
+function DecisionInteraction(props: ExerciseInteractionProps) {
+  const theme = useTheme();
+  const supplied = props.exercise.options?.length
+    ? props.exercise.options
+    : fallbackDecisionOptions;
+  const contentExercise = props.exercise as ContentExercise;
+  const authoredMap = contentExercise.decisionOptionMap;
+  const decisionOptions = stablePresentationOrder(
+    supplied.filter((option) => decisionForOption(option.id, authoredMap)),
+    `${props.exercise.id}:decision`,
+  );
+  const authoredReasons = contentExercise.reasonOptions;
+  const reasonOptions = stablePresentationOrder(
+    authoredReasons ?? supplied.filter((option) => !decisionForOption(option.id, authoredMap)),
+    `${props.exercise.id}:decision-reasons`,
+  );
+  const selectedDecision = props.answer?.kind === 'decision' ? props.answer.decision : undefined;
+  const selectedOptionId =
+    (props.answer?.kind === 'decision' ? props.answer.optionId : undefined) ??
+    decisionOptions.find((option) => decisionForOption(option.id, authoredMap) === selectedDecision)
+      ?.id ??
+    null;
+  const selectedReasons = props.answer?.kind === 'decision' ? (props.answer.reasonIds ?? []) : [];
+  return (
+    <View style={{ gap: theme.spacing.md }}>
+      <OptionGrid
+        disabled={props.disabled ?? false}
+        onSelect={(id) => {
+          const decision = decisionForOption(id, authoredMap);
+          if (!decision) return;
+          props.onChange({ kind: 'decision', decision, optionId: id, reasonIds: selectedReasons });
+        }}
+        options={decisionOptions}
+        selectedId={selectedOptionId}
+      />
+      {reasonOptions.length ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <UiText variant="label">אילו ראיות תומכות בהחלטה?</UiText>
+          {!selectedDecision ? (
+            <UiText color="textMuted" variant="caption">
+              בחרו החלטה לפני סימון הראיות.
+            </UiText>
+          ) : undefined}
+          {reasonOptions.map((option) => {
+            const checked = selectedReasons.includes(option.id);
+            return (
+              <Card
+                accessibilityLabel={option.labelHe}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                disabled={props.disabled || !selectedDecision}
+                key={option.id}
+                onPress={() => {
+                  if (!selectedDecision) return;
+                  const reasonIds = checked
+                    ? selectedReasons.filter((id) => id !== option.id)
+                    : [...selectedReasons, option.id];
+                  props.onChange({
+                    kind: 'decision',
+                    decision: selectedDecision,
+                    optionId: selectedOptionId ?? undefined,
+                    reasonIds,
+                  });
+                }}
+                variant={checked ? 'accent' : 'outlined'}
+              >
+                <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+                  {checked ? <Glyph name="check" /> : <View style={{ height: 20, width: 20 }} />}
+                  <UiText style={{ flex: 1 }}>{option.labelHe}</UiText>
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      ) : undefined}
+    </View>
   );
 }
 
 function SelectionInteraction(props: ExerciseInteractionProps) {
   const theme = useTheme();
   const selected = props.answer?.kind === 'selection' ? props.answer.selectedIds : [];
+  const options = stablePresentationOrder(
+    props.exercise.options ?? [],
+    `${props.exercise.id}:selection:order`,
+  );
   return (
     <View style={{ gap: theme.spacing.sm }}>
-      {props.exercise.options?.map((option) => {
+      {options.map((option) => {
         const checked = selected.includes(option.id);
         return (
           <Card
             accessibilityLabel={option.labelHe}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked }}
             disabled={props.disabled}
             key={option.id}
             onPress={() => {
@@ -189,10 +282,11 @@ function SelectionInteraction(props: ExerciseInteractionProps) {
 function SequenceInteraction(props: ExerciseInteractionProps) {
   const theme = useTheme();
   const options = props.exercise.options ?? [];
+  const presentedOptions = stablePresentationOrder(options, `${props.exercise.id}:sequence`);
   const initial =
     props.answer?.kind === 'sequence'
       ? props.answer.orderedIds
-      : options.map((option) => option.id);
+      : presentedOptions.map((option) => option.id);
   const optionMap = new Map(options.map((option) => [option.id, option]));
   const move = (index: number, delta: -1 | 1) => {
     const next = [...initial];
@@ -240,7 +334,7 @@ function SequenceInteraction(props: ExerciseInteractionProps) {
                   height: 44,
                   justifyContent: 'center',
                   opacity: index === 0 ? 0.3 : 1,
-                  width: 40,
+                  width: 44,
                 }}
               >
                 <Glyph name="up" />
@@ -254,7 +348,7 @@ function SequenceInteraction(props: ExerciseInteractionProps) {
                   height: 44,
                   justifyContent: 'center',
                   opacity: index === initial.length - 1 ? 0.3 : 1,
-                  width: 40,
+                  width: 44,
                 }}
               >
                 <Glyph name="down" />
@@ -278,7 +372,7 @@ const riskLabels: Readonly<
   Record<RiskAnswerField, { readonly he: string; readonly suffix: string }>
 > = {
   accountRisk: { he: 'סיכון כספי בחשבון', suffix: '₪' },
-  stopDistance: { he: 'מרחק לסטופ', suffix: '%' },
+  stopDistance: { he: 'מרחק לסטופ', suffix: '₪' },
   perUnitRisk: { he: 'סיכון ליחידה', suffix: '₪' },
   positionSize: { he: 'גודל פוזיציה', suffix: 'יח׳' },
   riskMultiple: { he: 'מכפיל סיכון', suffix: 'R' },
@@ -350,6 +444,8 @@ function RiskInteraction(props: ExerciseInteractionProps) {
 
 function DrawingInteraction(props: ExerciseInteractionProps) {
   const theme = useTheme();
+  const [draftCandleIndex, setDraftCandleIndex] = useState('');
+  const [draftPrice, setDraftPrice] = useState('');
   const [anchors, setAnchors] = useState<readonly ChartAnchor[]>(() => {
     if (props.answer?.kind === 'point') return props.answer.points;
     if (props.answer?.kind === 'line') return [props.answer.line.start, props.answer.line.end];
@@ -398,6 +494,81 @@ function DrawingInteraction(props: ExerciseInteractionProps) {
         selectedPoints={anchors}
         selectedZone={zone}
       />
+      <Card variant="subtle">
+        <View style={{ gap: theme.spacing.sm }}>
+          <UiText variant="label">חלופה נגישה לסימון על הגרף</UiText>
+          <UiText color="textMuted" variant="caption">
+            הזינו מספר נר ומחיר כדי להוסיף נקודה בלי מחוות מדויקות.
+          </UiText>
+          <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+            <TextInput
+              accessibilityLabel="מספר נר לסימון"
+              editable={!props.disabled}
+              keyboardType="number-pad"
+              onChangeText={setDraftCandleIndex}
+              placeholder="נר"
+              placeholderTextColor={theme.colors.textMuted}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                borderRadius: 10,
+                borderWidth: 1,
+                color: theme.colors.text,
+                flex: 1,
+                minHeight: 48,
+                paddingHorizontal: 12,
+                direction: 'ltr',
+                textAlign: 'left',
+                writingDirection: 'ltr',
+              }}
+              value={draftCandleIndex}
+            />
+            <TextInput
+              accessibilityLabel="מחיר לסימון"
+              editable={!props.disabled}
+              keyboardType="decimal-pad"
+              onChangeText={setDraftPrice}
+              placeholder="מחיר"
+              placeholderTextColor={theme.colors.textMuted}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                borderRadius: 10,
+                borderWidth: 1,
+                color: theme.colors.text,
+                flex: 1,
+                minHeight: 48,
+                paddingHorizontal: 12,
+                direction: 'ltr',
+                textAlign: 'left',
+                writingDirection: 'ltr',
+              }}
+              value={draftPrice}
+            />
+          </View>
+          <Button
+            disabled={
+              props.disabled ||
+              draftCandleIndex.trim() === '' ||
+              draftPrice.trim() === '' ||
+              !Number.isInteger(Number(draftCandleIndex)) ||
+              !Number.isFinite(Number(draftPrice)) ||
+              !props.chart.candles.some((candle) => candle.index === Number(draftCandleIndex))
+            }
+            onPress={() => {
+              handlePress({
+                candleIndex: Number(draftCandleIndex),
+                price: Number(draftPrice),
+              });
+              setDraftCandleIndex('');
+              setDraftPrice('');
+            }}
+            variant="secondary"
+          >
+            הוספת נקודה
+          </Button>
+        </View>
+      </Card>
       <View
         style={{
           alignItems: 'center',
@@ -423,25 +594,169 @@ function DrawingInteraction(props: ExerciseInteractionProps) {
   );
 }
 
+interface LabelPlacement {
+  readonly anchor: ChartAnchor;
+}
+
+function LabelPlacementInteraction(props: ExerciseInteractionProps) {
+  const theme = useTheme();
+  const options = props.exercise.options ?? [];
+  const [activeLabelId, setActiveLabelId] = useState<string | null>(options[0]?.id ?? null);
+  const [placements, setPlacements] = useState<Readonly<Record<string, LabelPlacement>>>({});
+  const chart = props.chart;
+
+  if (!chart) return <EmptyInteraction message="הגרף לתרגיל התוויות אינו זמין." />;
+  if (props.exercise.rubric.kind !== 'label-placement')
+    return <EmptyInteraction message="רובריקת התוויות אינה זמינה." />;
+  const targets = new Map(
+    props.exercise.rubric.targets.map((target) => [target.labelId, target.target]),
+  );
+  const bullishIndex = targets.get('high-top')?.candleIndex;
+  const bearishIndex = targets.get('bear-open-upper')?.candleIndex;
+  const activeTarget = activeLabelId ? targets.get(activeLabelId) : undefined;
+  const activeCandle = chart.candles.find((candle) => candle.index === activeTarget?.candleIndex);
+  const relativePositions = activeCandle
+    ? [
+        { label: 'קצה עליון של הצל', price: activeCandle.high },
+        { label: 'קצה עליון של הגוף', price: Math.max(activeCandle.open, activeCandle.close) },
+        { label: 'קצה תחתון של הגוף', price: Math.min(activeCandle.open, activeCandle.close) },
+        { label: 'קצה תחתון של הצל', price: activeCandle.low },
+      ]
+    : [];
+
+  const placeActiveLabel = (anchor: ChartAnchor) => {
+    if (props.disabled || !activeLabelId) return;
+    const next = { ...placements, [activeLabelId]: { anchor } };
+    setPlacements(next);
+    props.onChange({
+      kind: 'label-placement',
+      placements: Object.entries(next).map(([labelId, placement]) => ({
+        labelId,
+        anchor: placement.anchor,
+      })),
+    });
+    const currentIndex = options.findIndex((option) => option.id === activeLabelId);
+    setActiveLabelId(options[currentIndex + 1]?.id ?? activeLabelId);
+  };
+
+  return (
+    <View style={{ gap: theme.spacing.md }}>
+      <UiText color="textMuted" variant="bodySmall">
+        בחרו תווית ואז הקישו על נקודת המחיר המתאימה. אפשר לבחור תווית שוב ולמקם מחדש.
+      </UiText>
+      <UiText color="textMuted" variant="caption">
+        שני נרות התרגול מסומנים במסגרת מקווקוות; מיקום יחסי נגיש זמין מתחת לגרף.
+      </UiText>
+      <View
+        accessibilityRole="radiogroup"
+        style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}
+      >
+        {options.map((option) => {
+          const selected = activeLabelId === option.id;
+          const placed = placements[option.id] !== undefined;
+          return (
+            <Card
+              accessibilityHint={
+                placed ? 'בחירה מחדש תאפשר לשנות את המיקום' : 'לאחר הבחירה יש לסמן נקודה בגרף'
+              }
+              accessibilityLabel={option.labelHe}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              key={option.id}
+              onPress={() => setActiveLabelId(option.id)}
+              padding="sm"
+              variant={selected ? 'accent' : 'outlined'}
+            >
+              <UiText variant="label">
+                {placed ? '✓ ' : ''}
+                {option.labelHe}
+              </UiText>
+            </Card>
+          );
+        })}
+      </View>
+      <OhlcvChart
+        allowAccessibleDataTable={false}
+        chart={chart}
+        highlightedCandleIndices={[bullishIndex, bearishIndex].filter(
+          (index): index is number => index !== undefined,
+        )}
+        interactive={!props.disabled}
+        onChartPress={placeActiveLabel}
+        selectedPoints={Object.values(placements).map((placement) => placement.anchor)}
+        ticker="CPTH"
+      />
+      <Card variant="subtle">
+        <View style={{ gap: theme.spacing.sm }}>
+          <UiText variant="label">חלופת מיקום נגישה</UiText>
+          <UiText color="textMuted" variant="caption">
+            בחרו את המיקום היחסי של התווית הפעילה; אין צורך להקליד מספר נר או מחיר.
+          </UiText>
+          {relativePositions.map((position) => (
+            <Button
+              disabled={props.disabled || !activeTarget}
+              key={position.label}
+              onPress={() =>
+                activeTarget &&
+                placeActiveLabel({
+                  candleIndex: activeTarget.candleIndex,
+                  price: position.price,
+                })
+              }
+              variant="secondary"
+            >
+              {position.label}
+            </Button>
+          ))}
+        </View>
+      </Card>
+    </View>
+  );
+}
+
 function TimeframeComparison(props: ExerciseInteractionProps) {
   const theme = useTheme();
-  const secondary = useMemo(() => {
+  const comparisonCharts = useMemo(() => {
     if (!props.exercise.chartSpec) return undefined;
     try {
-      return generateChart({
+      const weekly = generateChart({
         ...props.exercise.chartSpec,
-        id: `${props.exercise.chartSpec.id}-higher`,
-        seed: props.exercise.chartSpec.seed + 101,
-        timeframe: props.exercise.chartSpec.timeframe === '1D' ? '1W' : '1D',
+        id: `${props.exercise.chartSpec.id}-weekly`,
+        timeframe: '1W',
+        scenario: 'uptrend',
       });
+      const daily = generateChart({
+        ...props.exercise.chartSpec,
+        id: `${props.exercise.chartSpec.id}-daily`,
+        seed: props.exercise.chartSpec.seed + 101,
+        timeframe: '1D',
+        scenario: 'downtrend',
+      });
+      const hourly = generateChart({
+        ...props.exercise.chartSpec,
+        id: `${props.exercise.chartSpec.id}-hourly`,
+        seed: props.exercise.chartSpec.seed + 202,
+        timeframe: '1H',
+        scenario: 'uptrend',
+      });
+      return [
+        { chart: weekly, label: 'שבועי — זהו את השכבה הראשית' },
+        { chart: daily, label: 'יומי — זהו את השכבה המשנית' },
+        { chart: hourly, label: 'שעתי — זהו את השכבה הקצרה' },
+      ] as const;
     } catch {
       return undefined;
     }
   }, [props.exercise.chartSpec]);
   return (
     <View style={{ gap: theme.spacing.md }}>
-      {props.chart ? <OhlcvChart chart={props.chart} ticker="CPTH" /> : undefined}
-      {secondary ? <OhlcvChart chart={secondary} ticker="CPTH" /> : undefined}
+      {comparisonCharts?.map((item) => (
+        <View key={item.chart.spec.id} style={{ gap: theme.spacing.xs }}>
+          <UiText variant="label">{item.label}</UiText>
+          <OhlcvChart chart={item.chart} ticker="CPTH" />
+        </View>
+      ))}
+      {!comparisonCharts ? <EmptyInteraction message="לא ניתן לטעון את מסגרות הזמן." /> : undefined}
       <RubricInteraction {...props} />
     </View>
   );
@@ -449,34 +764,53 @@ function TimeframeComparison(props: ExerciseInteractionProps) {
 
 function SequentialReveal(props: ExerciseInteractionProps) {
   const theme = useTheme();
-  const [revealed, setRevealed] = useState(Math.min(12, props.chart?.candles.length ?? 0));
   const total = props.chart?.candles.length ?? 0;
+  const decisionWindow = Math.min(
+    total,
+    (props.chart?.spec.decisionCandleIndex ?? Math.max(0, total - 1)) + 1,
+  );
+  const [revealed, setRevealed] = useState(
+    props.answer ? decisionWindow : Math.min(12, decisionWindow),
+  );
+  const [draftAnswer, setDraftAnswer] = useState<ExerciseAnswer | null>(props.answer);
+  const [recordedUpdates, setRecordedUpdates] = useState(0);
+  const atDecisionWindow = revealed >= decisionWindow;
+  if (!props.chart || decisionWindow === 0) {
+    return <EmptyInteraction message="לא ניתן לטעון את רצף הנרות; לא נרשמה תשובה." />;
+  }
   return (
     <View style={{ gap: theme.spacing.md }}>
-      {props.chart ? (
-        <OhlcvChart chart={props.chart} revealCount={revealed} ticker="CPTH" />
-      ) : (
-        <EmptyInteraction message="לא ניתן לטעון את רצף הנרות." />
-      )}
+      <OhlcvChart chart={props.chart} revealCount={revealed} ticker="CPTH" />
       <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
         <Button
-          disabled={revealed >= total}
-          onPress={() => setRevealed((value) => Math.min(total, value + 4))}
+          disabled={atDecisionWindow || !draftAnswer}
+          onPress={() => {
+            setRecordedUpdates((value) => value + 1);
+            setDraftAnswer(null);
+            props.onChange(null);
+            setRevealed((value) => Math.min(decisionWindow, value + 8));
+          }}
           variant="secondary"
         >
-          חשיפת 4 נרות
+          {draftAnswer ? 'תיעוד הניתוח וחשיפת 8 נרות' : 'בחרו ניתוח לפני החשיפה'}
         </Button>
         <LtrText color="textMuted" variant="numeric">
-          {revealed}/{total}
+          {revealed}/{decisionWindow}
         </LtrText>
       </View>
-      {revealed >= total ? (
-        <RubricInteraction {...props} />
-      ) : (
-        <UiText color="textMuted" variant="bodySmall">
-          בכל שלב עצרו, תארו את הראיות, ובחרו אם להמתין. העתיד אינו גלוי בזמן החלטה אמיתית.
-        </UiText>
-      )}
+      <UiText color="textMuted" variant="bodySmall">
+        {atDecisionWindow
+          ? `הגעתם לחלון ההחלטה לאחר ${recordedUpdates} עדכונים. הבחירה הבאה תהיה התשובה הסופית.`
+          : 'בחרו ניתוח לפי הנרות הגלויים, ורק אז ייחשפו הנרות הבאים. הבחירה הזמנית אינה מאפשרת הגשה.'}
+      </UiText>
+      <RubricInteraction
+        {...props}
+        answer={draftAnswer}
+        onChange={(next) => {
+          setDraftAnswer(next);
+          props.onChange(atDecisionWindow ? next : null);
+        }}
+      />
     </View>
   );
 }
@@ -498,14 +832,26 @@ export function ExerciseInteraction(props: ExerciseInteractionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.exercise.id]);
 
+  if (props.exercise.interactionType === 'capstone' && props.exercise.rubric.kind === 'capstone') {
+    const exercise = props.exercise as CapstoneExercise;
+    if (!exercise.capstoneSteps?.length)
+      return <EmptyInteraction message="שלבי התהליך המסכם אינם זמינים." />;
+    return (
+      <CapstoneInteraction
+        answer={props.answer?.kind === 'capstone' ? props.answer : null}
+        disabled={props.disabled}
+        exercise={exercise}
+        onChange={(answer) => props.onChange(answer)}
+      />
+    );
+  }
   if (props.exercise.interactionType === 'timeframe-comparison')
     return <TimeframeComparison {...props} />;
   if (props.exercise.interactionType === 'sequential-reveal')
     return <SequentialReveal {...props} />;
-  if (
-    props.exercise.interactionType === 'mistake-diagnosis' ||
-    props.exercise.interactionType === 'label-placement'
-  ) {
+  if (props.exercise.interactionType === 'label-placement')
+    return <LabelPlacementInteraction {...props} />;
+  if (props.exercise.interactionType === 'mistake-diagnosis') {
     return <RubricInteraction {...props} />;
   }
   return <RubricInteraction {...props} />;
@@ -515,6 +861,8 @@ function RubricInteraction(props: ExerciseInteractionProps) {
   switch (props.exercise.rubric.kind) {
     case 'decision':
       return <DecisionInteraction {...props} />;
+    case 'label-placement':
+      return <LabelPlacementInteraction {...props} />;
     case 'multiple-choice':
       return <MultipleChoiceInteraction {...props} />;
     case 'selection':
@@ -535,7 +883,10 @@ function MultipleChoiceInteraction(props: ExerciseInteractionProps) {
     <OptionGrid
       disabled={props.disabled ?? false}
       onSelect={(optionId) => props.onChange({ kind: 'multiple-choice', optionId })}
-      options={props.exercise.options ?? []}
+      options={stablePresentationOrder(
+        props.exercise.options ?? [],
+        `${props.exercise.id}:multiple-choice`,
+      )}
       selectedId={answerOptionId(props.answer)}
     />
   );

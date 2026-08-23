@@ -108,6 +108,11 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'context',
     promptHe: 'בחרו את ההקשר שהיה גלוי בהחלטה: מגמה שבועית עולה מול רעיון מכירה בחסר.',
+    options: [
+      { id: 'weekly-uptrend', labelHe: 'המגמה השבועית עולה' },
+      { id: 'countertrend-short', labelHe: 'הרעיון הוא מכירה בחסר נגד המגמה' },
+      { id: 'weekly-downtrend', labelHe: 'המגמה השבועית יורדת' },
+    ],
     rubric: {
       kind: 'selection',
       expectedIds: ['weekly-uptrend', 'countertrend-short'],
@@ -117,6 +122,11 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'structure',
     promptHe: 'סמנו את המבנה הנצפה בלבד: שלושה שיאים אפשריים ושפל ביניים, בלי לקבוע שההיפוך הושלם.',
+    options: [
+      { id: 'three-peak-candidate', labelHe: 'מועמד לשלושה שיאים' },
+      { id: 'intermediate-low', labelHe: 'שפל ביניים נצפה' },
+      { id: 'confirmed-reversal', labelHe: 'היפוך מאושר כבר הושלם' },
+    ],
     rubric: {
       kind: 'selection',
       expectedIds: ['three-peak-candidate', 'intermediate-low'],
@@ -126,26 +136,52 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'level',
     promptHe: 'סמנו את רמת התמיכה המתערבת 82.7 ואת אזור קו הצוואר 88.',
+    options: [
+      { id: 'support-82.7', labelHe: 'תמיכה שבועית 82.7' },
+      { id: 'neckline-88', labelHe: 'אזור קו צוואר 88' },
+      { id: 'measured-target-72', labelHe: 'יעד מדוד 72 בלבד' },
+    ],
     rubric: { kind: 'selection', expectedIds: ['support-82.7', 'neckline-88'], mode: 'exact' },
   },
   {
     id: 'setup',
     promptHe: 'סווגו את התצורה כראש וכתפיים אפשרי, לא כהיפוך מאושר.',
+    options: [
+      { id: 'possible-head-and-shoulders', labelHe: 'ראש וכתפיים אפשרי' },
+      { id: 'confirmed-head-and-shoulders', labelHe: 'ראש וכתפיים מאושר' },
+      { id: 'no-structure', labelHe: 'אין מבנה שניתן לתאר' },
+    ],
     rubric: { kind: 'selection', expectedIds: ['possible-head-and-shoulders'], mode: 'exact' },
   },
   {
     id: 'confirmation',
     promptHe: 'בחרו את האישור שנקבע מראש: סגירה יומית מתחת לקו הצוואר 88.',
+    options: [
+      { id: 'daily-close-below-88', labelHe: 'סגירה יומית מתחת ל־88' },
+      { id: 'intraday-touch-88', labelHe: 'מגע תוך־יומי ב־88' },
+      { id: 'later-price-decline', labelHe: 'ירידה שנראתה רק בדיעבד' },
+    ],
     rubric: { kind: 'selection', expectedIds: ['daily-close-below-88'], mode: 'exact' },
   },
   {
     id: 'entry',
     promptHe: 'תעדו את טריגר הכניסה התאורטי 87.8 בנפרד מן האישור ומן המילוי.',
+    options: [
+      { id: 'entry-trigger-87.8', labelHe: 'טריגר כניסה תאורטי 87.8' },
+      { id: 'confirmation-is-fill', labelHe: 'האישור הוא בהכרח מחיר המילוי' },
+      { id: 'enter-before-confirmation', labelHe: 'כניסה לפני האישור' },
+    ],
     rubric: { kind: 'selection', expectedIds: ['entry-trigger-87.8'], mode: 'exact' },
   },
   {
     id: 'invalidation',
     promptHe: 'בחרו ביטול תוקף מעל הכתף הימנית והוראת עצירה אפשרית 98.6 כשני שדות נפרדים.',
+    options: [
+      { id: 'right-shoulder-invalidation', labelHe: 'ביטול תוקף מעל הכתף הימנית' },
+      { id: 'stop-order-98.6', labelHe: 'הוראת עצירה אפשרית 98.6' },
+      { id: 'stop-guarantees-98.6', labelHe: 'העצירה מבטיחה מילוי בדיוק ב־98.6' },
+      { id: 'move-stop-to-improve-r', labelHe: 'להצמיד עצירה ללא עוגן כדי לשפר R' },
+    ],
     rubric: {
       kind: 'selection',
       expectedIds: ['right-shoulder-invalidation', 'stop-order-98.6'],
@@ -170,6 +206,17 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'management',
     promptHe: 'בחרו את פעולת הניהול לאחר פסילת העסקה לפני כניסה.',
+    options: [
+      { id: 'trade', labelHe: 'לנהל פוזיציה כאילו נפתחה' },
+      { id: 'wait', labelHe: 'להמשיך להמתין בתוך עסקה פתוחה' },
+      { id: 'no-trade', labelHe: 'אין עסקה ואין פוזיציה לניהול' },
+    ],
+    decisionOptionMap: { trade: 'trade', wait: 'wait', 'no-trade': 'no-trade' },
+    reasonOptions: [
+      { id: 'no-open-position', labelHe: 'לא נפתחה פוזיציה לאחר הפסילה' },
+      { id: 'manage-hypothetical-position', labelHe: 'יש לנהל גם פוזיציה שלא נפתחה' },
+      { id: 'outcome-decides-management', labelHe: 'מה שקרה אחר כך קובע אם הייתה פוזיציה' },
+    ],
     rubric: {
       kind: 'decision',
       acceptedDecisions: ['no-trade'],
@@ -179,6 +226,12 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'review',
     promptHe: 'דרגו את התהליך לפי ההקשר, המכשול והיחס שתועדו מראש, ולא לפי מה שהמחיר עשה אחר כך.',
+    options: [
+      { id: 'context-checked', labelHe: 'ההקשר נבדק לפני התבנית' },
+      { id: 'risk-checked', labelHe: 'המכשול והיחס נבדקו מראש' },
+      { id: 'outcome-independent', labelHe: 'איכות התהליך נפרדת מן התוצאה' },
+      { id: 'outcome-proves-process', labelHe: 'תוצאת המחיר לבדה מוכיחה את איכות התהליך' },
+    ],
     rubric: {
       kind: 'selection',
       expectedIds: ['context-checked', 'risk-checked', 'outcome-independent'],
@@ -213,7 +266,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       'הטווח הגבוה מגדיר הקשר ומגמה, הטווח האמצעי מציג את התיקון או התצורה, והטווח הנמוך משמש להגדרת טריגר. התפקידים נקבעים לפני חיפוש אות ואינם מתחלפים כדי להצדיק דעה קיימת.',
     alternativeExplanations: [
       {
-        answerId: 'reverse-timeframe-order',
+        feedbackCode: 'sequence-order-mismatch',
         explanationHe:
           'התחלה מן הגרף הנמוך וחיפוש הצדקה כלפי מעלה הופכת את סדר העבודה ומגדילה הטיית אישוש.',
         misconceptionId: 'misconception.timeframe-shopping',
@@ -323,7 +376,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       'הסדר הקנוני הוא: הקשר, מבנה, רמה, תצורה, אישור, כניסה, נקודת ביטול, גודל פוזיציה, יעד, ניהול ותחקור. הסדר מונע קביעת כמות או יעד לפני שהתרחיש והכשל שלו הוגדרו.',
     alternativeExplanations: [
       {
-        answerId: 'entry-first',
+        feedbackCode: 'sequence-order-mismatch',
         explanationHe:
           'פתיחה בכניסה מדלגת על ההקשר ועל תנאי התצורה והופכת את שאר השלבים להצדקה בדיעבד.',
         misconceptionId: 'misconception.confirmation-as-entry',
@@ -622,7 +675,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       'סיכון החשבון הוא 1,000 ש״ח. מרחק העצירה 5, והעלות הצפויה מעלה את הסיכון ליחידה ל־5.20. מחלקים 1,000 ב־5.20 ומעגלים מטה ל־192 יחידות, כדי לא לחרוג מתקציב הסיכון.',
     alternativeExplanations: [
       {
-        answerId: 'position-size-200',
+        feedbackCode: 'risk-value-outside-tolerance',
         explanationHe: '200 מתקבל מהשמטת 0.20 ש״ח עלות ליחידה ולכן חורג מתקציב הסיכון המתוכנן.',
         misconceptionId: 'misconception.costs-omitted',
       },
@@ -854,7 +907,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       'הגדרה מוקדמת מונעת התאמת הסיפור לתוצאה. הפיתוח נשאר במדגם האימון; אחרי הקפאה עוברים לנתונים שלא שימשו לבחירה. דיווח כולל ניסיונות חלשים ורגישות לשינויים קטנים.',
     alternativeExplanations: [
       {
-        answerId: 'test-before-freeze',
+        feedbackCode: 'sequence-order-mismatch',
         explanationHe: 'שינוי הכלל לאחר צפייה במדגם הבדיקה הופך אותו בפועל לחלק ממדגם הפיתוח.',
         misconceptionId: 'misconception.future-information-leak',
       },
@@ -1108,7 +1161,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       'מרחק העצירה הוא 4.7 והסיכון המתוכנן ליחידה 5.20. 750÷5.20 נותן 144 יחידות שלמות לכל היותר. מרחק היעד 9, ולכן אומדן היעד הוא כ־1.73R מתוכנן. עלייה בעלות מקטינה כמות וגם יחס יעד־לסיכון.',
     alternativeExplanations: [
       {
-        answerId: 'old-cost-result',
+        feedbackCode: 'risk-value-outside-tolerance',
         explanationHe:
           'שימוש בכמות 153 או ב־1.84R משאיר את העלות הישנה 0.20 ואינו מעדכן את התוכנית.',
         misconceptionId: 'misconception.costs-omitted',
@@ -1245,23 +1298,10 @@ export const exercises09To12: readonly ContentExercise[] = [
     difficulty: 5,
     promptHe:
       'מקרה ג׳ המעובד מציג ראש וכתפיים ברור לכאורה, אך המגמה השבועית עדיין עולה. קו הצוואר 88, כניסה אפשרית 87.8, עצירה 98.6, עלות 0.40 ותמיכה שבועית 82.7. עד התמיכה יש רק כ־0.48R. מהי החלטת התהליך?',
-    interactionType: 'decision',
-    options: [
-      { id: 'decision-trade-pattern', labelHe: 'לבצע כי שם התבנית ברור' },
-      {
-        id: 'decision-no-trade',
-        labelHe: 'אין עסקה: ההקשר והיחס עד הרמה המתערבת אינם מצדיקים ביצוע',
-      },
-      { id: 'decision-move-stop', labelHe: 'להצמיד עצירה ללא עוגן כדי לשפר יחס' },
-    ],
+    interactionType: 'capstone',
     rubric: {
-      kind: 'decision',
-      acceptedDecisions: ['no-trade'],
-      requiredReasonIds: [
-        'weekly-context-conflict',
-        'intervening-support',
-        'insufficient-r-to-first-level',
-      ],
+      kind: 'capstone',
+      steps: caseCWorkflow.map((step) => ({ id: step.id, rubric: step.rubric })),
       misconceptionIds: [
         'misconception.pattern-without-context',
         'misconception.forced-trade',
@@ -1272,12 +1312,12 @@ export const exercises09To12: readonly ContentExercise[] = [
       'התבנית ניתנת לזיהוי, אך מכירה נגד מגמה שבועית עולה ופוטנציאל של 0.48R בלבד עד תמיכה קרובה אינם מצדיקים את הסיכון. היעד המדוד הרחוק אינו גובר על הרמה שבדרך, ואין להמציא עצירה צרה בלי עוגן מבני.',
     alternativeExplanations: [
       {
-        answerId: 'decision-trade-pattern',
+        answerId: 'confirmed-head-and-shoulders',
         explanationHe: 'שם תבנית אינו מספיק בלי מגמה קודמת מתאימה, רמות ביניים ויחס סיכון מעשי.',
         misconceptionId: 'misconception.pattern-without-context',
       },
       {
-        answerId: 'decision-move-stop',
+        answerId: 'move-stop-to-improve-r',
         explanationHe: 'שינוי הביטול רק כדי לשפר R אינו כן מבנית ומשנה את התזה במקום לבדוק אותה.',
         misconceptionId: 'misconception.position-size-before-risk',
       },

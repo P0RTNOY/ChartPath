@@ -7,6 +7,7 @@ interface TestMatchers {
   toMatchObject(expected: unknown): void;
   toBeInstanceOf(expected: unknown): void;
   readonly rejects: TestMatchers;
+  readonly not: TestMatchers;
 }
 
 declare const describe: (name: string, suite: () => void) => void;
@@ -160,6 +161,86 @@ describe('LearningRepository', () => {
     });
   });
 
+  it('persists and reloads an independently answered capstone attempt', async () => {
+    const adapter = new InMemoryPersistenceAdapter();
+    const repository = new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    const base = attemptRecord('capstone-attempt');
+    const capstoneRecord: NewAttemptRecord = {
+      ...base,
+      attempt: {
+        ...base.attempt,
+        exerciseId: 'u10-capstone-e03',
+        answer: {
+          kind: 'capstone',
+          stepAnswers: [
+            {
+              stepId: 'context',
+              answer: { kind: 'selection', selectedIds: ['weekly-uptrend'] },
+            },
+            {
+              stepId: 'management',
+              answer: {
+                kind: 'decision',
+                decision: 'no-trade',
+                reasonIds: ['no-open-position'],
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    await repository.appendAttempt(capstoneRecord);
+    const reopened = await new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => REOPENED_AT,
+    }).initialize();
+
+    expect(reopened.attempts[0]?.attempt.answer).toEqual(capstoneRecord.attempt.answer);
+  });
+
+  it('persists label coordinates instead of UI-derived correctness tokens', async () => {
+    const adapter = new InMemoryPersistenceAdapter();
+    const repository = new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    const base = attemptRecord('label-attempt');
+    const record: NewAttemptRecord = {
+      ...base,
+      attempt: {
+        ...base.attempt,
+        answer: {
+          kind: 'label-placement',
+          placements: [{ labelId: 'high-top', anchor: { candleIndex: 12, price: 103.5 } }],
+        },
+      },
+    };
+
+    const stored = await repository.appendAttempt(record);
+    expect(stored.attempt.attempt.answer).toEqual(record.attempt.answer);
+  });
+
+  it('expires the current streak after a missed local calendar day', async () => {
+    const adapter = new InMemoryPersistenceAdapter();
+    const repository = new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    await repository.appendAttempt(attemptRecord());
+
+    const afterMissedDay = await new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => '2026-08-23T08:00:00.000Z',
+    }).initialize();
+
+    expect(afterMissedDay.projections.currentStreak).toBe(0);
+    expect(afterMissedDay.projections.longestStreak).toBe(1);
+  });
+
   it('rejects reuse of an attempt ID with different immutable data', async () => {
     const adapter = new InMemoryPersistenceAdapter();
     const repository = new LearningRepository(adapter, {
@@ -214,7 +295,15 @@ describe('LearningRepository', () => {
     );
     expect(afterContentMigration.metadata.contentVersion).toBe('catalog-3');
     expect(afterContentMigration.attempts).toEqual(migrated.attempts);
-    expect(afterContentMigration.projections).toEqual(migrated.projections);
+    expect(afterContentMigration.projections).toMatchObject({
+      lessonProgress: migrated.projections.lessonProgress,
+      skillMastery: migrated.projections.skillMastery,
+      reviewState: migrated.projections.reviewState,
+      dailyActivity: migrated.projections.dailyActivity,
+      totalXp: migrated.projections.totalXp,
+      longestStreak: migrated.projections.longestStreak,
+      currentStreak: 0,
+    });
   });
 
   it('leaves an unknown future schema untouched instead of resetting it', async () => {
@@ -232,5 +321,20 @@ describe('LearningRepository', () => {
       UnsupportedPersistenceVersionError,
     );
     expect(await adapter.dump()).toBe(futureData);
+  });
+
+  it('allows an explicit learner reset to recover from an unreadable snapshot', async () => {
+    const adapter = new InMemoryPersistenceAdapter('{not valid json');
+    const repository = new LearningRepository(adapter, {
+      contentVersion: 'catalog-2',
+      now: () => REOPENED_AT,
+    });
+
+    await expect(repository.initialize()).rejects.toBeInstanceOf(Error);
+    const recovered = await repository.reset();
+
+    expect(recovered.attempts).toEqual([]);
+    expect(recovered.metadata.contentVersion).toBe('catalog-2');
+    expect(await adapter.dump()).not.toBe('{not valid json');
   });
 });

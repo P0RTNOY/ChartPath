@@ -2,7 +2,7 @@ import type { ReviewState } from '@chartpath/domain';
 
 import { AttemptConflictError, type PersistenceAdapter } from './adapter';
 import { createEmptySnapshot, migratePersistence } from './migrations';
-import { replayAttempts } from './projections';
+import { localDateForTimestamp, replayAttempts } from './projections';
 import type {
   AppendAttemptResult,
   LearnerSettingsPatch,
@@ -103,7 +103,7 @@ export class LearningRepository {
           updatedAt: latestTimestamp(current.metadata.updatedAt, normalized.attempt.submittedAt),
         },
         attempts,
-        projections: replayAttempts(attempts),
+        projections: replayAttempts(attempts, localDateForTimestamp(migrationAt)),
       };
       return {
         nextValue: canonicalStringify(snapshot),
@@ -171,7 +171,7 @@ export class LearningRepository {
           ...current.metadata,
           updatedAt: latestTimestamp(current.metadata.updatedAt, rebuiltAt),
         },
-        projections: replayAttempts(current.attempts),
+        projections: replayAttempts(current.attempts, localDateForTimestamp(rebuiltAt)),
       };
       return {
         nextValue: canonicalStringify(snapshot),

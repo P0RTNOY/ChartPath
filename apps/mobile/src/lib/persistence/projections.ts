@@ -47,7 +47,10 @@ function calendarDayNumber(date: string): number {
   return Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1) / DAY_MS;
 }
 
-function applyDailyStreaks(activity: Readonly<Record<string, DailyActivity>>): {
+function applyDailyStreaks(
+  activity: Readonly<Record<string, DailyActivity>>,
+  asOfDate: string,
+): {
   readonly activity: Readonly<Record<string, DailyActivity>>;
   readonly currentStreak: number;
   readonly longestStreak: number;
@@ -68,14 +71,33 @@ function applyDailyStreaks(activity: Readonly<Record<string, DailyActivity>>): {
     previousDay = day;
   }
 
-  return { activity: result, currentStreak, longestStreak };
+  const latestDate = dates.at(-1);
+  const daysSinceLatest = latestDate
+    ? calendarDayNumber(asOfDate) - calendarDayNumber(latestDate)
+    : Number.POSITIVE_INFINITY;
+  return {
+    activity: result,
+    currentStreak: daysSinceLatest >= 0 && daysSinceLatest <= 1 ? currentStreak : 0,
+    longestStreak,
+  };
+}
+
+export function localDateForTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
  * Rebuilds every projection from the immutable attempt stream. The sort tie-breaker
  * makes the result independent from adapter enumeration order.
  */
-export function replayAttempts(attempts: readonly PersistedAttempt[]): LearningProjections {
+export function replayAttempts(
+  attempts: readonly PersistedAttempt[],
+  asOfDate: string,
+): LearningProjections {
   const lessonProgress: Record<LessonId, LessonProgress> = {};
   const skillMastery: Record<SkillId, SkillMastery> = {};
   const reviewState: Record<SkillId, ReviewState> = {};
@@ -143,7 +165,7 @@ export function replayAttempts(attempts: readonly PersistedAttempt[]): LearningP
     };
   }
 
-  const streaks = applyDailyStreaks(dailyActivity);
+  const streaks = applyDailyStreaks(dailyActivity, asOfDate);
   return {
     projectorVersion: CURRENT_PROJECTOR_VERSION,
     lastAppliedAttemptId: ordered.at(-1)?.attempt.id ?? null,

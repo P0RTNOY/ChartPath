@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { contentVersion, glossary } from '@chartpath/content';
@@ -23,6 +23,17 @@ import { exercises, lessons, skills, units } from '@/data/catalog';
 
 export default function DeveloperCatalogScreen() {
   const theme = useTheme();
+  const { developer } = useLocalSearchParams<{ developer?: string }>();
+  if (!__DEV__ || developer !== '1')
+    return (
+      <Screen>
+        <TopBar back title="כלי מפתחים" />
+        <EmptyState
+          message="הקטלוג נפתח רק ממחוות המפתחים במסך ההגדרות."
+          title="מצב מפתחים אינו פעיל"
+        />
+      </Screen>
+    );
   const interactions = [...new Set(exercises.map((exercise) => exercise.interactionType))];
   return (
     <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
@@ -93,15 +104,27 @@ export default function DeveloperCatalogScreen() {
         <EmptyState message="המצב הריק מסביר מה יופיע כאן ומה אפשר לעשות עכשיו." title="מצב ריק" />
       </View>
       <View style={{ gap: 10 }}>
+        <Heading level={2}>Lesson catalog</Heading>
+        {lessons.map((lesson) => (
+          <Card key={lesson.id} variant="outlined">
+            <View style={{ gap: 5 }}>
+              <UiText variant="label">{lesson.titleHe}</UiText>
+              <LtrText color="textMuted" variant="caption">
+                {lesson.id} • {lesson.unitId} • {lesson.exerciseIds.length} exercises •{' '}
+                {lesson.estimatedMinutes} min
+              </LtrText>
+              <UiText color="textMuted" numberOfLines={2} variant="bodySmall">
+                {lesson.summaryHe}
+              </UiText>
+            </View>
+          </Card>
+        ))}
+      </View>
+      <View style={{ gap: 10 }}>
         <Heading level={2}>Exercise catalog</Heading>
-        {exercises.slice(0, 20).map((exercise) => {
-          const lesson = lessons.find((candidate) => candidate.exerciseIds.includes(exercise.id));
+        {exercises.map((exercise) => {
           return (
-            <Card
-              key={exercise.id}
-              onPress={() => lesson && router.push(`/learn/${lesson.id}?exerciseId=${exercise.id}`)}
-              variant="outlined"
-            >
+            <Card key={exercise.id} variant="outlined">
               <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}>
                 <IconBubble tone="muted">
                   <Glyph name="chart" />

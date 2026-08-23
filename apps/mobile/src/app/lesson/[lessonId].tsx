@@ -16,7 +16,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from '@/components/app-state';
 import { Glyph, IconBubble } from '@/components/glyph';
 import { TopBar } from '@/components/top-bar';
-import { lessonExercises, lessons, skillById } from '@/data/catalog';
+import { isLessonUnlocked, lessonExercises, lessons, skillById } from '@/data/catalog';
 import { useLearning } from '@/state/learning';
 
 export function generateStaticParams() {
@@ -41,6 +41,17 @@ export default function LessonScreen() {
       <Screen>
         <TopBar back title="שיעור לא נמצא" />
         <EmptyState message="ייתכן שהתוכן עודכן. חזרו למסלול ונסו שוב." title="אין שיעור כזה" />
+      </Screen>
+    );
+  if (!isLessonUnlocked(lesson.id, learning.snapshot.projections.lessonProgress))
+    return (
+      <Screen>
+        <TopBar back title="שיעור נעול" />
+        <EmptyState
+          action={<Button onPress={() => router.replace('/home')}>חזרה למסלול</Button>}
+          message="יש להשלים את השיעור הקודם במסלול לפני פתיחת התוכן הזה."
+          title="השיעור עדיין נעול"
+        />
       </Screen>
     );
   const exercises = lessonExercises(lesson.id);

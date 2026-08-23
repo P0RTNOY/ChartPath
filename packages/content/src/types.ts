@@ -1,10 +1,12 @@
 import type {
-  AnswerRubric,
+  AtomicAnswerRubric,
   Exercise,
+  ExerciseOption,
   Lesson,
   Misconception,
   Skill,
   SourceReference,
+  TradeDecision,
   Unit,
 } from '@chartpath/domain';
 
@@ -40,7 +42,11 @@ export interface CapstoneStep {
   readonly id: WorkflowStepId;
   readonly promptHe: string;
   readonly promptEn?: string;
-  readonly rubric: AnswerRubric;
+  readonly rubric: AtomicAnswerRubric;
+  readonly options?: readonly ExerciseOption[];
+  readonly reasonOptions?: readonly ExerciseOption[];
+  /** Explicit authored mapping; option IDs must never be interpreted heuristically. */
+  readonly decisionOptionMap?: Readonly<Record<string, TradeDecision>>;
 }
 
 export interface ContentExercise extends Exercise {
@@ -53,6 +59,9 @@ export interface ContentExercise extends Exercise {
   readonly processCriteriaHe: readonly string[];
   readonly isRiskOrPositionSize: boolean;
   readonly capstoneSteps?: readonly CapstoneStep[];
+  readonly reasonOptions?: readonly ExerciseOption[];
+  /** Explicit authored mapping; option IDs must never be interpreted heuristically. */
+  readonly decisionOptionMap?: Readonly<Record<string, TradeDecision>>;
   readonly sourceReferences: readonly ExactSourceReference[];
 }
 

@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import {
   Pressable,
   View,
+  type AccessibilityRole,
+  type AccessibilityState,
   type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
@@ -21,6 +23,8 @@ export interface CardProps {
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -34,6 +38,8 @@ export function Card({
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityRole = 'button',
+  accessibilityState,
   style,
   testID,
 }: CardProps) {
@@ -74,8 +80,8 @@ export function Card({
     <Pressable
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={{ ...accessibilityState, disabled }}
       disabled={disabled}
       onLongPress={onLongPress}
       onPress={onPress}

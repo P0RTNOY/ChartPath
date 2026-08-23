@@ -3,7 +3,7 @@ import {
   PersistenceCorruptionError,
   UnsupportedPersistenceVersionError,
 } from './adapter';
-import { replayAttempts } from './projections';
+import { localDateForTimestamp, replayAttempts } from './projections';
 import {
   CURRENT_PERSISTENCE_SCHEMA_VERSION,
   CURRENT_PROJECTOR_VERSION,
@@ -84,7 +84,7 @@ export function createEmptySnapshot(contentVersion: string, now: string): Persis
     metadata: createMetadata(contentVersion, now, now),
     settings: DEFAULT_SETTINGS,
     attempts: [],
-    projections: replayAttempts([]),
+    projections: replayAttempts([], localDateForTimestamp(now)),
   };
 }
 
@@ -105,7 +105,7 @@ function migrateV1(
     metadata: createMetadata(targetContentVersion, legacy.createdAt, now),
     settings: normalizeSettings(legacy.settings),
     attempts,
-    projections: replayAttempts(attempts),
+    projections: replayAttempts(attempts, localDateForTimestamp(now)),
   };
 }
 
@@ -136,7 +136,7 @@ function normalizeV2(
       settings: normalizeSettings(value.settings),
       attempts,
       // Projections are rebuildable and never trusted over the event log.
-      projections: replayAttempts(attempts),
+      projections: replayAttempts(attempts, localDateForTimestamp(now)),
     },
     changed: contentVersionChanged || projectorChanged,
   };

@@ -108,7 +108,7 @@ export default function OnboardingScreen() {
             ))}
           </View>
           <Button
-            accessibilityHint="הנתונים יישמרו במכשיר בלבד"
+            accessibilityHint="אין חשבון ואין סנכרון ענן; פרטי גיבוי זמינים בהגדרות"
             fullWidth
             onPress={() => setStep(1)}
             size="large"
@@ -116,7 +116,7 @@ export default function OnboardingScreen() {
             המשך כאורח
           </Button>
           <UiText align="center" color="textMuted" variant="caption">
-            אין צורך בחשבון. ההתקדמות נשמרת במכשיר בלבד.
+            אין צורך בחשבון ואין סנכרון ענן. פרטי גיבוי המכשיר זמינים בהגדרות.
           </UiText>
         </View>
       ) : undefined}

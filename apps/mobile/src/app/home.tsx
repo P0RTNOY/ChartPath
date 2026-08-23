@@ -17,7 +17,7 @@ import { ErrorState, LoadingState } from '@/components/app-state';
 import { Glyph, IconBubble } from '@/components/glyph';
 import { MainScreen } from '@/components/main-screen';
 import { MetricPill, TopBar } from '@/components/top-bar';
-import { lessons, unitLessons, units } from '@/data/catalog';
+import { isUnitUnlocked, lessons, unitLessons, units } from '@/data/catalog';
 import { useLearning } from '@/state/learning';
 
 function todayKey(): string {
@@ -162,9 +162,7 @@ export default function HomeScreen() {
               (lesson) =>
                 lesson.id === currentLesson?.id || progress[lesson.id]?.status === 'in-progress',
             );
-            const locked = unit.prerequisiteUnitIds.some((id) =>
-              unitLessons(id).some((lesson) => progress[lesson.id]?.status !== 'completed'),
-            );
+            const locked = !isUnitUnlocked(unit.id, progress);
             return (
               <View key={unit.id} style={{ flexDirection: 'row-reverse', gap: 12 }}>
                 <View style={{ alignItems: 'center', width: 38 }}>

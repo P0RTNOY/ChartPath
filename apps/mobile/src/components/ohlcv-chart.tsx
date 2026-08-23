@@ -15,7 +15,7 @@ import type {
   GeneratedChart,
   OhlcvCandle,
 } from '@chartpath/domain';
-import { LtrText, UiText, useTheme } from '@chartpath/ui';
+import { Button, Card, LtrText, UiText, useTheme } from '@chartpath/ui';
 
 const CHART_HEIGHT = 320;
 const PLOT_TOP = 18;
@@ -28,11 +28,13 @@ export interface OhlcvChartProps {
   readonly chart: GeneratedChart;
   readonly ticker?: string;
   readonly interactive?: boolean;
+  readonly highlightedCandleIndices?: readonly number[];
   readonly selectedPoints?: readonly ChartAnchor[];
   readonly selectedZone?: ChartZone;
   readonly selectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
   readonly revealCount?: number;
   readonly showAnnotations?: boolean;
+  readonly allowAccessibleDataTable?: boolean;
   readonly onChartPress?: (anchor: ChartAnchor) => void;
   readonly accessibilityLabel?: string;
   readonly testID?: string;
@@ -76,10 +78,10 @@ function chartDescription(
   if (!first || !last) return `גרף ${ticker}, ללא נתונים`;
   const direction =
     last.close > first.open
-      ? 'מגמה עולה'
+      ? 'הסגירה האחרונה גבוהה מהפתיחה הראשונה'
       : last.close < first.open
-        ? 'מגמה יורדת'
-        : 'ללא שינוי מהותי';
+        ? 'הסגירה האחרונה נמוכה מהפתיחה הראשונה'
+        : 'הסגירה האחרונה שווה לפתיחה הראשונה';
   const frame = chartFrame(candles);
   return `גרף נרות ${ticker}, מסגרת זמן ${timeframe}, ${candles.length} נרות, ${direction}, טווח מחיר ${frame.low.toFixed(2)} עד ${frame.high.toFixed(2)}`;
 }
@@ -88,17 +90,20 @@ export function OhlcvChart({
   chart,
   ticker = 'CPTH',
   interactive = false,
+  highlightedCandleIndices = [],
   selectedPoints = [],
   selectedZone,
   selectedLine,
   revealCount,
   showAnnotations = false,
+  allowAccessibleDataTable = true,
   onChartPress,
   accessibilityLabel,
   testID = 'ohlcv-chart',
 }: OhlcvChartProps) {
   const theme = useTheme();
   const [width, setWidth] = useState(680);
+  const [showAccessibleData, setShowAccessibleData] = useState(false);
   const candles = useMemo(
     () => chart.candles.slice(0, revealCount ?? chart.candles.length),
     [chart.candles, revealCount],
@@ -260,17 +265,21 @@ export function OhlcvChart({
               y2={yForPrice(candle.low)}
             />
             <Rect
-              fill={color}
+              fill={rising ? theme.colors.surfaceRaised : color}
               height={Math.max(2, bodyBottom - bodyTop)}
               rx={1}
+              stroke={color}
+              strokeWidth={rising ? 2 : 1}
               width={candleWidth}
               x={x - candleWidth / 2}
               y={bodyTop}
             />
             <Rect
-              fill={color}
-              fillOpacity={0.36}
+              fill={rising ? theme.colors.surfaceRaised : color}
+              fillOpacity={rising ? 1 : 0.36}
               height={volume}
+              stroke={color}
+              strokeWidth={rising ? 1.5 : 0}
               width={candleWidth}
               x={x - candleWidth / 2}
               y={VOLUME_TOP + volumeHeight - volume}
@@ -278,6 +287,20 @@ export function OhlcvChart({
           </G>
         );
       })}
+      {highlightedCandleIndices.map((index) => (
+        <Rect
+          fill={theme.colors.warning}
+          fillOpacity={0.08}
+          height={PLOT_BOTTOM - PLOT_TOP}
+          key={`highlight-${index}`}
+          stroke={theme.colors.warning}
+          strokeDasharray="4 3"
+          strokeWidth={2}
+          width={Math.max(16, candleWidth + 8)}
+          x={xForIndex(index) - Math.max(16, candleWidth + 8) / 2}
+          y={PLOT_TOP}
+        />
+      ))}
       {showAnnotations ? chart.annotations.map(renderAnnotation) : undefined}
       {selectedZone ? (
         <Rect
@@ -383,6 +406,36 @@ export function OhlcvChart({
       >
         {body}
       </Pressable>
+      <UiText color="textMuted" variant="caption">
+        קוד חזותי: נר עולה = גוף חלול; נר יורד = גוף מלא.
+      </UiText>
+      {allowAccessibleDataTable ? (
+        <Button
+          accessibilityLabel={showAccessibleData ? 'הסתרת נתוני נרות' : 'הצגת נתוני נרות נגישים'}
+          onPress={() => setShowAccessibleData((visible) => !visible)}
+          size="compact"
+          variant="ghost"
+        >
+          {showAccessibleData ? 'הסתרת נתוני OHLC' : 'נתוני OHLC נגישים'}
+        </Button>
+      ) : undefined}
+      {allowAccessibleDataTable && showAccessibleData ? (
+        <Card variant="subtle">
+          <View style={{ gap: 5 }}>
+            <UiText variant="label">נתוני הנרות הגלויים</UiText>
+            {candles.map((candle) => {
+              const row = `נר ${candle.index}: פתיחה ${candle.open.toFixed(2)}, שיא ${candle.high.toFixed(2)}, שפל ${candle.low.toFixed(2)}, סגירה ${candle.close.toFixed(2)}, מחזור ${Math.round(candle.volume)}`;
+              return (
+                <View accessible accessibilityLabel={row} key={candle.index}>
+                  <LtrText color="textMuted" variant="caption">
+                    {`${candle.index} | O ${candle.open.toFixed(2)} H ${candle.high.toFixed(2)} L ${candle.low.toFixed(2)} C ${candle.close.toFixed(2)} V ${Math.round(candle.volume)}`}
+                  </LtrText>
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+      ) : undefined}
     </View>
   );
 }

@@ -30,6 +30,8 @@ describe('onboarding', () => {
       expect.arrayContaining([expect.objectContaining({ direction: 'rtl' })]),
     );
     expect(screen.getByText('מסלול ברור לקריאת גרפים')).toBeTruthy();
+    expect(screen.getByText(/אין צורך בחשבון ואין סנכרון ענן/)).toBeTruthy();
+    expect(screen.queryByText(/במכשיר בלבד/)).toBeNull();
 
     await fireEvent.press(screen.getByRole('button', { name: 'המשך כאורח' }));
     await fireEvent.press(screen.getByRole('checkbox'));

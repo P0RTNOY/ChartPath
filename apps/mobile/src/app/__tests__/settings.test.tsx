@@ -43,4 +43,14 @@ describe('settings accessibility preferences', () => {
     await fireEvent(screen.getByTestId('reduced-motion-switch'), 'valueChange', true);
     await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledWith({ reducedMotion: true }));
   });
+
+  it('discloses platform backup behavior alongside local-data controls', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <SettingsScreen />
+      </ChartPathThemeProvider>,
+    );
+    expect(screen.getByText(/גיבוי האפליקציה מושבת ב־Android/)).toBeTruthy();
+    expect(screen.getByText(/iCloud/)).toBeTruthy();
+  });
 });

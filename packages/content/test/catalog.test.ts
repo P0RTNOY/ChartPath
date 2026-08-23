@@ -166,4 +166,111 @@ describe('reviewed curriculum catalog', () => {
     };
     expect(issueCodes(copy)).toContain('source-page-offset');
   });
+
+  it('rejects semantic chart drift from the editorial annotation fingerprint', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises[0]!;
+    (copy.exercises as ContentCatalog['exercises'][number][])[0] = {
+      ...exercise,
+      chartSpec: { ...exercise.chartSpec!, seed: exercise.chartSpec!.seed + 1_000_000 },
+    };
+    expect(issueCodes(copy)).toContain('expected-annotations-mismatch');
+  });
+
+  it('rejects decision choices without an explicit reachable mapping', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u10-capstone-e04')!;
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      decisionOptionMap: { 'decision-no-trade-honest': 'no-trade' },
+    };
+    expect(issueCodes(copy)).toContain('insufficient-decision-options');
+  });
+
+  it('rejects decision feedback that no rendered choice or reason can reach', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u05-reversal-e01')!;
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      alternativeExplanations: [
+        { ...exercise.alternativeExplanations[0]!, answerId: 'unreachable-answer' },
+      ],
+    };
+    expect(issueCodes(copy)).toContain('unreachable-alternative-feedback');
+  });
+
+  it('rejects capstone feedback that no rendered workflow-step answer can reach', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u10-capstone-e03')!;
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      alternativeExplanations: [
+        { ...exercise.alternativeExplanations[0]!, answerId: 'unreachable-capstone-answer' },
+      ],
+    };
+    expect(issueCodes(copy)).toContain('unreachable-capstone-feedback');
+  });
+
+  it('rejects a feedback code that the exercise rubric cannot emit', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u08-risk-e03')!;
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      alternativeExplanations: [
+        {
+          ...exercise.alternativeExplanations[0]!,
+          feedbackCode: 'option-not-accepted',
+        },
+      ],
+    };
+    expect(issueCodes(copy)).toContain('unreachable-alternative-feedback-code');
+  });
+
+  it('rejects a capstone rubric answer without an authored learner-visible choice', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u10-capstone-e03')!;
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    const setup = exercise.capstoneSteps!.find((step) => step.id === 'setup')!;
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      capstoneSteps: exercise.capstoneSteps!.map((step) =>
+        step.id === 'setup'
+          ? {
+              ...setup,
+              options: setup.options?.filter(
+                (option) => option.id !== 'possible-head-and-shoulders',
+              ),
+            }
+          : step,
+      ),
+    };
+    expect(issueCodes(copy)).toContain('missing-capstone-rubric-choice');
+  });
+
+  it('rejects label-placement targets beyond the decision window', () => {
+    const copy = cloneCatalog();
+    const exercise = copy.exercises.find((item) => item.id === 'u01-chart-data-e01')!;
+    if (exercise.rubric.kind !== 'label-placement') throw new Error('Expected label rubric.');
+    const index = copy.exercises.findIndex((item) => item.id === exercise.id);
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      rubric: {
+        ...exercise.rubric,
+        targets: [
+          {
+            ...exercise.rubric.targets[0]!,
+            target: {
+              ...exercise.rubric.targets[0]!.target,
+              candleIndex: exercise.chartSpec!.decisionCandleIndex! + 1,
+            },
+          },
+        ],
+      },
+    };
+    expect(issueCodes(copy)).toContain('future-rubric-target');
+  });
 });

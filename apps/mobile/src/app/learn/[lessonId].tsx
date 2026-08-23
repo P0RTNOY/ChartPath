@@ -21,7 +21,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/app-state';
 import { ExerciseInteraction } from '@/components/exercise-interaction';
 import { Glyph } from '@/components/glyph';
 import { OhlcvChart } from '@/components/ohlcv-chart';
-import { lessonExercises, lessons } from '@/data/catalog';
+import { isLessonUnlocked, lessonExercises, lessons } from '@/data/catalog';
+import { matchingAlternativeExplanation } from '@/data/feedback-answer-ids';
 import { useLearning } from '@/state/learning';
 
 export function generateStaticParams() {
@@ -88,16 +89,22 @@ export default function LessonPlayerScreen() {
         />
       </Screen>
     );
+  if (!isLessonUnlocked(lesson.id, learning.snapshot.projections.lessonProgress))
+    return (
+      <Screen>
+        <EmptyState
+          action={<Button onPress={() => router.replace('/home')}>חזרה למסלול</Button>}
+          message="יש להשלים את השיעור הקודם לפני פתיחת התרגול הזה."
+          title="השיעור עדיין נעול"
+        />
+      </Screen>
+    );
 
   const hints = exercise.hints.slice(0, hintCount);
-  const answerAlternativeId =
-    answer?.kind === 'multiple-choice'
-      ? answer.optionId
-      : answer?.kind === 'decision'
-        ? answer.decision
-        : undefined;
-  const alternative = exercise.alternativeExplanations.find(
-    (item) => item.answerId === answerAlternativeId,
+  const alternative = matchingAlternativeExplanation(
+    exercise.alternativeExplanations,
+    answer,
+    result,
   );
 
   const submit = async () => {
@@ -265,10 +272,18 @@ export default function LessonPlayerScreen() {
 
       {phase === 'question' ? (
         <>
+          {chart &&
+          !['point', 'zone', 'line'].includes(exercise.rubric.kind) &&
+          !['label-placement', 'timeframe-comparison', 'sequential-reveal'].includes(
+            exercise.interactionType,
+          ) ? (
+            <OhlcvChart chart={chart} ticker="CPTH" />
+          ) : undefined}
           <ExerciseInteraction
             answer={answer}
             chart={chart}
             exercise={exercise}
+            key={exercise.id}
             onChange={setAnswer}
           />
           {hints.map((hint) => (

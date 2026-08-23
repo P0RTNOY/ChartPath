@@ -243,9 +243,22 @@ export interface DecisionRubric extends BaseRubric {
   readonly kind: 'decision';
   readonly acceptedDecisions: readonly TradeDecision[];
   readonly requiredReasonIds?: readonly string[];
+  readonly allowExtraReasons?: boolean;
 }
 
-export type AnswerRubric =
+export interface LabelPlacementTarget {
+  readonly labelId: string;
+  readonly target: ChartAnchor;
+}
+
+export interface LabelPlacementRubric extends BaseRubric {
+  readonly kind: 'label-placement';
+  readonly targets: readonly LabelPlacementTarget[];
+  readonly tolerance: NormalizedTolerance;
+  readonly decisionCandleIndex?: number;
+}
+
+export type AtomicAnswerRubric =
   | MultipleChoiceRubric
   | SelectionRubric
   | SequenceRubric
@@ -253,7 +266,20 @@ export type AnswerRubric =
   | ZoneRubric
   | LineRubric
   | RiskRubric
-  | DecisionRubric;
+  | DecisionRubric
+  | LabelPlacementRubric;
+
+export interface CapstoneStepRubric {
+  readonly id: string;
+  readonly rubric: AtomicAnswerRubric;
+}
+
+export interface CapstoneRubric extends BaseRubric {
+  readonly kind: 'capstone';
+  readonly steps: readonly CapstoneStepRubric[];
+}
+
+export type AnswerRubric = AtomicAnswerRubric | CapstoneRubric;
 
 export interface MultipleChoiceAnswer {
   readonly kind: 'multiple-choice';
@@ -297,9 +323,19 @@ export interface DecisionAnswer {
   readonly kind: 'decision';
   readonly decision: TradeDecision;
   readonly reasonIds?: readonly string[];
+  /** Authored presentation ID retained for misconception-specific feedback. */
+  readonly optionId?: string;
 }
 
-export type ExerciseAnswer =
+export interface LabelPlacementAnswer {
+  readonly kind: 'label-placement';
+  readonly placements: readonly {
+    readonly labelId: string;
+    readonly anchor: ChartAnchor;
+  }[];
+}
+
+export type AtomicExerciseAnswer =
   | MultipleChoiceAnswer
   | SelectionAnswer
   | SequenceAnswer
@@ -307,14 +343,23 @@ export type ExerciseAnswer =
   | ZoneAnswer
   | LineAnswer
   | RiskAnswer
-  | DecisionAnswer;
+  | DecisionAnswer
+  | LabelPlacementAnswer;
+
+export interface CapstoneStepAnswer {
+  readonly stepId: string;
+  readonly answer: AtomicExerciseAnswer;
+}
+
+export interface CapstoneAnswer {
+  readonly kind: 'capstone';
+  readonly stepAnswers: readonly CapstoneStepAnswer[];
+}
+
+export type ExerciseAnswer = AtomicExerciseAnswer | CapstoneAnswer;
 
 export type ExerciseInteractionType =
-  | AnswerRubric['kind']
-  | 'label-placement'
-  | 'timeframe-comparison'
-  | 'mistake-diagnosis'
-  | 'sequential-reveal';
+  AnswerRubric['kind'] | 'timeframe-comparison' | 'mistake-diagnosis' | 'sequential-reveal';
 
 export interface ExerciseOption {
   readonly id: string;
@@ -330,7 +375,9 @@ export interface ExerciseHint {
 }
 
 export interface AlternativeExplanation {
-  readonly answerId: string;
+  /** Exactly one match key is authored: a learner-visible answer ID or a grader feedback code. */
+  readonly answerId?: string;
+  readonly feedbackCode?: string;
   readonly explanationHe: string;
   readonly explanationEn?: string;
   readonly misconceptionId?: MisconceptionId;

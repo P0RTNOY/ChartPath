@@ -24,6 +24,7 @@ import {
   type LearnerSettingsPatch,
   type PersistenceSnapshot,
 } from '@/lib/persistence';
+import { boundedAttemptTiming } from '@/data/attempt-timing';
 
 export const DISCLAIMER_VERSION = 'chartpath-education-he-2026-08';
 
@@ -148,7 +149,9 @@ export function LearningProvider({ children }: { readonly children: ReactNode })
           : undefined,
       );
       const attemptId = `${input.exercise.id}:${submittedAt}:${Math.random().toString(36).slice(2, 8)}`;
-      const responseTimeMs = Math.max(0, Date.parse(submittedAt) - Date.parse(input.startedAt));
+      // Timing is diagnostic only. A suspended/backgrounded app must not make
+      // the learner's answer impossible to save after a long session.
+      const { responseTimeMs, activeMinutes } = boundedAttemptTiming(input.startedAt, submittedAt);
       const append = await repository().appendAttempt({
         attempt: {
           id: attemptId,
@@ -170,7 +173,7 @@ export function LearningProvider({ children }: { readonly children: ReactNode })
         xpAwarded: result.correct ? 20 : Math.max(4, Math.round(result.score * 12)),
         activityDate: localDate(submittedAt),
         dailyGoalMinutes: snapshot.settings.dailyGoalMinutes,
-        activeMinutes: Math.max(1, Math.round(responseTimeMs / 60_000)),
+        activeMinutes,
         completesLesson: input.completesLesson ?? false,
       });
       setSnapshot(append.snapshot);
@@ -182,6 +185,8 @@ export function LearningProvider({ children }: { readonly children: ReactNode })
   const resetData = useCallback(async () => {
     const next = await repository().reset();
     setSnapshot(next);
+    setError(null);
+    setStatus('ready');
   }, [repository]);
 
   const value = useMemo<LearningContextValue>(

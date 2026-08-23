@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#071B2D",
         "foregroundImage": "./assets/images/chartpath-icon.png"

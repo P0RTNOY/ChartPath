@@ -61,7 +61,7 @@ export default function GlossaryScreen() {
           <Pressable
             accessibilityLabel="ניקוי החיפוש"
             onPress={() => setQuery('')}
-            style={{ alignItems: 'center', height: 44, justifyContent: 'center', width: 36 }}
+            style={{ alignItems: 'center', height: 44, justifyContent: 'center', width: 44 }}
           >
             <Glyph name="close" />
           </Pressable>

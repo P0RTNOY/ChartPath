@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import type { GeneratedChart } from '@chartpath/domain';
 import { ChartPathThemeProvider } from '@chartpath/ui';
@@ -58,7 +58,8 @@ describe('OhlcvChart accessibility', () => {
       </ChartPathThemeProvider>,
     );
     expect(screen.getByLabelText(/גרף נרות CPTH/)).toBeTruthy();
-    expect(screen.getByLabelText(/3 נרות, מגמה עולה/)).toBeTruthy();
+    expect(screen.getByLabelText(/3 נרות, הסגירה האחרונה גבוהה מהפתיחה הראשונה/)).toBeTruthy();
+    expect(screen.getByText(/נר עולה = גוף חלול/)).toBeTruthy();
   });
 
   it('describes an interactive chart as a button', async () => {
@@ -68,5 +69,16 @@ describe('OhlcvChart accessibility', () => {
       </ChartPathThemeProvider>,
     );
     expect(screen.getByRole('button', { name: /גרף נרות CPTH/ })).toBeTruthy();
+  });
+
+  it('provides every visible candle as screen-reader-operable OHLC data', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart chart={chart} />
+      </ChartPathThemeProvider>,
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני נרות נגישים' }));
+    expect(screen.getByLabelText(/נר 0: פתיחה 100.00, שיא 103.00/)).toBeTruthy();
+    expect(screen.getByLabelText(/נר 2: פתיחה 104.00, שיא 108.00/)).toBeTruthy();
   });
 });

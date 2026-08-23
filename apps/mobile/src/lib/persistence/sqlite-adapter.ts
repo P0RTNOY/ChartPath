@@ -199,17 +199,22 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       );
       const currentValue = row?.payload_json ?? null;
       const next = mutation(currentValue);
-      const previousAttempts = byId(extractAttempts(currentValue));
       const nextAttempts = byId(extractAttempts(next.nextValue));
 
-      const removed = [...previousAttempts.keys()].filter((id) => !nextAttempts.has(id));
-      if (removed.length > 0 && next.allowAttemptDeletion !== true) {
-        throw new Error('Attempt deletion is only allowed through repository reset.');
-      }
-      for (const [id, previous] of previousAttempts) {
-        const following = nextAttempts.get(id);
-        if (following && canonicalStringify(previous) !== canonicalStringify(following)) {
-          throw new AttemptConflictError(id);
+      // An explicit learner-authorized reset must be able to recover even when
+      // the previous snapshot is too corrupt to parse. Normal writes retain the
+      // append-only comparison and fail closed.
+      if (next.allowAttemptDeletion !== true) {
+        const previousAttempts = byId(extractAttempts(currentValue));
+        const removed = [...previousAttempts.keys()].filter((id) => !nextAttempts.has(id));
+        if (removed.length > 0) {
+          throw new Error('Attempt deletion is only allowed through repository reset.');
+        }
+        for (const [id, previous] of previousAttempts) {
+          const following = nextAttempts.get(id);
+          if (following && canonicalStringify(previous) !== canonicalStringify(following)) {
+            throw new AttemptConflictError(id);
+          }
         }
       }
 
