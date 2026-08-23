@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 
-import { useTheme } from './theme';
+import { useChartPathTheme } from './theme';
 import type { LayoutDirection, ThemeColors, TypographyVariant } from './tokens';
 
 export type TextColor = keyof ThemeColors;
@@ -41,15 +41,22 @@ export function UiText({
   maxFontSizeMultiplier = 2,
   ...props
 }: UiTextProps) {
-  const theme = useTheme();
+  const { theme, textScale } = useChartPathTheme();
   const resolvedDirection = direction ?? theme.direction;
+  const typography = theme.typography[variant];
+  const scaledTypography: TextStyle = {
+    ...typography,
+    fontSize: typeof typography.fontSize === 'number' ? typography.fontSize * textScale : undefined,
+    lineHeight:
+      typeof typography.lineHeight === 'number' ? typography.lineHeight * textScale : undefined,
+  };
 
   return (
     <Text
       allowFontScaling={allowFontScaling}
       maxFontSizeMultiplier={maxFontSizeMultiplier}
       style={[
-        theme.typography[variant],
+        scaledTypography,
         {
           color: theme.colors[color],
           direction: resolvedDirection,

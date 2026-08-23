@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "ChartPath",
+    "slug": "chartpath",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/images/chartpath-icon.png",
+    "scheme": "chartpath",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/chartpath-icon.png",
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#071B2D",
+        "foregroundImage": "./assets/images/chartpath-icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/chartpath-favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#071B2D",
+          "image": "./assets/images/chartpath-icon.png",
+          "imageWidth": 112,
+          "dark": {
+            "backgroundColor": "#061722",
+            "image": "./assets/images/chartpath-icon.png"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

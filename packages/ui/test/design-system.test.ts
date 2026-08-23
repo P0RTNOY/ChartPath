@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { defaultMasteryLevels, getMasteryLevel } from '../src/mastery-utils';
 import { normalizeProgress } from '../src/progress-utils';
-import { darkColors, lightColors } from '../src/tokens';
+import { darkColors, lightColors, normalizeTextScale } from '../src/tokens';
 
 function relativeLuminance(hex: string): number {
   const channels = hex
@@ -57,6 +57,15 @@ describe('normalizeProgress', () => {
 
   it('supports non-percentage scales', () => {
     expect(normalizeProgress(3, 4)).toEqual({ value: 3, max: 4, ratio: 0.75, percent: 75 });
+  });
+});
+
+describe('normalizeTextScale', () => {
+  it('keeps user-controlled text scaling within a layout-safe accessible range', () => {
+    expect(normalizeTextScale(1.15)).toBe(1.15);
+    expect(normalizeTextScale(0.5)).toBe(1);
+    expect(normalizeTextScale(2)).toBe(1.4);
+    expect(normalizeTextScale(Number.NaN)).toBe(1);
   });
 });
 

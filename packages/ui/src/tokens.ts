@@ -192,6 +192,10 @@ export const typography = {
 
 export type TypographyVariant = keyof typeof typography;
 
+export function normalizeTextScale(value: number): number {
+  return Number.isFinite(value) ? Math.min(1.4, Math.max(1, value)) : 1;
+}
+
 export const layout = {
   minimumTouchTarget: 44,
   comfortableTouchTarget: 48,

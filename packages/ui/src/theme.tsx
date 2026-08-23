@@ -1,7 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, useColorScheme } from 'react-native';
 
-import { createTheme, type ChartPathTheme, type ColorScheme, type LayoutDirection } from './tokens';
+import {
+  createTheme,
+  normalizeTextScale,
+  type ChartPathTheme,
+  type ColorScheme,
+  type LayoutDirection,
+} from './tokens';
 
 export type ThemeMode = ColorScheme | 'system';
 export type ReducedMotionPreference = boolean | 'system';
@@ -9,11 +15,13 @@ export type ReducedMotionPreference = boolean | 'system';
 export interface ThemeContextValue {
   theme: ChartPathTheme;
   reducedMotion: boolean;
+  textScale: number;
 }
 
 const fallbackContext: ThemeContextValue = {
   theme: createTheme('light'),
   reducedMotion: false,
+  textScale: 1,
 };
 
 const ThemeContext = createContext<ThemeContextValue>(fallbackContext);
@@ -49,6 +57,7 @@ export interface ChartPathThemeProviderProps {
   mode?: ThemeMode;
   direction?: LayoutDirection;
   reducedMotion?: ReducedMotionPreference;
+  textScale?: number;
 }
 
 export function ChartPathThemeProvider({
@@ -56,6 +65,7 @@ export function ChartPathThemeProvider({
   mode = 'system',
   direction = 'rtl',
   reducedMotion: reducedMotionPreference = 'system',
+  textScale = 1,
 }: ChartPathThemeProviderProps) {
   const systemScheme = useColorScheme();
   const systemReducedMotion = useSystemReducedMotion();
@@ -67,9 +77,10 @@ export function ChartPathThemeProvider({
         : 'light';
   const reducedMotion =
     reducedMotionPreference === 'system' ? systemReducedMotion : reducedMotionPreference;
+  const safeTextScale = normalizeTextScale(textScale);
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme: createTheme(scheme, direction), reducedMotion }),
-    [direction, reducedMotion, scheme],
+    () => ({ theme: createTheme(scheme, direction), reducedMotion, textScale: safeTextScale }),
+    [direction, reducedMotion, safeTextScale, scheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -85,6 +96,10 @@ export function useTheme(): ChartPathTheme {
 
 export function useReducedMotion(): boolean {
   return useChartPathTheme().reducedMotion;
+}
+
+export function useTextScale(): number {
+  return useChartPathTheme().textScale;
 }
 
 export const ThemeProvider = ChartPathThemeProvider;
