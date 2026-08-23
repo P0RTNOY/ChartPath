@@ -26,6 +26,20 @@ pnpm mobile:web
 The application is guest-first and works without API keys or cloud services. Progress is stored on
 the device. See `docs/RELEASE_READINESS.md` for currently verified targets and known limitations.
 
+## Verification
+
+```sh
+pnpm check
+pnpm build
+pnpm test:e2e:web
+pnpm --filter @chartpath/mobile export:web
+```
+
+The production web export is verified end to end at phone and tablet viewports. Expo's iOS and
+Android Hermes bundles also export successfully; native UI, device SQLite, and screen-reader runs
+remain explicit gates before any distribution. Reproducible screenshot evidence is under
+`docs/screenshots/`.
+
 ## Educational safety
 
 All charts are synthetic. Examples explain observations, prerequisites, uncertainty, invalidation,

@@ -1,10 +1,9 @@
 # Privacy, Security, and Financial Safety
 
-> Status snapshot: 2026-08-23. This is the required policy and engineering design
-> for the beta, not evidence that controls are already implemented. The repository
-> contained no application code when this document was drafted. Verified controls
-> and unresolved gaps must be recorded in `docs/RELEASE_READINESS.md` before beta
-> distribution.
+> Status snapshot: 2026-08-23. This document defines the policy and engineering
+> requirements and now accompanies an implemented local beta. Evidence for controls,
+> test coverage, platform-backup behavior, and unresolved distribution gates is kept
+> in `docs/RELEASE_READINESS.md`; a requirement here is not evidence by itself.
 
 ## Product safety position
 
@@ -25,8 +24,9 @@ gaps, correlation, and leverage can change outcomes. “Wait,” “no trade,”
   release.
 - **Future design** means it is explicitly outside the offline beta and must not be
   represented as available.
-- **Verified** requires linked test or manual evidence. No control is marked verified
-  in this initial draft.
+- **Verified** requires linked automated or manual evidence in the release-readiness
+  record. Verification is target-specific; a passing web journey does not establish
+  native-device or screen-reader behavior.
 
 ## Data-minimization baseline
 
@@ -62,6 +62,12 @@ database encryption. Device lock, OS compromise, debugging tools, and platform c
 backup behavior affect confidentiality. Release documentation must state whether
 the database is included in iCloud/Android backups and either configure the intended
 exclusion or accurately disclose that it may be part of the user's device backup.
+
+For the current candidate, Android manifest generation is configured with
+`allowBackup: false`. The iOS SQLite container has not yet been marked or verified as
+excluded from iCloud/device backup, so it may be included according to platform and
+user settings. That uncertainty is an explicit native-distribution NO-GO gate rather
+than a claim that local storage can never leave the device through OS backup.
 
 ## No telemetry by default
 

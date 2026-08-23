@@ -13,14 +13,14 @@ Updated: 2026-08-23
 
 ## Milestones
 
-| Milestone                         | Status      | Evidence / next work                                        |
-| --------------------------------- | ----------- | ----------------------------------------------------------- |
-| 1. Product and source audit       | In progress | Full PDF audit and curriculum traceability underway.        |
-| 2. Domain and content foundation  | In progress | Workspace scaffolded; schemas, engines, tests next.         |
-| 3. End-to-end learning slice      | Pending     | Onboarding → lesson → persisted summary.                    |
-| 4. Adaptive review and curriculum | Pending     | 12 lessons, 60 reviewed exercises, glossary, capstone.      |
-| 5. Polish and accessibility       | Pending     | RTL, themes, reduced motion, large text, responsive checks. |
-| 6. Beta verification              | Pending     | Full checks, web export, browser journeys and screenshots.  |
+| Milestone                         | Status   | Evidence / next work                                                      |
+| --------------------------------- | -------- | ------------------------------------------------------------------------- |
+| 1. Product and source audit       | Complete | All 87 PDF pages, diagrams and printed-page offsets audited.              |
+| 2. Domain and content foundation  | Complete | Pure engines, schemas, versioning and 128 package tests pass.             |
+| 3. End-to-end learning slice      | Complete | Onboarding → five exercises → persisted summary passes E2E.               |
+| 4. Adaptive review and curriculum | Complete | 12 lessons, 60 reviewed exercises, glossary and capstone validate.        |
+| 5. Polish and accessibility       | Complete | RTL, themes, motion, user text scale and responsive screenshots verified. |
+| 6. Beta verification              | Complete | Static checks, 174 tests, 4 E2E journeys and all platform bundles pass.   |
 
 ## Decisions
 
@@ -33,10 +33,18 @@ Updated: 2026-08-23
 
 ## Validation log
 
-| Date       | Command / inspection                  | Result                                        |
-| ---------- | ------------------------------------- | --------------------------------------------- |
-| 2026-08-23 | Initial `git status --short --branch` | `main`, no commits, empty worktree.           |
-| 2026-08-23 | `pdfinfo` on supplied source          | 87 pages, unencrypted, no JavaScript, 1.7 MB. |
-| 2026-08-23 | Expo default template generation      | Selected Expo 57.0.15 / React Native 0.86.2.  |
+| Date       | Command / inspection                      | Result                                                                                |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| 2026-08-23 | Initial `git status --short --branch`     | `main`, no commits, empty worktree.                                                   |
+| 2026-08-23 | `pdfinfo` on supplied source              | 87 pages, unencrypted, no JavaScript, 1.7 MB.                                         |
+| 2026-08-23 | Expo default template generation          | Selected Expo 57.0.15 / React Native 0.86.2.                                          |
+| 2026-08-23 | `pnpm check`                              | PASS; format, lint, strict types, 174 tests, content validation.                      |
+| 2026-08-23 | `pnpm content:validate`                   | PASS; 12 lessons, 60/60 reviewed exercises, all quotas.                               |
+| 2026-08-23 | `pnpm test:e2e:web`                       | PASS; 4/4 production-export journeys on phone and tablet.                             |
+| 2026-08-23 | `pnpm dlx expo-doctor@latest apps/mobile` | PASS; 21/21 checks.                                                                   |
+| 2026-08-23 | Expo web, iOS and Android exports         | PASS; 49 web routes and both Hermes native bundles emitted.                           |
+| 2026-08-23 | Visual screenshot inspection              | PASS after fixing chart-axis RTL clipping.                                            |
+| 2026-08-23 | `pnpm audit --prod --audit-level high`    | PASS release threshold; 0 high/critical, one documented moderate build-tool advisory. |
 
-Keep this file current as implementation and verification proceed.
+Native UI/runtime, SQLite-on-device, and screen-reader verification remain distribution gates; see
+`docs/RELEASE_READINESS.md`.
