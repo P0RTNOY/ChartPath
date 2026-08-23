@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.expo/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+apps/mobile/.expo/
+apps/mobile/dist/

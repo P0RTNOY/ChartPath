@@ -1,0 +1,34 @@
+{
+  "name": "chartpath",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm content:validate",
+    "content:validate": "pnpm --filter @chartpath/content validate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "pnpm -r --if-present lint",
+    "mobile": "pnpm --filter @chartpath/mobile start",
+    "mobile:web": "pnpm --filter @chartpath/mobile web",
+    "test:e2e:web": "playwright test",
+    "web:e2e:serve": "pnpm --filter @chartpath/mobile export:web && serve apps/mobile/dist -l 4173",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.3.0",
+    "eslint": "^9.36.0",
+    "prettier": "^3.6.2",
+    "serve": "^14.2.5",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^4.1.11"
+  }
+}
