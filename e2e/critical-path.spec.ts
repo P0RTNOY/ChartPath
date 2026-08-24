@@ -115,6 +115,7 @@ test('glossary search and accessibility preferences work without an account', as
 test('learner completes a deterministic Chart Lab trendline analysis', async ({ page }) => {
   await beginFreshGuest(page);
   await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+  await page.getByRole('button', { name: 'פתיחת תרגול קו המגמה' }).click();
 
   await expect(page.getByTestId('chart-lab-screen')).toBeVisible();
   await expect(page.getByTestId('workbench-chart')).toBeVisible();
@@ -138,4 +139,133 @@ test('learner completes a deterministic Chart Lab trendline analysis', async ({ 
   await expect(page.getByTestId('workbench-feedback')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'סימון מדויק' })).toBeVisible();
   await expect(page.getByTestId('workbench-chart-expected-line')).toHaveCount(1);
+});
+
+async function submitGuidedSelections(page: Page, labels: readonly string[]) {
+  for (const label of labels) {
+    await page.getByRole('checkbox', { name: label, exact: true }).click();
+  }
+  await page.getByRole('button', { name: /הגשת השלב/ }).click();
+}
+
+async function startGuidedAnalysis(page: Page) {
+  await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+  await page.getByRole('button', { name: 'התחלת ניתוח חדש' }).click();
+  await expect(page.getByTestId('guided-analysis-session')).toBeVisible();
+}
+
+async function completeGuidedAnalysis(page: Page) {
+  await submitGuidedSelections(page, ['המגמה השבועית עולה', 'הרעיון הוא מכירה בחסר נגד המגמה']);
+  await submitGuidedSelections(page, ['מועמד לשלושה שיאים', 'שפל ביניים נצפה']);
+  await submitGuidedSelections(page, ['תמיכה שבועית 82.7', 'אזור קו צוואר 88']);
+  await submitGuidedSelections(page, ['ראש וכתפיים אפשרי']);
+  await submitGuidedSelections(page, ['סגירה יומית מתחת ל־88']);
+  await submitGuidedSelections(page, ['טריגר כניסה תאורטי 87.8']);
+  await submitGuidedSelections(page, ['ביטול תוקף מעל הכתף הימנית', 'הוראת עצירה אפשרית 98.6']);
+
+  await page.getByRole('textbox', { name: 'סיכון חשבון' }).fill('600');
+  await page.getByRole('textbox', { name: 'סיכון ליחידה' }).fill('11');
+  await page.getByRole('textbox', { name: 'מספר יחידות' }).fill('54');
+  await page.getByRole('button', { name: /הגשת השלב/ }).click();
+
+  await page.getByRole('textbox', { name: 'מכפיל סיכון' }).fill('0.48');
+  await page.getByRole('button', { name: /הגשת השלב/ }).click();
+
+  await page.getByRole('radio', { name: 'אין עסקה ואין פוזיציה לניהול' }).click();
+  await page.getByRole('checkbox', { name: 'לא נפתחה פוזיציה לאחר הפסילה' }).click();
+  await page.getByRole('button', { name: /הגשת השלב/ }).click();
+
+  await submitGuidedSelections(page, [
+    'ההקשר נבדק לפני התבנית',
+    'המכשול והיחס נבדקו מראש',
+    'איכות התהליך נפרדת מן התוצאה',
+  ]);
+}
+
+test('guided analysis resumes exact answers, replay, and learner annotations after leaving', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await beginFreshGuest(page);
+  await startGuidedAnalysis(page);
+
+  await submitGuidedSelections(page, ['המגמה השבועית עולה', 'הרעיון הוא מכירה בחסר נגד המגמה']);
+  await submitGuidedSelections(page, ['מועמד לשלושה שיאים', 'שפל ביניים נצפה']);
+
+  await page.getByRole('button', { name: 'כלי מחברת נקודה' }).click();
+  await page.getByRole('button', { name: 'סימון מדויק לפי נר ומחיר' }).click();
+  await page.getByRole('textbox', { name: 'מספר הנר במחברת' }).fill('12');
+  await page.getByRole('textbox', { name: 'מחיר במחברת' }).fill('88');
+  await page.getByRole('button', { name: 'החלת הנר והמחיר במחברת' }).click();
+  await page.getByRole('button', { name: 'הנר הבא' }).click();
+  await expect(page.getByText('נשמר במכשיר')).toBeVisible();
+
+  await page.goto('/home');
+  await expect(page.getByText('המשך מאותה טיוטה שמורה')).toBeVisible();
+  await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+  await expect(page.getByTestId('analysis-resume-card')).toContainText('2/11');
+  await page.getByRole('button', { name: 'המשך הניתוח' }).click();
+
+  await expect(page.getByTestId('guided-analysis-session')).toContainText('2/11');
+  await expect(page.getByRole('button', { name: /בחירת נקודה בנר/ })).toHaveCount(1);
+  await expect(page.getByTestId('guided-analysis-session')).toContainText('25/60');
+  await expect(page.getByRole('checkbox', { name: 'תמיכה שבועית 82.7', exact: true })).toHaveCount(
+    1,
+  );
+});
+
+test('guided analysis finalizes once, survives reload, and reopens read-only from history', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await beginFreshGuest(page);
+  await startGuidedAnalysis(page);
+  await completeGuidedAnalysis(page);
+
+  const finalizeHeading = page.getByRole('heading', { name: /השלבים הוגשו/ });
+  await finalizeHeading.scrollIntoViewIfNeeded();
+  await expect(finalizeHeading).toBeVisible();
+  await page.getByRole('button', { name: 'סיום מפורש של הניתוח' }).click();
+  await page.getByRole('button', { name: 'אישור וסיום' }).click();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  await expect(page.getByText('ציון תהליך')).toBeVisible();
+
+  const committed = await page.evaluate(() => {
+    const raw = localStorage.getItem('chartpath:guest-learning-data:v1');
+    const parsed = JSON.parse(raw ?? '{}') as {
+      attempts?: readonly { attempt?: { exerciseId?: string } }[];
+      projections?: { totalXp?: number };
+      analysisSessions?: readonly { status?: string }[];
+    };
+    return {
+      attempts: parsed.attempts?.filter(({ attempt }) => attempt?.exerciseId === 'u10-capstone-e03')
+        .length,
+      totalXp: parsed.projections?.totalXp,
+      finalized: parsed.analysisSessions?.filter(({ status }) => status === 'finalized').length,
+    };
+  });
+  expect(committed).toEqual({ attempts: 1, totalXp: 20, finalized: 1 });
+
+  await page.reload();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  const afterReload = await page.evaluate(() => {
+    const raw = localStorage.getItem('chartpath:guest-learning-data:v1');
+    const parsed = JSON.parse(raw ?? '{}') as {
+      attempts?: readonly { attempt?: { exerciseId?: string } }[];
+      projections?: { totalXp?: number };
+    };
+    return {
+      attempts: parsed.attempts?.filter(({ attempt }) => attempt?.exerciseId === 'u10-capstone-e03')
+        .length,
+      totalXp: parsed.projections?.totalXp,
+    };
+  });
+  expect(afterReload).toEqual({ attempts: 1, totalXp: 20 });
+
+  await page.getByRole('button', { name: 'היסטוריית ניתוחים' }).click();
+  await expect(page.getByTestId('analysis-history-screen')).toBeVisible();
+  await expect(page.getByTestId('analysis-history-finalized')).toContainText('סופי · קריאה בלבד');
+  await page.getByRole('button', { name: 'פתיחת התחקיר' }).click();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  await expect(page.getByRole('button', { name: /הגשת השלב/ })).toHaveCount(0);
 });

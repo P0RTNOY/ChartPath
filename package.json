@@ -17,6 +17,7 @@
     "mobile:web": "pnpm --filter @chartpath/mobile web",
     "screenshots:web": "node scripts/capture-screenshots.mjs",
     "screenshots:workbench": "node scripts/capture-workbench-screenshots.mjs",
+    "screenshots:guided": "node scripts/capture-guided-analysis-screenshots.mjs",
     "test:e2e:web": "playwright test",
     "web:e2e:serve": "pnpm --filter @chartpath/mobile export:web && serve apps/mobile/dist -l 4173",
     "test": "pnpm -r --if-present test",
