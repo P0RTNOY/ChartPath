@@ -24,7 +24,7 @@ jest.mock(
   () => ({
     assertValidGuidedAnalysisSession: (session: GuidedAnalysisSession) => {
       if (
-        session?.schemaVersion !== 1 ||
+        session?.schemaVersion !== 2 ||
         typeof session.sessionId !== 'string' ||
         !Number.isSafeInteger(session.revision)
       ) {
@@ -66,6 +66,11 @@ jest.mock(
       repetitions: 1,
       masteryScore: outcome.masteryScore,
     }),
+    assertCompatibleAnalysisChartIdentity: (left: unknown, right: unknown) => {
+      if (JSON.stringify(left) !== JSON.stringify(right)) throw new Error('Chart mismatch');
+    },
+    analysisChartIdentitiesEqual: (left: unknown, right: unknown) =>
+      JSON.stringify(left) === JSON.stringify(right),
     updateSkillMastery: (
       current: { score: number; attemptCount: number } | undefined,
       evidence: {
@@ -169,7 +174,7 @@ function activeSession(
   updatedAt = CREATED_AT,
 ): GuidedAnalysisSession {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision,
     sessionId,
     attemptId: `analysis-attempt:${sessionId}`,
@@ -178,6 +183,7 @@ function activeSession(
     contentVersionId: 'catalog-1',
     exerciseSchemaVersion: 1,
     chart: {
+      kind: 'synthetic',
       id: 'u10-capstone-e03-chart',
       seed: 91003,
       generatorVersion: '1.0.0',
@@ -201,7 +207,13 @@ function activeSession(
       ]),
     ) as unknown as GuidedAnalysisSession['steps'],
     annotations: [],
-    replay: { cursorCandleIndex: 23, decisionCandleIndex: 71, checkpoints: [] },
+    replay: {
+      initialCursorCandleIndex: 0,
+      cursorCandleIndex: 23,
+      maxCursorSeenCandleIndex: 23,
+      decisionCandleIndex: 71,
+      checkpoints: [],
+    },
   };
 }
 
@@ -257,6 +269,36 @@ function finalizationAttempt(session: GuidedAnalysisSession): NewAttemptRecord {
     activityDate: '2026-08-21',
     completesLesson: false,
   };
+}
+
+function historicalSession(
+  sessionId: string,
+  canonicalChecksum = `sha256:${'a'.repeat(64)}`,
+  learningCredit: 'course' | 'none' = 'none',
+): GuidedAnalysisSession {
+  return {
+    ...activeSession(sessionId),
+    chart: {
+      kind: 'historical',
+      id: 'historical-chart-1',
+      scenarioId: 'scenario-breakout-1',
+      scenarioVersion: '1.0.0',
+      datasetId: 'dataset-daily-1',
+      datasetVersion: '2026-08',
+      canonicalChecksum,
+      candleCount: 96,
+      interval: '1d',
+      firstCandleTimestamp: '2026-01-01T00:00:00.000Z',
+      lastCandleTimestamp: '2026-04-06T00:00:00.000Z',
+      decisionCandleIndex: 71,
+      learningCredit,
+    },
+  };
+}
+
+function creditedHistoricalAttempt(session: GuidedAnalysisSession): NewAttemptRecord {
+  const { generatorVersion: _generatorVersion, ...record } = finalizationAttempt(session);
+  return { ...record, analysisChartIdentity: session.chart };
 }
 
 describe('LearningRepository', () => {
@@ -476,7 +518,7 @@ describe('LearningRepository', () => {
     expect(await adapter.dump()).not.toBe('{not valid json');
   });
 
-  it('migrates a schema-2 snapshot with no sessions to schema 3', async () => {
+  it('migrates a schema-2 snapshot with no sessions to schema 4', async () => {
     const seed = new LearningRepository(new InMemoryPersistenceAdapter(), {
       contentVersion: 'catalog-1',
       now: () => CREATED_AT,
@@ -495,9 +537,95 @@ describe('LearningRepository', () => {
 
     const migrated = await repository.initialize();
 
-    expect(migrated.metadata.schemaVersion).toBe(3);
+    expect(migrated.metadata.schemaVersion).toBe(4);
     expect(migrated.analysisSessions).toEqual([]);
     expect(migrated.quarantinedAnalysisSessions).toEqual([]);
+  });
+
+  it('migrates every schema-3 session to synthetic v2 without losing learner data', async () => {
+    const seed = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    const seeded = await seed.appendAttempt(attemptRecord());
+    const toLegacy = (session: GuidedAnalysisSession, withCheckpoint: boolean) => {
+      const { kind: _kind, ...chart } = session.chart as Extract<
+        GuidedAnalysisSession['chart'],
+        { kind: 'synthetic' }
+      >;
+      return {
+        ...session,
+        schemaVersion: 1,
+        chart,
+        replay: {
+          cursorCandleIndex: session.replay.cursorCandleIndex,
+          decisionCandleIndex: session.replay.decisionCandleIndex,
+          checkpoints: withCheckpoint
+            ? [
+                {
+                  id: `checkpoint:${session.sessionId}:1`,
+                  stepId: 'context',
+                  cursorCandleIndex: 40,
+                  capturedAt: session.createdAt,
+                },
+                {
+                  id: `checkpoint:${session.sessionId}:2`,
+                  stepId: 'structure',
+                  cursorCandleIndex: 8,
+                  capturedAt: session.createdAt,
+                },
+              ]
+            : [],
+        },
+      };
+    };
+    const active = activeSession('legacy-active');
+    const finalized = finalizedSession(activeSession('legacy-finalized'));
+    const quarantine = {
+      quarantineId: 'existing-quarantine',
+      sessionId: 'older-damaged-session',
+      reason: 'Retained for recovery.',
+      payloadJson: '{"damaged":true}',
+      quarantinedAt: CREATED_AT,
+    };
+    const legacyV3 = {
+      ...seeded.snapshot,
+      metadata: { ...seeded.snapshot.metadata, schemaVersion: 3 },
+      settings: { ...seeded.snapshot.settings, reducedMotion: true },
+      analysisSessions: [toLegacy(active, true), toLegacy(finalized, false)],
+      quarantinedAnalysisSessions: [quarantine],
+    };
+    const repository = new LearningRepository(
+      new InMemoryPersistenceAdapter(JSON.stringify(legacyV3)),
+      { contentVersion: 'catalog-1', now: () => REOPENED_AT },
+    );
+
+    const migrated = await repository.initialize();
+
+    expect(migrated.metadata.schemaVersion).toBe(4);
+    expect(migrated.attempts).toEqual(seeded.snapshot.attempts);
+    expect(migrated.settings).toEqual(legacyV3.settings);
+    expect(migrated.projections).toEqual(seeded.snapshot.projections);
+    expect(migrated.quarantinedAnalysisSessions).toEqual([quarantine]);
+    expect(migrated.analysisSessions).toHaveLength(2);
+    expect(migrated.analysisSessions.map(({ status }) => status)).toEqual(['active', 'finalized']);
+    const migratedActive = migrated.analysisSessions[0]!;
+    expect(migratedActive.chart).toMatchObject({ kind: 'synthetic', seed: 91003 });
+    expect(migratedActive.replay).toMatchObject({
+      initialCursorCandleIndex: 0,
+      cursorCandleIndex: 23,
+      maxCursorSeenCandleIndex: 40,
+    });
+    expect(migratedActive.replay.checkpoints[0]).toMatchObject({
+      sequence: 1,
+      maxCursorSeenCandleIndex: 40,
+      annotations: [],
+    });
+    expect(migratedActive.replay.checkpoints[1]).toMatchObject({
+      sequence: 2,
+      maxCursorSeenCandleIndex: 40,
+      annotations: [],
+    });
   });
 
   it('creates or resumes one active identity and accepts a higher revision at the same timestamp', async () => {
@@ -513,7 +641,11 @@ describe('LearningRepository', () => {
     const saved = await repository.saveAnalysisSession({
       ...first,
       revision: 1,
-      replay: { ...first.replay, cursorCandleIndex: 24 },
+      replay: {
+        ...first.replay,
+        cursorCandleIndex: 24,
+        maxCursorSeenCandleIndex: 24,
+      },
     });
 
     expect(created.created).toBe(true);
@@ -525,6 +657,100 @@ describe('LearningRepository', () => {
     await expect(repository.saveAnalysisSession(first)).rejects.toBeInstanceOf(
       AnalysisSessionConflictError,
     );
+  });
+
+  it('enforces replay checkpoints as an exact append-only prefix', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    const active = activeSession();
+    await repository.createOrResumeAnalysisSession(active);
+    const firstCheckpoint = {
+      id: 'checkpoint-1',
+      sequence: 1,
+      stepId: 'context' as const,
+      cursorCandleIndex: 23,
+      maxCursorSeenCandleIndex: 23,
+      annotations: [],
+      capturedAt: CREATED_AT,
+    };
+    const withFirst = {
+      ...active,
+      revision: 1,
+      replay: { ...active.replay, checkpoints: [firstCheckpoint] },
+    };
+    await repository.saveAnalysisSession(withFirst);
+
+    await expect(
+      repository.saveAnalysisSession({
+        ...withFirst,
+        revision: 2,
+        replay: { ...withFirst.replay, checkpoints: [] },
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+    await expect(
+      repository.saveAnalysisSession({
+        ...withFirst,
+        revision: 2,
+        replay: {
+          ...withFirst.replay,
+          checkpoints: [{ ...firstCheckpoint, id: 'mutated-checkpoint' }],
+        },
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+
+    const secondCheckpoint = {
+      ...firstCheckpoint,
+      id: 'checkpoint-2',
+      sequence: 2,
+      stepId: 'structure' as const,
+    };
+    const withSecond = {
+      ...withFirst,
+      revision: 2,
+      replay: { ...withFirst.replay, checkpoints: [firstCheckpoint, secondCheckpoint] },
+    };
+    await repository.saveAnalysisSession(withSecond);
+    await expect(
+      repository.saveAnalysisSession({
+        ...withSecond,
+        revision: 3,
+        replay: {
+          ...withSecond.replay,
+          checkpoints: [
+            { ...secondCheckpoint, sequence: 1 },
+            { ...firstCheckpoint, sequence: 2 },
+          ],
+        },
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+  });
+
+  it('resumes exact historical evidence and rejects a changed checksum until abandon', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    const pinned = historicalSession('historical-pinned');
+    await repository.createOrResumeAnalysisSession(pinned);
+
+    const resumed = await repository.createOrResumeAnalysisSession(
+      historicalSession('historical-retry'),
+    );
+    expect(resumed.created).toBe(false);
+    expect(resumed.session.sessionId).toBe(pinned.sessionId);
+    await expect(
+      repository.createOrResumeAnalysisSession(
+        historicalSession('historical-modified', `sha256:${'b'.repeat(64)}`),
+      ),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+
+    await repository.abandonAnalysisSession(pinned.sessionId, REOPENED_AT);
+    const replacement = await repository.createOrResumeAnalysisSession(
+      historicalSession('historical-modified', `sha256:${'b'.repeat(64)}`),
+    );
+    expect(replacement.created).toBe(true);
   });
 
   it('restarts an active draft without deleting immutable attempts', async () => {
@@ -607,6 +833,74 @@ describe('LearningRepository', () => {
       }),
     ).rejects.toBeInstanceOf(AttemptConflictError);
     expect((await repository.load()).projections.totalXp).toBe(20);
+  });
+
+  it('finalizes non-credit historical practice without an attempt or projection changes', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => FINALIZED_AT,
+    });
+    await repository.appendAttempt(attemptRecord());
+    const active = historicalSession('practice-session');
+    await repository.createOrResumeAnalysisSession(active);
+    const before = await repository.load();
+    const finalized = finalizedSession(active);
+
+    const first = await repository.finalizePracticeAnalysisSession(finalized);
+    const retry = await repository.finalizePracticeAnalysisSession(finalized);
+
+    expect(first.inserted).toBe(true);
+    expect(retry.inserted).toBe(false);
+    expect(retry.snapshot.attempts).toEqual(before.attempts);
+    expect(retry.snapshot.projections).toEqual(before.projections);
+    await expect(
+      repository.finalizePracticeAnalysisSession({
+        ...finalized,
+        finalResult: { ...finalized.finalResult!, score: 0 },
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+    await expect(
+      repository.finalizeAnalysisSession({
+        session: finalized,
+        attemptRecord: creditedHistoricalAttempt(finalized),
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+  });
+
+  it('requires exact pinned evidence before credited historical finalization', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => FINALIZED_AT,
+    });
+    const active = historicalSession('credited-session', `sha256:${'c'.repeat(64)}`, 'course');
+    const finalized = finalizedSession(active);
+    await repository.createOrResumeAnalysisSession(active);
+    const { analysisChartIdentity: _identity, ...missingEvidence } =
+      creditedHistoricalAttempt(finalized);
+
+    await expect(
+      repository.finalizeAnalysisSession({ session: finalized, attemptRecord: missingEvidence }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+    await expect(
+      repository.finalizeAnalysisSession({
+        session: finalized,
+        attemptRecord: {
+          ...missingEvidence,
+          analysisChartIdentity: historicalSession(
+            'other-evidence',
+            `sha256:${'d'.repeat(64)}`,
+            'course',
+          ).chart,
+        },
+      }),
+    ).rejects.toBeInstanceOf(AnalysisSessionConflictError);
+
+    const result = await repository.finalizeAnalysisSession({
+      session: finalized,
+      attemptRecord: creditedHistoricalAttempt(finalized),
+    });
+    expect(result.inserted).toBe(true);
+    expect(result.attempt.analysisChartIdentity).toEqual(finalized.chart);
   });
 
   it('shares create-or-resume semantics across web repository instances', async () => {

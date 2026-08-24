@@ -12,6 +12,7 @@ import {
   type MigrationResult,
   type PersistenceSnapshot,
   type PersistenceSnapshotV1,
+  type PersistenceSnapshotV3,
   type QuarantinedAnalysisSession,
 } from './types';
 import {
@@ -258,7 +259,7 @@ function migrateV2(
   };
 }
 
-function normalizeV3(
+function normalizeV4(
   value: Record<string, unknown>,
   targetContentVersion: string,
   now: string,
@@ -299,6 +300,94 @@ function normalizeV3(
       projections: replayAttempts(attempts, localDateForTimestamp(now)),
     },
     changed,
+  };
+}
+
+function migrateLegacyAnalysisSession(value: unknown): unknown {
+  if (!isObject(value) || value.schemaVersion !== 1) return value;
+  if (!isObject(value.chart) || !isObject(value.replay)) return value;
+  const cursor = value.replay.cursorCandleIndex;
+  if (typeof cursor !== 'number' || !Number.isInteger(cursor) || cursor < 0) return value;
+  if (!Array.isArray(value.replay.checkpoints)) return value;
+
+  let runningMaximum = 0;
+  let previousCapturedAt = typeof value.createdAt === 'string' ? value.createdAt : undefined;
+  const checkpoints = value.replay.checkpoints.map((checkpoint, index) => {
+    if (!isObject(checkpoint)) return checkpoint;
+    const checkpointCursor = checkpoint.cursorCandleIndex;
+    if (
+      typeof checkpointCursor === 'number' &&
+      Number.isInteger(checkpointCursor) &&
+      checkpointCursor >= 0
+    ) {
+      runningMaximum = Math.max(runningMaximum, checkpointCursor);
+    }
+    const capturedAt =
+      typeof checkpoint.capturedAt === 'string' &&
+      (previousCapturedAt === undefined ||
+        Date.parse(checkpoint.capturedAt) >= Date.parse(previousCapturedAt))
+        ? checkpoint.capturedAt
+        : previousCapturedAt;
+    if (capturedAt !== undefined) previousCapturedAt = capturedAt;
+    return {
+      ...checkpoint,
+      sequence: index + 1,
+      maxCursorSeenCandleIndex: runningMaximum,
+      // Legacy drafts did not capture annotation state at checkpoint time. Empty is the
+      // only deterministic snapshot that does not manufacture historical evidence.
+      annotations: [],
+      ...(capturedAt === undefined ? {} : { capturedAt }),
+    };
+  });
+  const maxCursorSeenCandleIndex = Math.max(cursor, runningMaximum);
+  return {
+    ...value,
+    schemaVersion: 2,
+    chart: { ...value.chart, kind: 'synthetic' },
+    replay: {
+      ...value.replay,
+      initialCursorCandleIndex: 0,
+      maxCursorSeenCandleIndex,
+      checkpoints,
+    },
+  };
+}
+
+function migrateV3(
+  value: Record<string, unknown>,
+  targetContentVersion: string,
+  now: string,
+): PersistenceSnapshot {
+  if (!isObject(value.metadata)) {
+    throw new PersistenceCorruptionError('Stored metadata is missing.');
+  }
+  assertNonEmptyString(value.metadata.contentVersion, 'metadata.contentVersion');
+  assertUtcTimestamp(value.metadata.createdAt, 'metadata.createdAt');
+  assertUtcTimestamp(value.metadata.updatedAt, 'metadata.updatedAt');
+  if (!Array.isArray(value.attempts)) {
+    throw new PersistenceCorruptionError('Stored attempts must be an array.');
+  }
+  if (!Array.isArray(value.analysisSessions)) {
+    throw new PersistenceCorruptionError('Stored analysis sessions must be an array.');
+  }
+  if (!Array.isArray(value.quarantinedAnalysisSessions)) {
+    throw new PersistenceCorruptionError('Stored quarantined analysis sessions must be an array.');
+  }
+  if (!isObject(value.projections)) {
+    throw new PersistenceCorruptionError('Stored learning projections are missing.');
+  }
+  const attempts = normalizeAttempts(value.attempts);
+  const migratedValues = value.analysisSessions.map(migrateLegacyAnalysisSession);
+  const normalizedSessions = normalizeAnalysisSessions(migratedValues, now);
+  const existingQuarantines = normalizeQuarantinedSessions(value.quarantinedAnalysisSessions);
+  return {
+    metadata: createMetadata(targetContentVersion, value.metadata.createdAt, now),
+    settings: normalizeSettings(value.settings),
+    attempts,
+    analysisSessions: normalizedSessions.sessions,
+    quarantinedAnalysisSessions: [...existingQuarantines, ...normalizedSessions.quarantined],
+    // Schema 3 projections are already derived from the exact preserved attempt stream.
+    projections: (value as unknown as PersistenceSnapshotV3).projections,
   };
 }
 
@@ -347,15 +436,26 @@ export function migratePersistence(
       contentVersionChanged: previousContentVersion !== targetContentVersion,
     };
   }
-  if (version !== 3) {
+  if (version === 3) {
+    const previousContentVersion = isObject(parsed.metadata)
+      ? parsed.metadata.contentVersion
+      : undefined;
+    return {
+      snapshot: migrateV3(parsed, targetContentVersion, now),
+      migrated: true,
+      fromSchemaVersion: 3,
+      contentVersionChanged: previousContentVersion !== targetContentVersion,
+    };
+  }
+  if (version !== 4) {
     throw new UnsupportedPersistenceVersionError(version);
   }
 
-  const normalized = normalizeV3(parsed, targetContentVersion, now);
+  const normalized = normalizeV4(parsed, targetContentVersion, now);
   return {
     snapshot: normalized.snapshot,
     migrated: normalized.changed,
-    fromSchemaVersion: 3,
+    fromSchemaVersion: 4,
     contentVersionChanged:
       isObject(parsed.metadata) && parsed.metadata.contentVersion !== targetContentVersion,
   };

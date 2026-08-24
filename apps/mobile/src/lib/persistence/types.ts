@@ -1,4 +1,5 @@
 import type {
+  AnalysisChartIdentity,
   Attempt,
   DailyActivity,
   Difficulty,
@@ -9,7 +10,7 @@ import type {
   SkillMastery,
 } from '@chartpath/domain';
 
-export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 3;
+export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 4;
 export const CURRENT_PROJECTOR_VERSION = 1;
 export const ATTEMPT_RECORD_SCHEMA_VERSION = 1;
 
@@ -35,6 +36,8 @@ export interface NewAttemptRecord {
   readonly difficulty: Difficulty;
   readonly exerciseVersion: number;
   readonly generatorVersion?: string;
+  /** Pinned chart evidence. Required when a historical session grants course credit. */
+  readonly analysisChartIdentity?: AnalysisChartIdentity;
   readonly isReview: boolean;
   readonly xpAwarded: number;
   /** Calendar date captured by the UI in the learner's local time zone. */
@@ -125,6 +128,22 @@ export interface PersistenceSnapshotV2 {
   readonly projections: LearningProjections;
 }
 
+/** Fixture shape retained so guided-analysis payload schema 3 can migrate forward. */
+export interface PersistenceSnapshotV3 {
+  readonly metadata: {
+    readonly schemaVersion: 3;
+    readonly contentVersion: string;
+    readonly projectorVersion: number;
+    readonly createdAt: string;
+    readonly updatedAt: string;
+  };
+  readonly settings: LearnerSettings;
+  readonly attempts: readonly PersistedAttempt[];
+  readonly analysisSessions: readonly unknown[];
+  readonly quarantinedAnalysisSessions: readonly QuarantinedAnalysisSession[];
+  readonly projections: LearningProjections;
+}
+
 export interface RepositoryOptions {
   readonly contentVersion: string;
   /** Explicit clock keeps initialization and migrations reproducible in tests. */
@@ -157,6 +176,13 @@ export interface FinalizeAnalysisSessionInput {
 export interface FinalizeAnalysisSessionResult {
   readonly session: GuidedAnalysisSession;
   readonly attempt: PersistedAttempt;
+  readonly inserted: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface FinalizePracticeAnalysisSessionResult {
+  readonly session: GuidedAnalysisSession;
+  /** True only when this call performed the active-to-finalized transition. */
   readonly inserted: boolean;
   readonly snapshot: PersistenceSnapshot;
 }

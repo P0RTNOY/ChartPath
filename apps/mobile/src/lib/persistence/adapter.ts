@@ -11,6 +11,8 @@ export interface PersistenceMutation<T> {
   readonly allowAttemptDeletion?: boolean;
   /** Reserved for explicit reset/recovery paths; ordinary session writes are append-preserving. */
   readonly allowAnalysisSessionDeletion?: boolean;
+  /** Reserved for the forward schema migration that rewrites finalized session envelopes. */
+  readonly allowAnalysisSessionMigration?: boolean;
 }
 
 export interface PersistenceAdapter {

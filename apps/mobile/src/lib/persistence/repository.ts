@@ -1,4 +1,5 @@
 import {
+  analysisChartIdentitiesEqual,
   assertValidGuidedAnalysisSession,
   reduceGuidedAnalysisSession,
   type GuidedAnalysisSession,
@@ -18,6 +19,7 @@ import type {
   CreateOrResumeAnalysisSessionResult,
   FinalizeAnalysisSessionInput,
   FinalizeAnalysisSessionResult,
+  FinalizePracticeAnalysisSessionResult,
   LearnerSettingsPatch,
   NewAttemptRecord,
   PersistedAttempt,
@@ -59,6 +61,19 @@ function analysisSessionIdentity(session: GuidedAnalysisSession): string {
     contentVersionId: session.contentVersionId,
     exerciseId: session.exerciseId,
     exerciseSchemaVersion: session.exerciseSchemaVersion,
+  });
+}
+
+function historicalLogicalIdentity(session: GuidedAnalysisSession): string | null {
+  if (session.chart.kind !== 'historical') return null;
+  return canonicalStringify({
+    contentVersionId: session.contentVersionId,
+    exerciseId: session.exerciseId,
+    exerciseSchemaVersion: session.exerciseSchemaVersion,
+    scenarioId: session.chart.scenarioId,
+    scenarioVersion: session.chart.scenarioVersion,
+    datasetId: session.chart.datasetId,
+    datasetVersion: session.chart.datasetVersion,
   });
 }
 
@@ -106,6 +121,58 @@ function assertUniqueFinalizationIdentity(
   }
 }
 
+function assertCheckpointHistoryPrefix(
+  persisted: GuidedAnalysisSession,
+  candidate: GuidedAnalysisSession,
+): void {
+  if (candidate.replay.checkpoints.length < persisted.replay.checkpoints.length) {
+    throw new AnalysisSessionConflictError(
+      candidate.sessionId,
+      'Replay checkpoint history is append-only.',
+    );
+  }
+  for (const [index, checkpoint] of persisted.replay.checkpoints.entries()) {
+    if (
+      canonicalStringify(checkpoint) !== canonicalStringify(candidate.replay.checkpoints[index])
+    ) {
+      throw new AnalysisSessionConflictError(
+        candidate.sessionId,
+        'Replay checkpoint history is append-only.',
+      );
+    }
+  }
+}
+
+function assertFinalizationTransition(
+  persisted: GuidedAnalysisSession,
+  candidate: GuidedAnalysisSession,
+): boolean {
+  assertSameSessionIdentity(persisted, candidate);
+  assertCheckpointHistoryPrefix(persisted, candidate);
+  if (persisted.status === 'abandoned') {
+    throw new AnalysisSessionConflictError(
+      candidate.sessionId,
+      'Abandoned session cannot finalize.',
+    );
+  }
+  if (persisted.status === 'finalized') {
+    if (canonicalStringify(persisted) !== canonicalStringify(candidate)) {
+      throw new AnalysisSessionConflictError(
+        candidate.sessionId,
+        'Finalized session data is immutable.',
+      );
+    }
+    return false;
+  }
+  if (candidate.revision !== persisted.revision + 1) {
+    throw new AnalysisSessionConflictError(
+      candidate.sessionId,
+      'Finalization must directly follow the persisted active revision.',
+    );
+  }
+  return true;
+}
+
 /** Local, offline repository. It has no network or telemetry dependencies. */
 export class LearningRepository {
   private readonly now: () => string;
@@ -136,9 +203,10 @@ export class LearningRepository {
         nextValue: serialized,
         result: cloneSnapshot(migration.snapshot),
         allowAnalysisSessionDeletion:
-          migration.fromSchemaVersion === 3 &&
+          migration.fromSchemaVersion === 4 &&
           migration.migrated &&
           migration.snapshot.quarantinedAnalysisSessions.length > 0,
+        allowAnalysisSessionMigration: migration.fromSchemaVersion === 3 && migration.migrated,
       };
     });
   }
@@ -236,6 +304,21 @@ export class LearningRepository {
           },
         };
       }
+      const logicalHistoricalIdentity = historicalLogicalIdentity(candidate);
+      const incompatibleHistorical =
+        logicalHistoricalIdentity === null
+          ? undefined
+          : current.analysisSessions.find(
+              (session) =>
+                session.status === 'active' &&
+                historicalLogicalIdentity(session) === logicalHistoricalIdentity,
+            );
+      if (incompatibleHistorical) {
+        throw new AnalysisSessionConflictError(
+          candidate.sessionId,
+          'The active historical session pins different dataset evidence; abandon it explicitly before starting again.',
+        );
+      }
       const session = cloneSession(candidate);
       const snapshot: PersistenceSnapshot = {
         ...current,
@@ -305,6 +388,7 @@ export class LearningRepository {
           'A newer revision cannot move the session timestamp backwards.',
         );
       }
+      assertCheckpointHistoryPrefix(persisted, candidate);
       const sessions = [...current.analysisSessions];
       const session = cloneSession(candidate);
       sessions[index] = session;
@@ -451,13 +535,29 @@ export class LearningRepository {
     if (input.session.status !== 'finalized') {
       throw new AnalysisSessionConflictError(input.session.sessionId, 'Session is not finalized.');
     }
+    if (
+      input.session.chart.kind === 'historical' &&
+      input.session.chart.learningCredit !== 'course'
+    ) {
+      throw new AnalysisSessionConflictError(
+        input.session.sessionId,
+        'Practice-only historical sessions cannot create learning attempts.',
+      );
+    }
     const normalized = normalizeAttemptRecord(input.attemptRecord);
+    const chartEvidenceMatches =
+      input.session.chart.kind === 'synthetic'
+        ? input.session.chart.generatorVersion === normalized.generatorVersion &&
+          (normalized.analysisChartIdentity === undefined ||
+            analysisChartIdentitiesEqual(input.session.chart, normalized.analysisChartIdentity))
+        : normalized.analysisChartIdentity !== undefined &&
+          analysisChartIdentitiesEqual(input.session.chart, normalized.analysisChartIdentity);
     if (
       input.session.attemptId !== normalized.attempt.id ||
       input.session.exerciseId !== normalized.attempt.exerciseId ||
       input.session.contentVersionId !== normalized.attempt.contentVersionId ||
       input.session.exerciseSchemaVersion !== normalized.exerciseVersion ||
-      input.session.chart.generatorVersion !== normalized.generatorVersion ||
+      !chartEvidenceMatches ||
       canonicalStringify(input.session.finalResult) !==
         canonicalStringify(normalized.attempt.result)
     ) {
@@ -475,31 +575,7 @@ export class LearningRepository {
       );
       const persistedSession = current.analysisSessions[sessionIndex];
       if (!persistedSession) throw new AnalysisSessionNotFoundError(input.session.sessionId);
-      assertSameSessionIdentity(persistedSession, input.session);
-      if (persistedSession.status === 'abandoned') {
-        throw new AnalysisSessionConflictError(
-          input.session.sessionId,
-          'Abandoned session cannot finalize.',
-        );
-      }
-      if (
-        persistedSession.status === 'finalized' &&
-        canonicalStringify(persistedSession) !== canonicalStringify(input.session)
-      ) {
-        throw new AnalysisSessionConflictError(
-          input.session.sessionId,
-          'Finalized session data is immutable.',
-        );
-      }
-      if (
-        persistedSession.status === 'active' &&
-        input.session.revision !== persistedSession.revision + 1
-      ) {
-        throw new AnalysisSessionConflictError(
-          input.session.sessionId,
-          'Finalization must directly follow the persisted active revision.',
-        );
-      }
+      assertFinalizationTransition(persistedSession, input.session);
       const duplicate = current.attempts.find(
         (candidate) => candidate.attempt.id === normalized.attempt.id,
       );
@@ -522,6 +598,58 @@ export class LearningRepository {
           session: cloneSession(input.session),
           attempt: duplicate ?? normalized,
           inserted: duplicate === undefined,
+          snapshot: cloneSnapshot(snapshot),
+        },
+      };
+    });
+  }
+
+  public async finalizePracticeAnalysisSession(
+    session: GuidedAnalysisSession,
+  ): Promise<FinalizePracticeAnalysisSessionResult> {
+    assertValidGuidedAnalysisSession(session);
+    if (
+      session.status !== 'finalized' ||
+      session.chart.kind !== 'historical' ||
+      session.chart.learningCredit !== 'none'
+    ) {
+      throw new AnalysisSessionConflictError(
+        session.sessionId,
+        'Practice finalization requires a finalized, non-credit historical session.',
+      );
+    }
+    await this.initializeAdapter();
+    const migrationAt = this.now();
+    return this.adapter.transact<FinalizePracticeAnalysisSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, migrationAt).snapshot;
+      const sessionIndex = current.analysisSessions.findIndex(
+        ({ sessionId }) => sessionId === session.sessionId,
+      );
+      const persisted = current.analysisSessions[sessionIndex];
+      if (!persisted) throw new AnalysisSessionNotFoundError(session.sessionId);
+      const inserted = assertFinalizationTransition(persisted, session);
+      if (!inserted) {
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: cloneSession(persisted),
+            inserted: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      const sessions = [...current.analysisSessions];
+      sessions[sessionIndex] = cloneSession(session);
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, session.updatedAt),
+        analysisSessions: sessions,
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: {
+          session: cloneSession(session),
+          inserted: true,
           snapshot: cloneSnapshot(snapshot),
         },
       };

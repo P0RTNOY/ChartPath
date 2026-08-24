@@ -1,4 +1,9 @@
-import type { Attempt, Difficulty } from '@chartpath/domain';
+import {
+  assertCompatibleAnalysisChartIdentity,
+  type AnalysisChartIdentity,
+  type Attempt,
+  type Difficulty,
+} from '@chartpath/domain';
 
 import { PersistenceCorruptionError } from './adapter';
 import {
@@ -305,6 +310,18 @@ export function normalizeAttemptRecord(value: NewAttemptRecord | unknown): Persi
   if (value.generatorVersion !== undefined) {
     assertNonEmptyString(value.generatorVersion, 'generatorVersion');
   }
+  if (value.analysisChartIdentity !== undefined) {
+    try {
+      assertCompatibleAnalysisChartIdentity(
+        value.analysisChartIdentity as AnalysisChartIdentity,
+        value.analysisChartIdentity as AnalysisChartIdentity,
+      );
+    } catch (error) {
+      fail(
+        `analysisChartIdentity is invalid: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+  }
   if (typeof value.isReview !== 'boolean') fail('isReview must be boolean.');
   assertIntegerRange(value.xpAwarded, 'xpAwarded', 0, 1_000_000);
   assertLocalDate(value.activityDate, 'activityDate');
@@ -322,6 +339,9 @@ export function normalizeAttemptRecord(value: NewAttemptRecord | unknown): Persi
     difficulty: value.difficulty as Difficulty,
     exerciseVersion: value.exerciseVersion,
     ...(value.generatorVersion === undefined ? {} : { generatorVersion: value.generatorVersion }),
+    ...(value.analysisChartIdentity === undefined
+      ? {}
+      : { analysisChartIdentity: value.analysisChartIdentity as AnalysisChartIdentity }),
     isReview: value.isReview,
     xpAwarded: value.xpAwarded,
     activityDate: value.activityDate,

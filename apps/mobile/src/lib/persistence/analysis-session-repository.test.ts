@@ -32,6 +32,7 @@ function completedActiveSession(): GuidedAnalysisSession {
     contentVersionId: 'catalog-1',
     exerciseSchemaVersion: 1,
     chart: {
+      kind: 'synthetic',
       id: 'u10-capstone-e03-chart',
       seed: 91003,
       generatorVersion: '1.0.0',
@@ -78,6 +79,7 @@ describe('guided analysis repository integration', () => {
       contentVersionId: 'catalog-1',
       exerciseSchemaVersion: 1,
       chart: {
+        kind: 'synthetic',
         id: 'u10-capstone-e03-chart',
         seed: 91003,
         generatorVersion: '1.0.0',

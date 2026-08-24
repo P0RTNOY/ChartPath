@@ -84,6 +84,50 @@ const CREATE_ANALYSIS_SESSIONS_SCHEMA = `
   ${CREATE_ANALYSIS_SESSION_TRIGGERS}
 `;
 
+const MIGRATE_ANALYSIS_SESSIONS_TO_HISTORICAL_SCHEMA = `
+  DROP TRIGGER IF EXISTS analysis_sessions_reject_finalized_update;
+  DROP TRIGGER IF EXISTS analysis_sessions_reject_delete;
+  DROP INDEX IF EXISTS analysis_sessions_status_updated_idx;
+  ALTER TABLE analysis_sessions RENAME TO analysis_sessions_v2;
+  CREATE TABLE analysis_sessions (
+    session_id TEXT PRIMARY KEY NOT NULL,
+    exercise_id TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    exercise_schema_version INTEGER NOT NULL,
+    chart_id TEXT NOT NULL,
+    source_kind TEXT NOT NULL CHECK (source_kind IN ('synthetic', 'historical')),
+    generator_version TEXT,
+    historical_scenario_id TEXT,
+    historical_scenario_version TEXT,
+    historical_dataset_id TEXT,
+    historical_dataset_version TEXT,
+    historical_dataset_checksum TEXT,
+    historical_learning_credit TEXT,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    attempt_id TEXT,
+    schema_version INTEGER NOT NULL,
+    payload_json TEXT NOT NULL
+  );
+  INSERT INTO analysis_sessions (
+    session_id, exercise_id, content_version, exercise_schema_version, chart_id,
+    source_kind, generator_version, historical_scenario_id, historical_scenario_version,
+    historical_dataset_id, historical_dataset_version, historical_dataset_checksum,
+    historical_learning_credit, status, created_at, updated_at, attempt_id, schema_version,
+    payload_json
+  )
+  SELECT
+    session_id, exercise_id, content_version, exercise_schema_version, chart_id,
+    'synthetic', generator_version, NULL, NULL, NULL, NULL, NULL, NULL,
+    status, created_at, updated_at, attempt_id, schema_version, payload_json
+  FROM analysis_sessions_v2;
+  DROP TABLE analysis_sessions_v2;
+  CREATE INDEX analysis_sessions_status_updated_idx
+    ON analysis_sessions(status, updated_at);
+  ${CREATE_ANALYSIS_SESSION_TRIGGERS}
+`;
+
 const SQLITE_MIGRATIONS = [
   {
     version: 1,
@@ -98,6 +142,13 @@ const SQLITE_MIGRATIONS = [
     checksum: 'sha256:5a5c057716114c61e925393653a1d11fb9ed4d3a1d50ce14434f06720b00836b',
     appliedAt: '2026-08-24T00:00:00.000Z',
     sql: CREATE_ANALYSIS_SESSIONS_SCHEMA,
+  },
+  {
+    version: 3,
+    name: 'pin_historical_analysis_session_evidence',
+    checksum: 'sha256:da1ca5901e6cc9574c0366c258b6f1dc55895bd482b83439765c820b35ed8fe4',
+    appliedAt: '2026-08-24T00:00:00.000Z',
+    sql: MIGRATE_ANALYSIS_SESSIONS_TO_HISTORICAL_SCHEMA,
   },
 ] as const;
 
@@ -284,6 +335,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
   private async upsertAnalysisSession(
     database: SQLiteDatabase,
     session: GuidedAnalysisSession,
+    allowSchemaMigration = false,
   ): Promise<void> {
     const payload = canonicalStringify(session);
     const existing = await database.getFirstAsync<{ payload_json: string; status: string }>(
@@ -291,7 +343,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       session.sessionId,
     );
     if (existing?.payload_json === payload) return;
-    if (existing?.status === 'finalized') {
+    if (existing?.status === 'finalized' && !allowSchemaMigration) {
       throw new AnalysisSessionConflictError(
         session.sessionId,
         'Finalized SQLite analysis session is immutable.',
@@ -300,19 +352,30 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
     await database.runAsync(
       `INSERT INTO analysis_sessions (
         session_id, exercise_id, content_version, exercise_schema_version, chart_id,
-        generator_version, status, created_at, updated_at, attempt_id, schema_version, payload_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        source_kind, generator_version, historical_scenario_id, historical_scenario_version,
+        historical_dataset_id, historical_dataset_version, historical_dataset_checksum,
+        historical_learning_credit, status, created_at, updated_at, attempt_id, schema_version,
+        payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         status = excluded.status,
         updated_at = excluded.updated_at,
         attempt_id = excluded.attempt_id,
+        schema_version = excluded.schema_version,
         payload_json = excluded.payload_json`,
       session.sessionId,
       session.exerciseId,
       session.contentVersionId,
       session.exerciseSchemaVersion,
       session.chart.id,
-      session.chart.generatorVersion,
+      session.chart.kind,
+      session.chart.kind === 'synthetic' ? session.chart.generatorVersion : null,
+      session.chart.kind === 'historical' ? session.chart.scenarioId : null,
+      session.chart.kind === 'historical' ? session.chart.scenarioVersion : null,
+      session.chart.kind === 'historical' ? session.chart.datasetId : null,
+      session.chart.kind === 'historical' ? session.chart.datasetVersion : null,
+      session.chart.kind === 'historical' ? session.chart.canonicalChecksum : null,
+      session.chart.kind === 'historical' ? session.chart.learningCredit : null,
       session.status,
       session.createdAt,
       session.updatedAt,
@@ -355,7 +418,10 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
         }
       }
 
-      if (next.allowAnalysisSessionDeletion !== true) {
+      if (
+        next.allowAnalysisSessionDeletion !== true &&
+        next.allowAnalysisSessionMigration !== true
+      ) {
         const previousSessions = sessionsById(extractAnalysisSessions(currentValue));
         const removed = [...previousSessions.keys()].filter((id) => !nextSessions.has(id));
         if (removed.length > 0) {
@@ -389,9 +455,24 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
           ${CREATE_ANALYSIS_SESSION_TRIGGERS}
         `);
       }
+      if (
+        next.allowAnalysisSessionMigration === true &&
+        next.allowAnalysisSessionDeletion !== true
+      ) {
+        await transaction.execAsync(`
+          DROP TRIGGER IF EXISTS analysis_sessions_reject_finalized_update;
+          DROP TRIGGER IF EXISTS analysis_sessions_reject_delete;
+          DELETE FROM analysis_sessions;
+          ${CREATE_ANALYSIS_SESSION_TRIGGERS}
+        `);
+      }
       for (const record of nextAttempts.values()) await this.insertAttempt(transaction, record);
       for (const session of nextSessions.values()) {
-        await this.upsertAnalysisSession(transaction, session);
+        await this.upsertAnalysisSession(
+          transaction,
+          session,
+          next.allowAnalysisSessionMigration === true,
+        );
       }
 
       if (next.nextValue === null) {
