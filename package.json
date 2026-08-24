@@ -10,6 +10,7 @@
     "build": "pnpm -r --if-present build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm content:validate",
     "content:validate": "pnpm --filter @chartpath/content validate",
+    "historical:validate": "pnpm --filter @chartpath/historical-data validate",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "pnpm -r --if-present lint",
