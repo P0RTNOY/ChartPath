@@ -15,7 +15,7 @@ import type {
   GeneratedChart,
   OhlcvCandle,
 } from '@chartpath/domain';
-import { Button, Card, LtrText, UiText, useTheme } from '@chartpath/ui';
+import { Button, Card, isolateLtrRunsInHebrew, LtrText, UiText, useTheme } from '@chartpath/ui';
 
 const CHART_HEIGHT = 320;
 const PLOT_TOP = 18;
@@ -32,10 +32,14 @@ export interface OhlcvChartProps {
   readonly selectedPoints?: readonly ChartAnchor[];
   readonly selectedZone?: ChartZone;
   readonly selectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
+  readonly expectedPoints?: readonly ChartAnchor[];
+  readonly expectedZone?: ChartZone;
+  readonly expectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
   readonly revealCount?: number;
   readonly showAnnotations?: boolean;
   readonly allowAccessibleDataTable?: boolean;
   readonly onChartPress?: (anchor: ChartAnchor) => void;
+  readonly interactionHint?: string;
   readonly accessibilityLabel?: string;
   readonly testID?: string;
 }
@@ -72,10 +76,10 @@ function chartDescription(
   ticker: string,
   timeframe: string,
 ): string {
-  if (candles.length === 0) return `גרף ${ticker}, ללא נתונים`;
+  if (candles.length === 0) return isolateLtrRunsInHebrew(`גרף ${ticker}, ללא נתונים`);
   const first = candles[0];
   const last = candles.at(-1);
-  if (!first || !last) return `גרף ${ticker}, ללא נתונים`;
+  if (!first || !last) return isolateLtrRunsInHebrew(`גרף ${ticker}, ללא נתונים`);
   const direction =
     last.close > first.open
       ? 'הסגירה האחרונה גבוהה מהפתיחה הראשונה'
@@ -83,7 +87,16 @@ function chartDescription(
         ? 'הסגירה האחרונה נמוכה מהפתיחה הראשונה'
         : 'הסגירה האחרונה שווה לפתיחה הראשונה';
   const frame = chartFrame(candles);
-  return `גרף נרות ${ticker}, מסגרת זמן ${timeframe}, ${candles.length} נרות, ${direction}, טווח מחיר ${frame.low.toFixed(2)} עד ${frame.high.toFixed(2)}`;
+  return isolateLtrRunsInHebrew(
+    `גרף נרות ${ticker}, מסגרת זמן ${timeframe}, ${candles.length} נרות, ${direction}, טווח מחיר ${frame.low.toFixed(2)} עד ${frame.high.toFixed(2)}`,
+  );
+}
+
+function shortChartDate(timestamp: string | undefined): string {
+  if (!timestamp) return '';
+  const [yearMonthDay] = timestamp.split('T');
+  const [, month, day] = yearMonthDay?.split('-') ?? [];
+  return month && day ? `${day}/${month}` : timestamp;
 }
 
 export function OhlcvChart({
@@ -94,16 +107,21 @@ export function OhlcvChart({
   selectedPoints = [],
   selectedZone,
   selectedLine,
+  expectedPoints = [],
+  expectedZone,
+  expectedLine,
   revealCount,
   showAnnotations = false,
   allowAccessibleDataTable = true,
   onChartPress,
+  interactionHint,
   accessibilityLabel,
   testID = 'ohlcv-chart',
 }: OhlcvChartProps) {
   const theme = useTheme();
   const [width, setWidth] = useState(680);
   const [showAccessibleData, setShowAccessibleData] = useState(false);
+  const [interactionStatus, setInteractionStatus] = useState<string | undefined>();
   const candles = useMemo(
     () => chart.candles.slice(0, revealCount ?? chart.candles.length),
     [chart.candles, revealCount],
@@ -126,8 +144,19 @@ export function OhlcvChart({
   };
   const onPress = (event: GestureResponderEvent): void => {
     if (!interactive || !onChartPress || candles.length === 0) return;
-    const x = Math.max(AXIS_LEFT, Math.min(width - AXIS_RIGHT, event.nativeEvent.locationX));
-    const y = Math.max(PLOT_TOP, Math.min(PLOT_BOTTOM, event.nativeEvent.locationY));
+    const { locationX, locationY } = event.nativeEvent;
+    if (
+      locationX < AXIS_LEFT ||
+      locationX > width - AXIS_RIGHT ||
+      locationY < PLOT_TOP ||
+      locationY > PLOT_BOTTOM
+    ) {
+      setInteractionStatus('ההקשה הייתה מחוץ לאזור המחיר. נסו שוב בתוך הגרף העליון.');
+      return;
+    }
+    setInteractionStatus(undefined);
+    const x = locationX;
+    const y = locationY;
     const candleIndex = Math.max(
       frame.first,
       Math.min(frame.last, Math.floor(((x - AXIS_LEFT) / plotWidth) * candleSpan) + frame.first),
@@ -195,7 +224,21 @@ export function OhlcvChart({
     );
   };
 
-  const description = accessibilityLabel ?? chartDescription(candles, ticker, chart.spec.timeframe);
+  const baseDescription =
+    accessibilityLabel ?? chartDescription(candles, ticker, chart.spec.timeframe);
+  const description = selectedPoints.length
+    ? `${baseDescription}. ${isolateLtrRunsInHebrew(
+        selectedPoints.length === 1
+          ? 'הסימון שלך כולל נקודה אחת'
+          : `הסימון שלך כולל ${selectedPoints.length} נקודות`,
+      )}`
+    : expectedPoints.length
+      ? `${baseDescription}. ${isolateLtrRunsInHebrew(
+          expectedPoints.length === 1
+            ? 'מוצגת נקודת ייחוס אחת'
+            : `מוצגות ${expectedPoints.length} נקודות ייחוס`,
+        )}`
+      : baseDescription;
   if (candles.length === 0) {
     return (
       <View
@@ -302,6 +345,49 @@ export function OhlcvChart({
         />
       ))}
       {showAnnotations ? chart.annotations.map(renderAnnotation) : undefined}
+      {expectedZone ? (
+        <Rect
+          fill={theme.colors.warning}
+          fillOpacity={0.09}
+          height={Math.abs(yForPrice(expectedZone.priceLow) - yForPrice(expectedZone.priceHigh))}
+          stroke={theme.colors.warning}
+          strokeDasharray="7 4"
+          strokeWidth={2}
+          testID={`${testID}-expected-zone`}
+          width={Math.abs(
+            xForIndex(expectedZone.endCandleIndex) - xForIndex(expectedZone.startCandleIndex),
+          )}
+          x={Math.min(
+            xForIndex(expectedZone.startCandleIndex),
+            xForIndex(expectedZone.endCandleIndex),
+          )}
+          y={yForPrice(expectedZone.priceHigh)}
+        />
+      ) : undefined}
+      {expectedLine ? (
+        <Line
+          stroke={theme.colors.warning}
+          strokeDasharray="7 4"
+          strokeWidth={3}
+          testID={`${testID}-expected-line`}
+          x1={xForIndex(expectedLine.start.candleIndex)}
+          x2={xForIndex(expectedLine.end.candleIndex)}
+          y1={yForPrice(expectedLine.start.price)}
+          y2={yForPrice(expectedLine.end.price)}
+        />
+      ) : undefined}
+      {expectedPoints.map((point, index) => (
+        <Circle
+          cx={xForIndex(point.candleIndex)}
+          cy={yForPrice(point.price)}
+          fill={theme.colors.warning}
+          key={`expected-${point.candleIndex}-${point.price}-${index}`}
+          r={6}
+          stroke={theme.colors.surface}
+          strokeWidth={2}
+          testID={`${testID}-expected-point-${index}`}
+        />
+      ))}
       {selectedZone ? (
         <Rect
           fill={theme.colors.primary}
@@ -310,6 +396,7 @@ export function OhlcvChart({
           stroke={theme.colors.primary}
           strokeDasharray="4 3"
           strokeWidth={2}
+          testID={`${testID}-selected-zone`}
           width={Math.abs(
             xForIndex(selectedZone.endCandleIndex) - xForIndex(selectedZone.startCandleIndex),
           )}
@@ -324,6 +411,7 @@ export function OhlcvChart({
         <Line
           stroke={theme.colors.primary}
           strokeWidth={3}
+          testID={`${testID}-selected-line`}
           x1={xForIndex(selectedLine.start.candleIndex)}
           x2={xForIndex(selectedLine.end.candleIndex)}
           y1={yForPrice(selectedLine.start.price)}
@@ -331,7 +419,10 @@ export function OhlcvChart({
         />
       ) : undefined}
       {selectedPoints.map((point, index) => (
-        <G key={`${point.candleIndex}-${point.price}-${index}`}>
+        <G
+          key={`${point.candleIndex}-${point.price}-${index}`}
+          testID={`${testID}-selected-point-${index}`}
+        >
           <Circle
             cx={xForIndex(point.candleIndex)}
             cy={yForPrice(point.price)}
@@ -359,7 +450,7 @@ export function OhlcvChart({
         x={AXIS_LEFT + 18}
         y={315}
       >
-        {`⁦${candles[0]?.timestamp.slice(5, 10)}⁩`}
+        {`⁦${shortChartDate(candles[0]?.timestamp)}⁩`}
       </SvgText>
       <SvgText
         fill={theme.colors.textMuted}
@@ -368,7 +459,7 @@ export function OhlcvChart({
         x={width - AXIS_RIGHT - 18}
         y={315}
       >
-        {`⁦${candles.at(-1)?.timestamp.slice(5, 10)}⁩`}
+        {`⁦${shortChartDate(candles.at(-1)?.timestamp)}⁩`}
       </SvgText>
       <SvgText
         fill={theme.colors.textMuted}
@@ -384,19 +475,23 @@ export function OhlcvChart({
 
   return (
     <View style={{ gap: 7 }}>
-      <View style={styles.metaRow}>
-        <View style={styles.metaGroup}>
+      <View style={[styles.metaRow, { direction: theme.direction }]}>
+        <UiText color="textMuted" variant="caption">
+          {interactive ? 'הקישו על הגרף כדי לסמן' : 'מחיר ומחזור'}
+        </UiText>
+        <View style={[styles.metaGroup, { direction: 'ltr' }]}>
           <LtrText variant="label">{ticker}</LtrText>
           <LtrText color="textMuted" variant="caption">
             {chart.spec.timeframe}
           </LtrText>
         </View>
-        <UiText color="textMuted" variant="caption">
-          {interactive ? 'הקישו על הגרף כדי לסמן' : 'מחיר ונפח'}
-        </UiText>
       </View>
       <Pressable
-        accessibilityHint={interactive ? 'הקישו במיקום הרצוי בתוך אזור המחיר' : undefined}
+        accessibilityHint={
+          interactive
+            ? `${interactionHint ?? 'הקישו במיקום הרצוי בתוך אזור המחיר'} הגרף מצמיד את הבחירה לנר הקרוב.`
+            : undefined
+        }
         accessibilityLabel={description}
         accessibilityRole={interactive ? 'button' : 'image'}
         onLayout={onLayout}
@@ -407,16 +502,21 @@ export function OhlcvChart({
         {body}
       </Pressable>
       <UiText color="textMuted" variant="caption">
-        קוד חזותי: נר עולה = גוף חלול; נר יורד = גוף מלא.
+        מקרא: נר עולה = גוף חלול; נר יורד = גוף מלא.
       </UiText>
+      {interactionStatus ? (
+        <UiText accessibilityLiveRegion="polite" color="warning" variant="caption">
+          {interactionStatus}
+        </UiText>
+      ) : undefined}
       {allowAccessibleDataTable ? (
         <Button
-          accessibilityLabel={showAccessibleData ? 'הסתרת נתוני נרות' : 'הצגת נתוני נרות נגישים'}
+          accessibilityLabel={showAccessibleData ? 'הסתרת נתוני הנרות' : 'הצגת נתוני הנרות'}
           onPress={() => setShowAccessibleData((visible) => !visible)}
           size="compact"
           variant="ghost"
         >
-          {showAccessibleData ? 'הסתרת נתוני OHLC' : 'נתוני OHLC נגישים'}
+          {showAccessibleData ? 'הסתרת נתוני הנרות' : 'הצגת נתוני הנרות'}
         </Button>
       ) : undefined}
       {allowAccessibleDataTable && showAccessibleData ? (

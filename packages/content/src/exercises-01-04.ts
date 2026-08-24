@@ -291,7 +291,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     skillIds: ['safe.ta-boundaries'],
     difficulty: 2,
     promptHe:
-      'בחלון ההחלטה סומנו קווים רק לאחר שהמהלך כבר הושלם, ואין כלל תבנית שנכתב מראש. מהי ההחלטה המשמעתית?',
+      'בחלון ההחלטה סומנו קווים רק לאחר שהמהלך כבר הושלם, ולא הוגדר מראש כלל לזיהוי התבנית. מהי ההחלטה העקבית עם הכללים?',
     interactionType: 'decision',
     options: [
       { id: 'trade', labelHe: 'לפעול לפי הצורה שנראית כעת.' },
@@ -367,7 +367,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u00-scenarios-e05',
     skillIds: ['safe.ta-boundaries'],
     difficulty: 2,
-    promptHe: 'עברו על פתק הלמידה ובחרו את כל המשפטים שמתאימים לתחקור אחראי.',
+    promptHe: 'עברו על סיכום הלמידה ובחרו את כל המשפטים שמתאימים לתחקור אחראי.',
     interactionType: 'selection',
     options: [
       { id: 'education-framing', labelHe: 'המקרה מיועד לתרגול תהליך, לא כהמלצה.' },
@@ -394,7 +394,7 @@ export const exercises01To04: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.outcome-bias'],
     },
     explanationHe:
-      'פתק למידה טוב מציג את מטרת התרגול, את הסיכון, את הכללים שנקבעו מראש ואת איכות התהליך. תוצאה אחת אינה הוכחת שיטה ואינה רשות לשנות כללים בדיעבד.',
+      'סיכום למידה טוב מציג את מטרת התרגול, את הסיכון, את הכללים שנקבעו מראש ואת איכות התהליך. תוצאה אחת אינה הוכחת שיטה ואינה רשות לשנות כללים בדיעבד.',
     alternativeExplanations: [
       {
         answerId: 'profit-promise',
@@ -411,7 +411,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     hints: hints('u00-scenarios-e05', [
       'הפרידו בין איכות ההחלטה לבין מה שהמחיר עשה אחר כך.',
       'חפשו גילוי סיכון וכללים שנכתבו מראש.',
-      'בחרו ארבעה סעיפים: מסגור לימודי, סיכון, קדם־התחייבות ותחקור תהליך.',
+      'בחרו ארבעה סעיפים: מסגור לימודי, סיכון, כללים שנקבעו מראש ותחקור תהליך.',
     ]),
     sourceReferences: [
       ...source(3, 3, 'p. i', 'Front matter — educational and financial-risk disclosure'),
@@ -424,7 +424,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     safetyNoteHe: 'התחקור מודד תהליך לימודי; הוא אינו מבטיח תשואה ואינו מחליף ייעוץ מוסמך.',
     processCriteriaHe: [
       'שומר מסגור לימודי וגילוי סיכון.',
-      'מעריך קדם־התחייבות ותהליך בנפרד מתוצאה.',
+      'מעריך את הכללים שנקבעו מראש ואת התהליך בנפרד מן התוצאה.',
     ],
   },
   {
@@ -976,7 +976,8 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u02-structure-e04',
     skillIds: ['structure.swings'],
     difficulty: 2,
-    promptHe: 'הקישו על כל נקודות הנדנדה המסומנות ברצף כמייצגות שיא גבוה (HH) או שפל גבוה (HL).',
+    promptHe:
+      'סמנו בגרף את כל השיאים והשפלים המשמעותיים שמרכיבים את הרצף: שיאים עולים (HH) ושפלים עולים (HL).',
     interactionType: 'point',
     chartSpec: chart('u02-structure-e04', 20204, 'uptrend', { noise: 0.25 }),
     rubric: {
@@ -997,12 +998,12 @@ export const exercises01To04: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.pattern-without-context'],
     },
     explanationHe:
-      'מגמה עולה ניתנת לתיאור כרצף שיאים ושפלים עולים. הסימון נעשה לפי נקודות נדנדה משמעותיות, לא לפי כל נר שזז בכיוון הנגדי.',
+      'מגמה עולה ניתנת לתיאור כרצף שיאים ושפלים עולים. הסימון נעשה לפי נקודות מפנה משמעותיות, לא לפי כל נר שזז בכיוון הנגדי.',
     alternativeExplanations: [
       {
         feedbackCode: 'point-outside-tolerance',
         explanationHe:
-          'בחירת כל תנודה זעירה מערבבת רעש עם נקודת נדנדה משמעותית. הגדרת מגמה דורשת לסמן גם שיאים וגם שפלים מרכזיים.',
+          'בחירת כל תנודה זעירה מערבבת רעש עם נקודת מפנה משמעותית. הגדרת מגמה דורשת לסמן גם שיאים וגם שפלים מרכזיים.',
         misconceptionId: 'misconception.pattern-without-context',
       },
     ],
@@ -1018,7 +1019,10 @@ export const exercises01To04: readonly ContentExercise[] = [
     role: 'positive',
     category: 'visual',
     safetyNoteHe: 'רצף מבני מתאר את התרשים הסינתטי; הוא אינו מבטיח המשך של המגמה.',
-    processCriteriaHe: ['מסמן קיצוני נדנדה ולא רעש תוך־נרי.', 'בודק שיאים ושפלים כרצף משותף.'],
+    processCriteriaHe: [
+      'מסמן נקודות קיצון משמעותיות ולא רעש בתוך הנר.',
+      'בודק שיאים ושפלים כרצף משותף.',
+    ],
   },
   {
     ...common,
@@ -1026,17 +1030,17 @@ export const exercises01To04: readonly ContentExercise[] = [
     skillIds: ['structure.swings'],
     difficulty: 3,
     promptHe:
-      'הכלל שנקבע מראש דורש שינוי של 3% כדי לאשר נדנדה. השפל האחרון ירד 1.2% מתחת ל־HL הקודם, ועדיין לא נוצר LH. כיצד לסווג?',
+      'הכלל שנקבע מראש דורש שינוי של 3% כדי לאשר נקודת מפנה. השפל האחרון ירד 1.2% מתחת ל־HL הקודם, ועדיין לא נוצר LH. כיצד לסווג?',
     interactionType: 'decision',
     options: [
       { id: 'trade', labelHe: 'היפוך יורד מלא אושר.' },
       { id: 'wait', labelHe: 'להמתין אך להתעלם מכלל ה־3%.' },
-      { id: 'reject', labelHe: 'לדחות את כלל הנדנדה לאחר החריגה.' },
+      { id: 'reject', labelHe: 'לדחות את כלל נקודות המפנה לאחר החריגה.' },
       {
         id: 'insufficient-evidence',
         labelHe: 'אין עדיין די ראיות להיפוך מלא לפי הכלל.',
       },
-      { id: 'below-swing-threshold', labelHe: 'החריגה קטנה מסף הנדנדה שנקבע.' },
+      { id: 'below-swing-threshold', labelHe: 'החריגה קטנה מסף השינוי שנקבע.' },
       { id: 'new-sequence-absent', labelHe: 'עדיין חסר רצף LH/LL חדש.' },
     ],
     chartSpec: chart(
@@ -1087,8 +1091,9 @@ export const exercises01To04: readonly ContentExercise[] = [
     termIds: ['term.higher-low', 'term.lower-high', 'term.atr'],
     role: 'near-miss',
     category: 'visual',
-    safetyNoteHe: 'כלל נדנדה מפחית שרירותיות אך אינו מבטל שיקול דעת ואינו מבטיח תוצאה עתידית.',
-    processCriteriaHe: ['מיישם את סף הנדנדה שנקבע מראש.', 'מפריד שבירה יחידה מרצף מבני חדש.'],
+    safetyNoteHe:
+      'כלל לזיהוי נקודות מפנה מפחית שרירותיות, אך אינו מבטל שיקול דעת ואינו מבטיח תוצאה עתידית.',
+    processCriteriaHe: ['מיישם את סף השינוי שנקבע מראש.', 'מפריד שבירה יחידה מרצף מבני חדש.'],
   },
   {
     ...common,
@@ -1096,7 +1101,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     skillIds: ['levels.zones'],
     difficulty: 2,
     promptHe:
-      'ציירו אזור תמיכה שמכיל את רוב הפתילות והסגירות בתגובות החוזרות, במקום קו במחיר יחיד.',
+      'סמנו שתי פינות מנוגדות של אזור תמיכה שמכיל את רוב הפתילות והסגירות בתגובות החוזרות, במקום קו במחיר יחיד.',
     interactionType: 'zone',
     chartSpec: chart('u03-levels-e01', 30301, 'range', { volatility: 0.016, noise: 0.3 }),
     rubric: {
@@ -1275,8 +1280,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u03-levels-e04',
     skillIds: ['levels.lines'],
     difficulty: 3,
-    promptHe:
-      'חברו את שפל־העוגן הראשון והאחרון בקו מגמה עולה. לאחר מכן יש להעביר קו מקביל דרך השיאים ליצירת ערוץ.',
+    promptHe: 'סמנו שתי נקודות עוגן על השפלים העולים כדי לשרטט את קו המגמה הבסיסי.',
     interactionType: 'line',
     chartSpec: chart('u03-levels-e04', 30304, 'uptrend', { volatility: 0.015, noise: 0.2 }),
     rubric: {
@@ -1304,7 +1308,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     hints: hints('u03-levels-e04', [
       'במגמה עולה מתחילים מן השפלים, לא מן השיאים.',
       'בחרו עוגנים משמעותיים שהקו נשאר מתחת לרוב המבנה.',
-      'חברו את נר 21 סביב 105.94 לנר 56 סביב 115.05; קו הערוץ מקביל.',
+      'חברו את נר 21 סביב 105.94 לנר 56 סביב 115.05.',
     ]),
     sourceReferences: source(
       31,
@@ -1319,7 +1323,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     safetyNoteHe: 'קו וערוץ הם כלי תיאור; נגיעה או חצייה אינן הוראת פעולה עצמאית.',
     processCriteriaHe: [
       'מחבר עוגני שפל מותרים בקו עולה.',
-      'שומר את קו הערוץ מקביל ואינו מתאים את הזווית בדיעבד.',
+      'שומר על זווית קו הבסיס ואינו מתאים אותה בדיעבד.',
     ],
   },
   {

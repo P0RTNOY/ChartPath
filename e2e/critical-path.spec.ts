@@ -12,13 +12,16 @@ async function beginFreshGuest(page: Page, dailyGoal = 10) {
     .click();
   await page.getByRole('button', { name: 'המשך', exact: true }).click();
   await page.getByRole('radio', { name: `${dailyGoal} דקות ביום` }).click();
-  await page.getByRole('button', { name: 'בניית המסלול שלי' }).click();
+  await page.getByRole('button', { name: 'בנו לי מסלול' }).click();
   await expect(page.getByRole('heading', { name: 'המסלול שלי' })).toBeVisible();
 }
 
 async function answerExercise(page: Page, answers: readonly string[], nextLabel: string) {
   for (const answer of answers) {
-    await page.getByText(answer, { exact: true }).click();
+    await page
+      .getByRole('radio', { name: answer, exact: true })
+      .or(page.getByRole('checkbox', { name: answer, exact: true }))
+      .click();
   }
   await page.getByRole('button', { name: 'בדיקת התשובה' }).click();
   await expect(page.getByRole('heading', { name: 'הבחנה מדויקת' })).toBeVisible();
@@ -33,9 +36,9 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
   await expect(page.getByRole('heading', { name: 'השיעור עדיין נעול' })).toBeVisible();
   await expect(page.getByText(/מקמו על הנר העולה/)).toHaveCount(0);
   await page.goto('/home');
-  await page.getByRole('button', { name: 'התחלת השיעור' }).click();
+  await page.getByRole('button', { name: 'התחילו את השיעור' }).click();
   await expect(page.getByRole('heading', { name: 'תרחישים, לא נבואות' })).toBeVisible();
-  await page.getByRole('button', { name: 'התחלת השיעור' }).click();
+  await page.getByRole('button', { name: 'התחילו את השיעור' }).click();
 
   await answerExercise(page, ['לתאר מבנה ותרחיש מותנה, בלי להבטיח כיוון או תוצאה.'], 'לתרגיל הבא');
   await answerExercise(
@@ -90,15 +93,15 @@ test('glossary search and accessibility preferences work without an account', as
 
   await page.getByRole('tab', { name: 'הגדרות' }).click();
   await page.getByRole('radio', { name: 'כהה' }).click();
-  await page.getByRole('radio', { name: 'ענק' }).click();
+  await page.getByRole('radio', { name: 'גדול מאוד' }).click();
   await page.getByRole('switch', { name: 'הפחתת תנועה' }).click();
 
   await expect(page.getByRole('radio', { name: 'כהה' })).toBeChecked();
-  await expect(page.getByRole('radio', { name: 'ענק' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'גדול מאוד' })).toBeChecked();
   await expect(page.getByRole('switch', { name: 'הפחתת תנועה' })).toBeChecked();
 
   await page.reload();
   await expect(page.getByRole('radio', { name: 'כהה' })).toBeChecked();
-  await expect(page.getByRole('radio', { name: 'ענק' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'גדול מאוד' })).toBeChecked();
   await expect(page.getByRole('switch', { name: 'הפחתת תנועה' })).toBeChecked();
 });

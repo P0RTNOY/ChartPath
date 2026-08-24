@@ -53,7 +53,7 @@ export default function OnboardingScreen() {
       accessibilityLabel="היכרות עם ChartPath"
       contentContainerStyle={{ gap: theme.spacing.xl, justifyContent: 'space-between' }}
       scroll
-      style={{ direction: 'rtl' }}
+      style={{ direction: theme.direction }}
       testID="onboarding-screen"
     >
       <View style={{ alignItems: 'center', gap: theme.spacing.md, paddingTop: theme.spacing.xl }}>
@@ -68,6 +68,7 @@ export default function OnboardingScreen() {
         <ProgressBar
           accessibilityLabel={`שלב ${step + 1} מתוך 3`}
           showValue={false}
+          style={{ alignSelf: 'stretch' }}
           value={(step + 1) * (100 / 3)}
         />
       </View>
@@ -86,13 +87,13 @@ export default function OnboardingScreen() {
           </View>
           <View style={{ gap: theme.spacing.sm }}>
             {[
-              ['chart', 'תרגול חזותי', 'מסמנים רמות, קווים ואזורי החלטה על גרפים חיים.'],
+              ['chart', 'תרגול חזותי', 'מסמנים רמות, קווים ואזורי החלטה על גרפים אינטראקטיביים.'],
               ['spark', 'משוב שמסביר', 'לא רק נכון או לא נכון — גם מה לראות בפעם הבאה.'],
-              ['review', 'חזרה מותאמת', 'מיומנויות חלשות חוזרות בזמן המתאים.'],
+              ['review', 'חזרה מותאמת', 'מיומנויות שדורשות חיזוק חוזרות בזמן המתאים.'],
             ].map(([icon, title, body]) => (
               <Card
                 key={title}
-                style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 14 }}
+                style={{ alignItems: 'center', flexDirection: 'row', gap: 14 }}
                 variant="outlined"
               >
                 <IconBubble>
@@ -155,7 +156,7 @@ export default function OnboardingScreen() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: accepted }}
             onPress={() => setAccepted((value) => !value)}
-            style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12, minHeight: 48 }}
+            style={{ alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 48 }}
           >
             <View
               style={{
@@ -177,7 +178,7 @@ export default function OnboardingScreen() {
               קראתי, הבנתי ואני רוצה להמשיך
             </UiText>
           </Pressable>
-          <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button onPress={() => setStep(0)} variant="ghost">
               חזרה
             </Button>
@@ -204,7 +205,7 @@ export default function OnboardingScreen() {
           <View
             accessibilityRole="radiogroup"
             style={{
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               flexWrap: 'wrap',
               gap: 10,
               justifyContent: 'center',
@@ -259,12 +260,12 @@ export default function OnboardingScreen() {
               {saveError}
             </UiText>
           ) : undefined}
-          <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button disabled={saving} onPress={() => setStep(1)} variant="ghost">
               חזרה
             </Button>
             <Button fullWidth loading={saving} onPress={() => void finish()} style={{ flex: 1 }}>
-              בניית המסלול שלי
+              בנו לי מסלול
             </Button>
           </View>
         </View>

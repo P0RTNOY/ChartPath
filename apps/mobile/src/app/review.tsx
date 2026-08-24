@@ -46,22 +46,27 @@ export default function ReviewScreen() {
     <MainScreen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
       <TopBar subtitle="חזרה מרווחת לפי המיומנויות שלך" title="חזרה חכמה" />
       <Card variant="accent">
-        <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 14 }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 14 }}>
           <IconBubble tone="gold">
             <Glyph name="review" size={25} />
           </IconBubble>
           <View style={{ flex: 1, gap: 3 }}>
             <Heading level={2}>
-              {due.length ? `${due.length} מיומנויות הגיעו למועד חזרה` : 'אין חזרות דחופות כרגע'}
+              {due.length === 1
+                ? 'מיומנות אחת הגיעה למועד חזרה'
+                : due.length
+                  ? `${due.length} מיומנויות הגיעו למועד חזרה`
+                  : 'אין חזרות דחופות כרגע'}
             </Heading>
             <UiText color="textMuted" variant="bodySmall">
-              התרגול נקבע לפי ניסיונות שמורים. הסבר אופציונלי לעולם אינו משנה את הציון.
+              התרגול נקבע לפי ניסיונות שמורים. הסבר נוסף יכול לעזור להבין את התשובה, אך אינו משנה את
+              הציון.
             </UiText>
           </View>
         </View>
       </Card>
       <View style={{ gap: theme.spacing.md }}>
-        <Heading level={2}>{due.length ? 'ממתינות עכשיו' : 'חיזוק מומלץ'}</Heading>
+        <Heading level={2}>{due.length ? 'לחזרה עכשיו' : 'חיזוק מומלץ'}</Heading>
         {queue.length === 0 ? (
           <EmptyState
             action={
@@ -83,12 +88,12 @@ export default function ReviewScreen() {
                 onPress={() => startReview(item.skillId)}
                 variant={dueNow ? 'outlined' : 'subtle'}
               >
-                <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+                <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
                   <IconBubble tone={dueNow ? 'gold' : 'muted'}>
                     <Glyph name="spark" />
                   </IconBubble>
                   <View style={{ flex: 1, gap: 4 }}>
-                    <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 7 }}>
+                    <View style={{ alignItems: 'center', flexDirection: 'row', gap: 7 }}>
                       <Heading level={3} style={{ flex: 1 }}>
                         {skill?.titleHe ?? item.skillId}
                       </Heading>
@@ -106,8 +111,9 @@ export default function ReviewScreen() {
                       </LtrText>{' '}
                       • מרווח:{' '}
                       <LtrText color="textMuted" variant="caption">
-                        {item.intervalDays}d
-                      </LtrText>
+                        {item.intervalDays}
+                      </LtrText>{' '}
+                      {item.intervalDays === 1 ? 'יום' : 'ימים'}
                     </UiText>
                   </View>
                 </View>

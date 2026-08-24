@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 
+import { isolateLtrRunsInHebrew } from './bidi';
 import { useChartPathTheme } from './theme';
 import type { LayoutDirection, ThemeColors, TypographyVariant } from './tokens';
 
@@ -31,6 +32,12 @@ function alignmentFor(
   return direction === 'rtl' ? 'left' : 'right';
 }
 
+function isolateMixedChildren(children: ReactNode): ReactNode {
+  if (typeof children === 'string') return isolateLtrRunsInHebrew(children);
+  if (Array.isArray(children)) return children.map(isolateMixedChildren);
+  return children;
+}
+
 export function UiText({
   variant = 'body',
   color = 'text',
@@ -39,6 +46,7 @@ export function UiText({
   style,
   allowFontScaling = true,
   maxFontSizeMultiplier = 2,
+  children,
   ...props
 }: UiTextProps) {
   const { theme, textScale } = useChartPathTheme();
@@ -66,7 +74,9 @@ export function UiText({
         style,
       ]}
       {...props}
-    />
+    >
+      {resolvedDirection === 'rtl' ? isolateMixedChildren(children) : children}
+    </Text>
   );
 }
 

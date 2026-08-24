@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { isTextOnlyBadgeContent } from './badge-utils';
 import { useTheme } from './theme';
 import { UiText } from './text';
 
@@ -22,6 +23,7 @@ export function Badge({
   testID,
 }: BadgeProps) {
   const theme = useTheme();
+  const childNodes = Children.toArray(children);
   const palette = {
     neutral: { background: theme.colors.surfaceMuted, foreground: theme.colors.text },
     teal: { background: theme.colors.primarySoft, foreground: theme.colors.primary },
@@ -51,7 +53,7 @@ export function Badge({
       ]}
       testID={testID}
     >
-      {typeof children === 'string' || typeof children === 'number' ? (
+      {isTextOnlyBadgeContent(childNodes) ? (
         <UiText style={{ color: palette.foreground }} variant="caption">
           {children}
         </UiText>

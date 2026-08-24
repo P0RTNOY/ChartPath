@@ -24,7 +24,8 @@ pnpm mobile:web
 ```
 
 The application is guest-first and works without API keys or cloud services. Progress is stored on
-the device. See `docs/RELEASE_READINESS.md` for currently verified targets and known limitations.
+the device. See `docs/RELEASE_READINESS.md` for currently verified targets and known limitations,
+and `docs/HEBREW_INTERACTIVE_EXERCISE_AUDIT.md` for the Hebrew/RTL and chart-interaction review.
 
 ## Verification
 
@@ -36,9 +37,10 @@ pnpm --filter @chartpath/mobile export:web
 ```
 
 The production web export is verified end to end at phone and tablet viewports. Expo's iOS and
-Android Hermes bundles also export successfully; native UI, device SQLite, and screen-reader runs
-remain explicit gates before any distribution. Reproducible screenshot evidence is under
-`docs/screenshots/`.
+Android Hermes bundles also export successfully. An iOS Expo Go simulator journey verifies native
+onboarding, lesson completion, device SQLite, and force-quit/reopen persistence; Android runtime,
+standalone/physical-device, and screen-reader runs remain explicit gates before any distribution.
+Reproducible screenshot evidence is under `docs/screenshots/`.
 
 ## Educational safety
 

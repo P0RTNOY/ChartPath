@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { isTextOnlyBadgeContent } from '../src/badge-utils';
+import { isolateLtrRunsInHebrew } from '../src/bidi';
 import { defaultMasteryLevels, getMasteryLevel } from '../src/mastery-utils';
 import { normalizeProgress } from '../src/progress-utils';
 import { darkColors, lightColors, normalizeTextScale } from '../src/tokens';
@@ -57,6 +59,24 @@ describe('normalizeProgress', () => {
 
   it('supports non-percentage scales', () => {
     expect(normalizeProgress(3, 4)).toEqual({ value: 3, max: 4, ratio: 0.75, percent: 75 });
+  });
+});
+
+describe('isolateLtrRunsInHebrew', () => {
+  it('isolates Latin and numeric runs only inside mixed Hebrew text', () => {
+    expect(isolateLtrRunsInHebrew('יחס 1.5R עם ATR ו־HH/HL')).toBe(
+      'יחס \u20661.5R\u2069 עם \u2066ATR\u2069 ו־\u2066HH/HL\u2069',
+    );
+    expect(isolateLtrRunsInHebrew('עברית בלבד')).toBe('עברית בלבד');
+    expect(isolateLtrRunsInHebrew('English only 1.5R')).toBe('English only 1.5R');
+  });
+});
+
+describe('isTextOnlyBadgeContent', () => {
+  it('recognizes interpolated text fragments that React passes as an array', () => {
+    expect(isTextOnlyBadgeContent(['שיעור ', 1, ' מתוך 12'])).toBe(true);
+    expect(isTextOnlyBadgeContent(['רמז ', 2])).toBe(true);
+    expect(isTextOnlyBadgeContent([{ type: 'custom-text' }])).toBe(false);
   });
 });
 

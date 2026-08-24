@@ -302,7 +302,7 @@ function SelectionEditor({
               borderColor: checked ? theme.colors.primary : theme.colors.border,
               borderRadius: theme.radii.md,
               borderWidth: checked ? 2 : 1,
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               gap: 12,
               minHeight: 52,
               padding: 12,
@@ -362,7 +362,7 @@ function RadioEditor({
               borderColor: selected ? theme.colors.primary : theme.colors.border,
               borderRadius: theme.radii.md,
               borderWidth: selected ? 2 : 1,
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               gap: 12,
               minHeight: 52,
               padding: 12,
@@ -558,7 +558,7 @@ function SequenceEditor({
           <Card
             key={id}
             padding="sm"
-            style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}
+            style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}
             variant="outlined"
           >
             <LtrText color="primary" variant="numeric">
@@ -608,7 +608,7 @@ function SequenceEditor({
           onPress={() => onAnswer({ kind: 'sequence', orderedIds })}
           variant="secondary"
         >
-          אישור הסדר
+          אשרו את הסדר
         </Button>
       ) : undefined}
     </View>
@@ -675,9 +675,7 @@ function StepEditor({
     return renderCustomStep({ step, answer: answer ?? null, disabled, onAnswer });
   return (
     <Card variant="subtle">
-      <UiText color="danger">
-        שלב שרטוט זה דורש מתאם גרף. חברו אותו באמצעות renderCustomStep כדי לשמור על ציון דטרמיניסטי.
-      </UiText>
+      <UiText color="danger">שלב השרטוט אינו זמין כרגע; לא נשמרה תשובה.</UiText>
     </Card>
   );
 }
@@ -730,14 +728,14 @@ function CapstoneSession({
   return (
     <View
       accessibilityLabel="תרגיל מסכם, תהליך 11 השלבים"
-      style={{ direction: 'rtl', gap: theme.spacing.xl }}
+      style={{ direction: theme.direction, gap: theme.spacing.xl }}
       testID={testID}
     >
       <View style={{ gap: theme.spacing.sm }}>
         <View
           style={{
             alignItems: 'center',
-            flexDirection: 'row-reverse',
+            flexDirection: 'row',
             justifyContent: 'space-between',
           }}
         >
@@ -759,7 +757,7 @@ function CapstoneSession({
 
       <View
         accessibilityLabel="ניווט בין שלבי התהליך"
-        style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}
+        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
       >
         {stages.map((step, index) => {
           const answered = answerIsComplete(step, answers[step.id]);
@@ -780,7 +778,7 @@ function CapstoneSession({
                 borderWidth: selected ? 2 : 1,
                 flexBasis: '30%',
                 flexGrow: 1,
-                flexDirection: 'row-reverse',
+                flexDirection: 'row',
                 gap: 8,
                 minHeight: 48,
                 minWidth: 132,
@@ -817,7 +815,7 @@ function CapstoneSession({
       <Card variant="accent">
         <View style={{ gap: theme.spacing.lg }}>
           <View style={{ gap: 6 }}>
-            <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 8 }}>
+            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
               <Badge tone="teal">{`שלב ${activeIndex + 1} מתוך 11`}</Badge>
               <Heading level={3}>{CAPSTONE_STEP_LABELS[activeStep.id]}</Heading>
             </View>
@@ -836,7 +834,7 @@ function CapstoneSession({
             renderCustomStep={renderCustomStep}
             step={activeStep}
           />
-          <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button
               disabled={activeIndex === 0}
               onPress={() => setActiveStepId(stages[activeIndex - 1]!.id)}

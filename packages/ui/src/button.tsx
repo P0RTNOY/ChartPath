@@ -38,7 +38,7 @@ export function Button({
   size = 'default',
   disabled = false,
   loading = false,
-  loadingLabel = 'טוען',
+  loadingLabel = 'טוענים…',
   accessibilityLabel,
   accessibilityHint,
   leadingAccessory,

@@ -70,6 +70,7 @@ export function ProgressBar({
           borderColor: theme.colors.border,
           borderRadius: theme.radii.pill,
           borderWidth: 1,
+          direction: theme.direction,
           height: 12,
           overflow: 'hidden',
           width: '100%',
@@ -77,7 +78,7 @@ export function ProgressBar({
       >
         <View
           style={{
-            alignSelf: theme.direction === 'rtl' ? 'flex-end' : 'flex-start',
+            alignSelf: 'flex-start',
             backgroundColor: fillColor,
             borderRadius: theme.radii.pill,
             height: '100%',

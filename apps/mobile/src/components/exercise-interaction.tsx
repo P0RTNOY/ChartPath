@@ -61,7 +61,7 @@ function OptionGrid({
             style={{
               borderColor: selected ? theme.colors.primary : theme.colors.border,
               borderWidth: selected ? 2 : 1,
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               gap: 12,
             }}
             variant={selected ? 'accent' : 'outlined'}
@@ -176,7 +176,7 @@ function DecisionInteraction(props: ExerciseInteractionProps) {
           <UiText variant="label">אילו ראיות תומכות בהחלטה?</UiText>
           {!selectedDecision ? (
             <UiText color="textMuted" variant="caption">
-              בחרו החלטה לפני סימון הראיות.
+              בחרו תחילה כיצד לפעול.
             </UiText>
           ) : undefined}
           {reasonOptions.map((option) => {
@@ -202,7 +202,7 @@ function DecisionInteraction(props: ExerciseInteractionProps) {
                 }}
                 variant={checked ? 'accent' : 'outlined'}
               >
-                <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+                <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
                   {checked ? <Glyph name="check" /> : <View style={{ height: 20, width: 20 }} />}
                   <UiText style={{ flex: 1 }}>{option.labelHe}</UiText>
                 </View>
@@ -243,7 +243,7 @@ function SelectionInteraction(props: ExerciseInteractionProps) {
               alignItems: 'center',
               borderColor: checked ? theme.colors.primary : theme.colors.border,
               borderWidth: checked ? 2 : 1,
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               gap: 12,
             }}
             variant={checked ? 'accent' : 'outlined'}
@@ -304,7 +304,7 @@ function SequenceInteraction(props: ExerciseInteractionProps) {
           <Card
             key={id}
             padding="sm"
-            style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}
+            style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}
             variant="outlined"
           >
             <View
@@ -362,7 +362,7 @@ function SequenceInteraction(props: ExerciseInteractionProps) {
         onPress={() => props.onChange({ kind: 'sequence', orderedIds: initial })}
         variant="secondary"
       >
-        אישור הסדר
+        אשרו את הסדר
       </Button>
     </View>
   );
@@ -372,7 +372,7 @@ const riskLabels: Readonly<
   Record<RiskAnswerField, { readonly he: string; readonly suffix: string }>
 > = {
   accountRisk: { he: 'סיכון כספי בחשבון', suffix: '₪' },
-  stopDistance: { he: 'מרחק לסטופ', suffix: '₪' },
+  stopDistance: { he: 'מרחק עצירה', suffix: '₪' },
   perUnitRisk: { he: 'סיכון ליחידה', suffix: '₪' },
   positionSize: { he: 'גודל פוזיציה', suffix: 'יח׳' },
   riskMultiple: { he: 'מכפיל סיכון', suffix: 'R' },
@@ -446,6 +446,7 @@ function DrawingInteraction(props: ExerciseInteractionProps) {
   const theme = useTheme();
   const [draftCandleIndex, setDraftCandleIndex] = useState('');
   const [draftPrice, setDraftPrice] = useState('');
+  const [showPreciseEntry, setShowPreciseEntry] = useState(false);
   const [anchors, setAnchors] = useState<readonly ChartAnchor[]>(() => {
     if (props.answer?.kind === 'point') return props.answer.points;
     if (props.answer?.kind === 'line') return [props.answer.line.start, props.answer.line.end];
@@ -458,17 +459,80 @@ function DrawingInteraction(props: ExerciseInteractionProps) {
   });
   if (!props.chart)
     return <EmptyInteraction message="הגרף אינו זמין כרגע. אפשר לחזור ולנסות שוב." />;
-  const mode = props.exercise.rubric.kind;
-  const requiredPoints = mode === 'point' ? Math.max(1, props.exercise.rubric.targets.length) : 2;
-  const handlePress = (anchor: ChartAnchor) => {
+  const rubric = props.exercise.rubric;
+  if (rubric.kind !== 'point' && rubric.kind !== 'line' && rubric.kind !== 'zone') {
+    return <EmptyInteraction message="סוג הסימון של התרגיל אינו זמין." />;
+  }
+  const mode = rubric.kind;
+  const requiredPoints =
+    mode === 'point' ? (rubric.matching === 'any' ? 1 : Math.max(1, rubric.targets.length)) : 2;
+  const complete = anchors.length === requiredPoints;
+  const frame = props.chart.candles.reduce(
+    (current, candle) => ({
+      first: Math.min(current.first, candle.index),
+      last: Math.max(current.last, candle.index),
+      low: Math.min(current.low, candle.low),
+      high: Math.max(current.high, candle.high),
+    }),
+    {
+      first: Number.POSITIVE_INFINITY,
+      last: Number.NEGATIVE_INFINITY,
+      low: Number.POSITIVE_INFINITY,
+      high: Number.NEGATIVE_INFINITY,
+    },
+  );
+  const pricePadding = Math.max(0.01, (frame.high - frame.low) * 0.08);
+  const minimumPrice = frame.low - pricePadding;
+  const maximumPrice = frame.high + pricePadding;
+  const parsedCandleIndex = Number(draftCandleIndex);
+  const parsedPrice = Number(draftPrice.replace(',', '.'));
+  const candleIsValid =
+    Number.isInteger(parsedCandleIndex) &&
+    props.chart.candles.some((candle) => candle.index === parsedCandleIndex);
+  const priceIsValid =
+    Number.isFinite(parsedPrice) && parsedPrice >= minimumPrice && parsedPrice <= maximumPrice;
+  const canReplaceSinglePoint = mode === 'point' && requiredPoints === 1;
+  const canAddAnchor = !complete || canReplaceSinglePoint;
+  const inputValidationMessage =
+    draftCandleIndex.trim() !== '' && !candleIsValid
+      ? `מספר הנר חייב להיות בין ${frame.first} ל־${frame.last}.`
+      : draftPrice.trim() !== '' && !priceIsValid
+        ? `המחיר חייב להיות בין ${minimumPrice.toFixed(2)} ל־${maximumPrice.toFixed(2)}.`
+        : undefined;
+  const copy =
+    mode === 'line'
+      ? {
+          title: 'סמנו שני עוגנים לקו',
+          instruction: 'סמנו תחילה את נקודת ההתחלה, ואז את נקודת הסיום.',
+          unit: 'עוגנים',
+          add: 'הוספת עוגן',
+        }
+      : mode === 'zone'
+        ? {
+            title: 'סמנו שתי פינות של האזור',
+            instruction: 'סמנו שתי פינות מנוגדות. סדר הסימון אינו משנה.',
+            unit: 'פינות',
+            add: 'הוספת פינה',
+          }
+        : {
+            title: requiredPoints === 1 ? 'סמנו נקודה בגרף' : 'סמנו את כל הנקודות בגרף',
+            instruction:
+              requiredPoints === 1
+                ? 'הקישו על נקודת המחיר המבוקשת.'
+                : 'סמנו נקודה אחת בכל הקשה, לפי סדר הופעתן בגרף.',
+            unit: 'נקודות',
+            add: 'הוסיפו נקודה',
+          };
+  const commitAnchors = (next: readonly ChartAnchor[]) => {
     if (props.disabled) return;
-    const next = anchors.length >= requiredPoints ? [anchor] : [...anchors, anchor];
     setAnchors(next);
-    if (mode === 'point') {
+    if (next.length !== requiredPoints) {
+      props.onChange(null);
+    } else if (mode === 'point') {
       props.onChange({ kind: 'point', points: next });
-    } else if (mode === 'line' && next.length === 2) {
+    } else if (mode === 'line') {
       props.onChange({ kind: 'line', line: { start: next[0]!, end: next[1]! } });
-    } else if (mode === 'zone' && next.length === 2) {
+    } else {
       props.onChange({
         kind: 'zone',
         zone: {
@@ -478,117 +542,192 @@ function DrawingInteraction(props: ExerciseInteractionProps) {
           priceHigh: Math.max(next[0]!.price, next[1]!.price),
         },
       });
-    } else {
-      props.onChange(null);
     }
+  };
+  const handlePress = (anchor: ChartAnchor) => {
+    if (props.disabled || (complete && !canReplaceSinglePoint)) return;
+    commitAnchors(canReplaceSinglePoint ? [anchor] : [...anchors, anchor]);
   };
   const zone: ChartZone | undefined = props.answer?.kind === 'zone' ? props.answer.zone : undefined;
   const line = props.answer?.kind === 'line' ? props.answer.line : undefined;
+  const lastAnchor = anchors.at(-1);
   return (
     <View style={{ gap: theme.spacing.sm }}>
+      <Card variant="outlined">
+        <View style={{ gap: 4 }}>
+          <UiText variant="label">{copy.title}</UiText>
+          <UiText color="textMuted" variant="bodySmall">
+            {copy.instruction} הגרף מצמיד את הסימון לנר הקרוב.
+          </UiText>
+        </View>
+      </Card>
       <OhlcvChart
         chart={props.chart}
-        interactive={!props.disabled}
+        interactionHint={copy.instruction}
+        interactive={!props.disabled && canAddAnchor}
         onChartPress={handlePress}
         selectedLine={line}
         selectedPoints={anchors}
         selectedZone={zone}
       />
-      <Card variant="subtle">
-        <View style={{ gap: theme.spacing.sm }}>
-          <UiText variant="label">חלופה נגישה לסימון על הגרף</UiText>
-          <UiText color="textMuted" variant="caption">
-            הזינו מספר נר ומחיר כדי להוסיף נקודה בלי מחוות מדויקות.
-          </UiText>
-          <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
-            <TextInput
-              accessibilityLabel="מספר נר לסימון"
-              editable={!props.disabled}
-              keyboardType="number-pad"
-              onChangeText={setDraftCandleIndex}
-              placeholder="נר"
-              placeholderTextColor={theme.colors.textMuted}
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                borderRadius: 10,
-                borderWidth: 1,
-                color: theme.colors.text,
-                flex: 1,
-                minHeight: 48,
-                paddingHorizontal: 12,
-                direction: 'ltr',
-                textAlign: 'left',
-                writingDirection: 'ltr',
+      <Button
+        onPress={() => setShowPreciseEntry((visible) => !visible)}
+        size="compact"
+        variant="ghost"
+      >
+        {showPreciseEntry ? 'הסתרת סימון מדויק' : 'סימון מדויק באמצעות ערכים'}
+      </Button>
+      {showPreciseEntry ? (
+        <Card variant="subtle">
+          <View style={{ gap: theme.spacing.sm }}>
+            <UiText variant="label">סימון מדויק באמצעות ערכים</UiText>
+            <UiText color="textMuted" variant="caption">
+              הזינו את מספר הנר ואת המחיר כדי לסמן בלי להסתמך על מחווה מדויקת.
+            </UiText>
+            <UiText color="textMuted" variant="caption">
+              טווח זמין: נרות{' '}
+              <LtrText color="textMuted" variant="caption">
+                {frame.first}–{frame.last}
+              </LtrText>
+              , מחיר{' '}
+              <LtrText color="textMuted" variant="caption">
+                {minimumPrice.toFixed(2)}–{maximumPrice.toFixed(2)}
+              </LtrText>
+              .
+            </UiText>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                accessibilityLabel="מספר הנר לסימון"
+                editable={!props.disabled}
+                keyboardType="number-pad"
+                onChangeText={setDraftCandleIndex}
+                placeholder="נר"
+                placeholderTextColor={theme.colors.textMuted}
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  color: theme.colors.text,
+                  flex: 1,
+                  minHeight: 48,
+                  paddingHorizontal: 12,
+                  direction: 'ltr',
+                  textAlign: 'left',
+                  writingDirection: 'ltr',
+                }}
+                value={draftCandleIndex}
+              />
+              <TextInput
+                accessibilityLabel="מחיר לסימון"
+                editable={!props.disabled}
+                keyboardType="decimal-pad"
+                onChangeText={setDraftPrice}
+                placeholder="מחיר"
+                placeholderTextColor={theme.colors.textMuted}
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  color: theme.colors.text,
+                  flex: 1,
+                  minHeight: 48,
+                  paddingHorizontal: 12,
+                  direction: 'ltr',
+                  textAlign: 'left',
+                  writingDirection: 'ltr',
+                }}
+                value={draftPrice}
+              />
+            </View>
+            <Button
+              disabled={
+                props.disabled ||
+                draftCandleIndex.trim() === '' ||
+                draftPrice.trim() === '' ||
+                !candleIsValid ||
+                !priceIsValid ||
+                !canAddAnchor
+              }
+              onPress={() => {
+                handlePress({
+                  candleIndex: parsedCandleIndex,
+                  price: parsedPrice,
+                });
+                setDraftCandleIndex('');
+                setDraftPrice('');
               }}
-              value={draftCandleIndex}
-            />
-            <TextInput
-              accessibilityLabel="מחיר לסימון"
-              editable={!props.disabled}
-              keyboardType="decimal-pad"
-              onChangeText={setDraftPrice}
-              placeholder="מחיר"
-              placeholderTextColor={theme.colors.textMuted}
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                borderRadius: 10,
-                borderWidth: 1,
-                color: theme.colors.text,
-                flex: 1,
-                minHeight: 48,
-                paddingHorizontal: 12,
-                direction: 'ltr',
-                textAlign: 'left',
-                writingDirection: 'ltr',
-              }}
-              value={draftPrice}
-            />
+              variant="secondary"
+            >
+              {copy.add}
+            </Button>
+            {inputValidationMessage ? (
+              <UiText color="danger" variant="caption">
+                {inputValidationMessage}
+              </UiText>
+            ) : undefined}
           </View>
-          <Button
-            disabled={
-              props.disabled ||
-              draftCandleIndex.trim() === '' ||
-              draftPrice.trim() === '' ||
-              !Number.isInteger(Number(draftCandleIndex)) ||
-              !Number.isFinite(Number(draftPrice)) ||
-              !props.chart.candles.some((candle) => candle.index === Number(draftCandleIndex))
-            }
-            onPress={() => {
-              handlePress({
-                candleIndex: Number(draftCandleIndex),
-                price: Number(draftPrice),
-              });
-              setDraftCandleIndex('');
-              setDraftPrice('');
-            }}
-            variant="secondary"
-          >
-            הוספת נקודה
-          </Button>
-        </View>
-      </Card>
+        </Card>
+      ) : undefined}
+      {complete ? (
+        <Card variant="accent">
+          <UiText variant="bodySmall">
+            הסימון הושלם. אפשר לבדוק את התשובה או לתקן את הסימון לפני ההגשה.
+          </UiText>
+        </Card>
+      ) : undefined}
       <View
         style={{
-          alignItems: 'center',
-          flexDirection: 'row-reverse',
-          justifyContent: 'space-between',
+          gap: theme.spacing.xs,
         }}
       >
-        <UiText color="textMuted" variant="caption">
-          {anchors.length} מתוך {requiredPoints} נקודות סומנו
-        </UiText>
-        <Button
-          onPress={() => {
-            setAnchors([]);
-            props.onChange(null);
+        <View style={{ gap: 2 }}>
+          <UiText color="textMuted" variant="caption">
+            סומנו{' '}
+            <LtrText color="textMuted" variant="caption">
+              {anchors.length}
+            </LtrText>{' '}
+            מתוך{' '}
+            <LtrText color="textMuted" variant="caption">
+              {requiredPoints}
+            </LtrText>{' '}
+            {copy.unit}
+          </UiText>
+          {lastAnchor ? (
+            <UiText color="textMuted" variant="caption">
+              הסימון האחרון: נר{' '}
+              <LtrText color="textMuted" variant="caption">
+                {lastAnchor.candleIndex}, {lastAnchor.price.toFixed(2)}
+              </LtrText>
+            </UiText>
+          ) : undefined}
+        </View>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 2,
+            justifyContent: 'flex-end',
           }}
-          size="compact"
-          variant="ghost"
         >
-          ניקוי סימון
-        </Button>
+          <Button
+            disabled={props.disabled || anchors.length === 0}
+            onPress={() => commitAnchors(anchors.slice(0, -1))}
+            size="compact"
+            variant="ghost"
+          >
+            ביטול הסימון האחרון
+          </Button>
+          <Button
+            disabled={props.disabled || anchors.length === 0}
+            onPress={() => commitAnchors([])}
+            size="compact"
+            variant="ghost"
+          >
+            ניקוי הסימון
+          </Button>
+        </View>
       </View>
     </View>
   );
@@ -602,7 +741,16 @@ function LabelPlacementInteraction(props: ExerciseInteractionProps) {
   const theme = useTheme();
   const options = props.exercise.options ?? [];
   const [activeLabelId, setActiveLabelId] = useState<string | null>(options[0]?.id ?? null);
-  const [placements, setPlacements] = useState<Readonly<Record<string, LabelPlacement>>>({});
+  const [placements, setPlacements] = useState<Readonly<Record<string, LabelPlacement>>>(() =>
+    props.answer?.kind === 'label-placement'
+      ? Object.fromEntries(
+          props.answer.placements.map((placement) => [
+            placement.labelId,
+            { anchor: placement.anchor },
+          ]),
+        )
+      : {},
+  );
   const chart = props.chart;
 
   if (!chart) return <EmptyInteraction message="הגרף לתרגיל התוויות אינו זמין." />;
@@ -611,6 +759,8 @@ function LabelPlacementInteraction(props: ExerciseInteractionProps) {
   const targets = new Map(
     props.exercise.rubric.targets.map((target) => [target.labelId, target.target]),
   );
+  const requiredLabelIds = props.exercise.rubric.targets.map((target) => target.labelId);
+  const placedRequiredCount = requiredLabelIds.filter((labelId) => placements[labelId]).length;
   const bullishIndex = targets.get('high-top')?.candleIndex;
   const bearishIndex = targets.get('bear-open-upper')?.candleIndex;
   const activeTarget = activeLabelId ? targets.get(activeLabelId) : undefined;
@@ -627,14 +777,13 @@ function LabelPlacementInteraction(props: ExerciseInteractionProps) {
   const placeActiveLabel = (anchor: ChartAnchor) => {
     if (props.disabled || !activeLabelId) return;
     const next = { ...placements, [activeLabelId]: { anchor } };
-    setPlacements(next);
-    props.onChange({
-      kind: 'label-placement',
-      placements: Object.entries(next).map(([labelId, placement]) => ({
-        labelId,
-        anchor: placement.anchor,
-      })),
+    const ready = requiredLabelIds.every((labelId) => next[labelId]);
+    const nextPlacements = requiredLabelIds.flatMap((labelId) => {
+      const placement = next[labelId];
+      return placement ? [{ labelId, anchor: placement.anchor }] : [];
     });
+    setPlacements(next);
+    props.onChange(ready ? { kind: 'label-placement', placements: nextPlacements } : null);
     const currentIndex = options.findIndex((option) => option.id === activeLabelId);
     setActiveLabelId(options[currentIndex + 1]?.id ?? activeLabelId);
   };
@@ -647,9 +796,20 @@ function LabelPlacementInteraction(props: ExerciseInteractionProps) {
       <UiText color="textMuted" variant="caption">
         שני נרות התרגול מסומנים במסגרת מקווקוות; מיקום יחסי נגיש זמין מתחת לגרף.
       </UiText>
+      <UiText color="textMuted" variant="caption">
+        מוקמו{' '}
+        <LtrText color="textMuted" variant="caption">
+          {placedRequiredCount}
+        </LtrText>{' '}
+        מתוך{' '}
+        <LtrText color="textMuted" variant="caption">
+          {requiredLabelIds.length}
+        </LtrText>{' '}
+        תוויות. אפשר להגיש רק לאחר מיקום כולן.
+      </UiText>
       <View
         accessibilityRole="radiogroup"
-        style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}
+        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
       >
         {options.map((option) => {
           const selected = activeLabelId === option.id;
@@ -710,6 +870,13 @@ function LabelPlacementInteraction(props: ExerciseInteractionProps) {
           ))}
         </View>
       </Card>
+      {placedRequiredCount === requiredLabelIds.length ? (
+        <Card variant="accent">
+          <UiText variant="bodySmall">
+            כל התוויות מוקמו. אפשר לבדוק את התשובה או לבחור תווית ולתקן את מיקומה.
+          </UiText>
+        </Card>
+      ) : undefined}
     </View>
   );
 }
@@ -781,19 +948,25 @@ function SequentialReveal(props: ExerciseInteractionProps) {
   return (
     <View style={{ gap: theme.spacing.md }}>
       <OhlcvChart chart={props.chart} revealCount={revealed} ticker="CPTH" />
-      <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
-        <Button
-          disabled={atDecisionWindow || !draftAnswer}
-          onPress={() => {
-            setRecordedUpdates((value) => value + 1);
-            setDraftAnswer(null);
-            props.onChange(null);
-            setRevealed((value) => Math.min(decisionWindow, value + 8));
-          }}
-          variant="secondary"
-        >
-          {draftAnswer ? 'תיעוד הניתוח וחשיפת 8 נרות' : 'בחרו ניתוח לפני החשיפה'}
-        </Button>
+      <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
+        {atDecisionWindow ? (
+          <Card padding="sm" variant="accent">
+            <UiText variant="bodySmall">חלון ההחלטה — בחרו תשובה והגישו.</UiText>
+          </Card>
+        ) : (
+          <Button
+            disabled={!draftAnswer}
+            onPress={() => {
+              setRecordedUpdates((value) => value + 1);
+              setDraftAnswer(null);
+              props.onChange(null);
+              setRevealed((value) => Math.min(decisionWindow, value + 8));
+            }}
+            variant="secondary"
+          >
+            {draftAnswer ? 'תעדו את הניתוח וחשפו 8 נרות' : 'בחרו ניתוח לפני החשיפה'}
+          </Button>
+        )}
         <LtrText color="textMuted" variant="numeric">
           {revealed}/{decisionWindow}
         </LtrText>
@@ -801,7 +974,7 @@ function SequentialReveal(props: ExerciseInteractionProps) {
       <UiText color="textMuted" variant="bodySmall">
         {atDecisionWindow
           ? `הגעתם לחלון ההחלטה לאחר ${recordedUpdates} עדכונים. הבחירה הבאה תהיה התשובה הסופית.`
-          : 'בחרו ניתוח לפי הנרות הגלויים, ורק אז ייחשפו הנרות הבאים. הבחירה הזמנית אינה מאפשרת הגשה.'}
+          : 'בחרו ניתוח לפי הנרות הגלויים, ורק אז ייחשפו הנרות הבאים. אי אפשר להגיש את הבחירה הזמנית.'}
       </UiText>
       <RubricInteraction
         {...props}

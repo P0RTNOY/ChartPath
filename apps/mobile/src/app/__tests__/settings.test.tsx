@@ -50,7 +50,7 @@ describe('settings accessibility preferences', () => {
         <SettingsScreen />
       </ChartPathThemeProvider>,
     );
-    expect(screen.getByText(/גיבוי האפליקציה מושבת ב־Android/)).toBeTruthy();
+    expect(screen.getByText(/גיבוי האפליקציה מושבת/)).toBeTruthy();
     expect(screen.getByText(/iCloud/)).toBeTruthy();
   });
 });

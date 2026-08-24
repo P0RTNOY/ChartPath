@@ -37,7 +37,7 @@ describe('onboarding', () => {
     await fireEvent.press(screen.getByRole('checkbox'));
     await fireEvent.press(screen.getByRole('button', { name: 'המשך' }));
     await fireEvent.press(screen.getByRole('radio', { name: '15 דקות ביום' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'בניית המסלול שלי' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'בנו לי מסלול' }));
 
     await waitFor(() => expect(mockAcceptDisclaimer).toHaveBeenCalledWith(15));
   });

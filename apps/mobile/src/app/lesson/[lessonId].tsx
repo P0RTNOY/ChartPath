@@ -68,22 +68,25 @@ export default function LessonScreen() {
 
   return (
     <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
-      <TopBar back subtitle={lesson.titleEn} title={lesson.titleHe} />
+      <TopBar back subtitle={lesson.titleEn} subtitleDirection="ltr" title={lesson.titleHe} />
       <Card variant="accent">
         <View style={{ gap: theme.spacing.md }}>
           <View
             style={{
               alignItems: 'center',
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               justifyContent: 'space-between',
             }}
           >
             <Badge tone="teal">שיעור {lesson.order} מתוך 12</Badge>
-            <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 5 }}>
+            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 5 }}>
               <Glyph color={theme.colors.textMuted} name="clock" size={16} />
-              <LtrText color="textMuted" variant="caption">
-                {lesson.estimatedMinutes} min
-              </LtrText>
+              <UiText color="textMuted" variant="caption">
+                <LtrText color="textMuted" variant="caption">
+                  {lesson.estimatedMinutes}
+                </LtrText>{' '}
+                דק׳
+              </UiText>
             </View>
           </View>
           <UiText>{lesson.summaryHe}</UiText>
@@ -94,10 +97,7 @@ export default function LessonScreen() {
       <View style={{ gap: theme.spacing.md }}>
         <Heading level={2}>מה נלמד</Heading>
         {lesson.doctrineHe.map((principle, index) => (
-          <View
-            key={principle}
-            style={{ alignItems: 'flex-start', flexDirection: 'row-reverse', gap: 12 }}
-          >
+          <View key={principle} style={{ alignItems: 'flex-start', flexDirection: 'row', gap: 12 }}>
             <View
               style={{
                 alignItems: 'center',
@@ -119,7 +119,7 @@ export default function LessonScreen() {
 
       <View style={{ gap: theme.spacing.md }}>
         <Heading level={2}>מיומנויות</Heading>
-        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {lesson.skillIds.map((id) => (
             <Badge key={id} tone="info">
               {skillById.get(id)?.titleHe ?? id}
@@ -129,7 +129,7 @@ export default function LessonScreen() {
       </View>
 
       <Card variant="outlined">
-        <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
           <IconBubble tone="muted">
             <Glyph name="book" />
           </IconBubble>
@@ -152,7 +152,7 @@ export default function LessonScreen() {
             ? 'תרגול מחדש'
             : completedCount
               ? 'המשך מהתרגיל הבא'
-              : 'התחלת השיעור'}
+              : 'התחילו את השיעור'}
         </Button>
       ) : (
         <EmptyState message="התוכן לשיעור הזה עוד לא פורסם במכשיר." title="התרגילים בדרך" />

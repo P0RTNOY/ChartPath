@@ -1,28 +1,28 @@
 # ChartPath beta release readiness
 
-Updated: 2026-08-23 (Asia/Jerusalem)
+Updated: 2026-08-24 (Asia/Jerusalem)
 
 This record distinguishes the verified local beta from native distribution readiness. It does not
 claim app-store, production, or human-learning validation.
 
 ## Candidate identity
 
-| Field                      | Value                                                                |
-| -------------------------- | -------------------------------------------------------------------- |
-| Product version            | `0.1.0`                                                              |
-| Content version            | `2026.08-beta.1`                                                     |
-| Content schema             | `1`                                                                  |
-| Persistence schema         | `2`                                                                  |
-| Branch                     | `main`                                                               |
-| Foundation commit          | `f394380`                                                            |
-| Catalog commit             | `1e194e0`                                                            |
-| Mobile commit              | `f928497`                                                            |
-| Journey-evidence commit    | `3bc11d4`                                                            |
-| Integrity-hardening commit | `dc992bd`                                                            |
-| Source PDF SHA-256         | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`   |
-| Verified runtime           | Static Expo web export in Chromium, Pixel 7 and iPad Pro 11 profiles |
-| Bundle-verified targets    | Expo iOS and Android Hermes bundles                                  |
-| Decision                   | **GO for the local web beta; NO-GO for native distribution**         |
+| Field                      | Value                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| Product version            | `0.1.0`                                                                                |
+| Content version            | `2026.08-beta.1`                                                                       |
+| Content schema             | `1`                                                                                    |
+| Persistence schema         | `2`                                                                                    |
+| Branch                     | `main`                                                                                 |
+| Foundation commit          | `f394380`                                                                              |
+| Catalog commit             | `1e194e0`                                                                              |
+| Mobile commit              | `f928497`                                                                              |
+| Journey-evidence commit    | `3bc11d4`                                                                              |
+| Integrity-hardening commit | `dc992bd`                                                                              |
+| Source PDF SHA-256         | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
+| Verified runtime           | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
+| Bundle-verified targets    | Expo iOS and Android Hermes bundles                                                    |
+| Decision                   | **GO for the local web beta; NO-GO for native distribution**                           |
 
 ## Verified product scope
 
@@ -55,24 +55,26 @@ claim app-store, production, or human-learning validation.
 
 All commands were run from the repository root on macOS with Node `v22.23.2` and pnpm `11.21.0`.
 
-| Check                                   | Command                                                                                         | Result                                                                           |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Frozen install                          | `pnpm install --frozen-lockfile`                                                                | PASS; lockfile unchanged                                                         |
-| Formatting, lint, types, tests, content | `pnpm check`                                                                                    | PASS                                                                             |
-| Package builds                          | `pnpm build`                                                                                    | PASS for domain, chart engine, content, and UI                                   |
-| Unit/integration inventory              | included in `pnpm check`                                                                        | 174 tests: domain 48, chart 48, content 20, UI 12, mobile/persistence/UI 46      |
-| Catalog validation                      | `pnpm content:validate`                                                                         | PASS; exact inventory printed and quotas satisfied                               |
-| Web export                              | `pnpm --filter @chartpath/mobile export:web`                                                    | PASS; 49 static routes, including every dynamic unit/lesson path                 |
-| Browser journeys                        | `pnpm test:e2e:web`                                                                             | PASS; 4/4 on phone and tablet Chromium projects, no retries                      |
-| Expo dependency alignment               | `pnpm --filter @chartpath/mobile exec expo install --check`                                     | PASS; dependencies up to date                                                    |
-| Expo project health                     | `pnpm dlx expo-doctor@latest apps/mobile`                                                       | PASS; 21/21 checks                                                               |
-| iOS bundle                              | `pnpm --filter @chartpath/mobile exec expo export --platform ios --output-dir dist-ios`         | PASS; 1,405 modules, Hermes bundle emitted                                       |
-| Android bundle                          | `pnpm --filter @chartpath/mobile exec expo export --platform android --output-dir dist-android` | PASS; 1,535 modules, Hermes bundle emitted                                       |
-| Production dependency audit             | `pnpm audit --prod --audit-level high`                                                          | PASS gate: 0 high, 0 critical; one moderate build-tool advisory documented below |
-| Diff integrity                          | `git diff --check`                                                                              | PASS                                                                             |
+| Check                                   | Command                                                                                         | Result                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Frozen install                          | `pnpm install --frozen-lockfile`                                                                | PASS; lockfile unchanged                                                            |
+| Formatting, lint, types, tests, content | `pnpm check`                                                                                    | PASS                                                                                |
+| Package builds                          | `pnpm build`                                                                                    | PASS for domain, chart engine, content, and UI                                      |
+| Unit/integration inventory              | included in `pnpm check`                                                                        | 184 tests: domain 48, chart 48, content 20, UI 14, mobile/persistence/UI 54         |
+| Catalog validation                      | `pnpm content:validate`                                                                         | PASS; exact inventory printed and quotas satisfied                                  |
+| Web export                              | `pnpm --filter @chartpath/mobile export:web`                                                    | PASS; 49 static routes, including every dynamic unit/lesson path                    |
+| Browser journeys                        | `pnpm test:e2e:web`                                                                             | PASS; 4/4 on phone and tablet Chromium projects, no retries                         |
+| Expo dependency alignment               | `pnpm --filter @chartpath/mobile exec expo install --check`                                     | PASS; dependencies up to date                                                       |
+| Expo project health                     | `pnpm dlx expo-doctor@latest apps/mobile`                                                       | PASS; 21/21 checks                                                                  |
+| iOS bundle                              | `pnpm --filter @chartpath/mobile exec expo export --platform ios --output-dir dist-ios`         | PASS; 1,405 modules, Hermes bundle emitted                                          |
+| Android bundle                          | `pnpm --filter @chartpath/mobile exec expo export --platform android --output-dir dist-android` | PASS; 1,535 modules, Hermes bundle emitted                                          |
+| iOS Expo Go runtime journey             | Expo Go `57.0.9`, iPhone 17 Pro simulator on iOS `26.5`, LAN Metro bundle                       | PASS; onboarding, five attempts, completion, force-quit/reopen, and SQLite readback |
+| Production dependency audit             | `pnpm audit --prod --audit-level high`                                                          | PASS gate: 0 high, 0 critical; one moderate build-tool advisory documented below    |
+| Diff integrity                          | `git diff --check`                                                                              | PASS                                                                                |
 
-The 174-test inventory excludes the four browser journeys. Together the automated candidate evidence
-contains 178 passing tests/journeys.
+The 184-test inventory excludes the four browser journeys. Together the automated candidate evidence
+contains 188 passing tests/journeys. The native simulator journey is recorded separately because it
+was driven through native controls rather than the browser suite.
 
 ## Journey evidence
 
@@ -93,24 +95,47 @@ Persistence integration tests additionally cover idempotent retry, conflicting a
 projection rebuild, content migration, restart survival, a corrupt-SQLite reset, bounded long-session
 timing, complex capstone/label answers, and safe rejection of a future schema.
 
+### Native iOS simulator journey
+
+On 2026-08-24, the app was launched in Expo Go `57.0.9` on a booted iPhone 17 Pro simulator running
+iOS `26.5`. Opening the LAN `exp://` URL with `simctl` bypassed the previously blocked macOS handoff
+prompt. The journey then used native iOS controls, not a browser surface:
+
+1. Completed all three Hebrew onboarding screens, accepted the educational disclaimer, and selected
+   a 15-minute daily goal.
+2. Opened the first lesson and submitted all five deterministic exercises. Four were fully correct;
+   the selection exercise scored `2/3` because the automation missed the duration checkbox. The
+   lesson still completed truthfully with `4/5` and `93%`.
+3. The native run exposed a React Native raw-text error for badges containing interpolated fragments.
+   `Badge` now wraps all-text child arrays in `UiText`, and a regression test covers the lesson and
+   hint label shapes. The lesson intro was rerun without a LogBox error.
+4. Force-terminated Expo Go, reopened the same experience, observed restoration to the previous tab,
+   then returned home and verified the completed first lesson and unlocked next lesson.
+5. Read `chartpath.db` directly from the simulator container. It contained five append-only attempt
+   rows, the accepted disclaimer, the 15-minute goal, and a completed `lesson-u00-scenarios`
+   projection with all five exercise IDs. The update/delete rejection triggers were present.
+
+This proves the iOS Expo Go UI path and device SQLite restart behavior on one simulator. It is not a
+standalone-build, physical-device, screen-reader, Android, signing, or distribution claim.
+
 ## Required manual-journey matrix
 
 The original request calls these manual journeys. The table below deliberately separates automated
 evidence from human execution; component/domain coverage is not relabeled as a manual pass.
 
-| Requested journey                                     | Automated evidence in this candidate                                    | Human/manual status                              |
-| ----------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
-| Hebrew onboarding and first lesson                    | Production-export Playwright journey on phone and tablet                | Screenshots inspected; no native human run       |
-| Wrong answer, hint, misconception feedback, later try | Hint/feedback domain and UI tests; reviewed alternative feedback        | Full later-variant journey not manually executed |
-| Tap higher highs and higher lows                      | Coordinate grader and accessible-input coverage                         | Gesture journey not manually executed            |
-| Draw and grade a support zone                         | Zone tolerance and scale-invariance tests                               | Gesture journey not manually executed            |
-| Reject lookalike without a preceding trend            | Authored decision mapping/UI regression for `u05-reversal-e01`          | Not manually executed                            |
-| Wait for missing confirmation                         | Reviewed uncertainty rubrics and decision interaction tests             | Not manually executed                            |
-| Complete position sizing                              | Table-driven risk/cost/invalid-input tests and capstone risk UI         | Not manually executed                            |
-| Close/reopen without losing progress                  | Web reload E2E plus repository reopen/migration tests                   | Native force-quit/reopen not executed            |
-| Due concept appears in review                         | Deterministic review/daily-path tests                                   | Not manually executed                            |
-| Complete all 11 capstone stages                       | Aggregate domain, UI completion, persistence and malformed-answer tests | Full human completion not executed               |
-| Dark, reduced motion, and large text                  | Production-export Playwright persistence plus screenshots               | No VoiceOver/TalkBack or native largest-text run |
+| Requested journey                                     | Automated evidence in this candidate                                       | Human/manual status                                        |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Hebrew onboarding and first lesson                    | Production-export Playwright journey plus native iOS Expo Go simulator run | Agent-driven native run passed; human sign-off outstanding |
+| Wrong answer, hint, misconception feedback, later try | Hint/feedback domain and UI tests; reviewed alternative feedback           | Full later-variant journey not manually executed           |
+| Tap higher highs and higher lows                      | Seven-point draft/completion, undo, input, and coordinate-grader tests     | Gesture journey not manually executed                      |
+| Draw and grade a support zone                         | Two-corner UI, normalization, tolerance, and scale-invariance tests        | Gesture journey not manually executed                      |
+| Reject lookalike without a preceding trend            | Authored decision mapping/UI regression for `u05-reversal-e01`             | Not manually executed                                      |
+| Wait for missing confirmation                         | Reviewed uncertainty rubrics and decision interaction tests                | Not manually executed                                      |
+| Complete position sizing                              | Table-driven risk/cost/invalid-input tests and capstone risk UI            | Not manually executed                                      |
+| Close/reopen without losing progress                  | Web reload E2E, repository reopen/migration tests, and iOS SQLite readback | Native iOS simulator force-quit/reopen passed              |
+| Due concept appears in review                         | Deterministic review/daily-path tests                                      | Not manually executed                                      |
+| Complete all 11 capstone stages                       | Aggregate domain, UI completion, persistence and malformed-answer tests    | Full human completion not executed                         |
+| Dark, reduced motion, and large text                  | Production-export Playwright persistence plus screenshots                  | No VoiceOver/TalkBack or native largest-text run           |
 
 These outstanding human journeys remain required before native distribution and before claiming a
 completed manual QA pass. They do not block the declared local, automated web beta target.
@@ -125,17 +150,28 @@ contrast, and bottom-navigation obstruction:
 - `docs/screenshots/home-light-phone.png`
 - `docs/screenshots/lesson-light-phone.png`
 - `docs/screenshots/exercise-feedback-light-phone.png`
+- `docs/screenshots/interactive-chart-light-phone.png`
 - `docs/screenshots/settings-dark-large-phone.png`
 - `docs/screenshots/home-light-tablet.png`
+- `docs/screenshots/native-ios-disclaimer.png`
+- `docs/screenshots/native-ios-lesson-intro.png`
+- `docs/screenshots/native-ios-summary.png`
+- `docs/screenshots/native-ios-restart-home.png`
 
-The inspection found and fixed RTL inheritance that clipped the chart's `VOL` label and first date.
-Dates are now LTR-isolated and centered. Radio controls expose explicit `aria-checked`; charts have a
-concise, non-interpretive screen-reader description. Ordinary and read-only charts provide an
-expandable OHLC row for every visible candle; the OHLC label-placement assessment instead provides
-four relative-position controls so its accessible path does not reveal the numeric answer key.
-Hollow/filled candle bodies provide a non-color direction cue. Touch targets use a 44-point minimum;
-palette tests enforce WCAG AA normal-text contrast; system font scaling remains enabled up to `2x`,
-and the in-app preference adds bounded `1.15x`/`1.3x` scaling.
+The inspection verified logical RTL navigation order, a right-edge back action, Hebrew sequence and
+icon order, right-origin progress, and a rightmost home tab. Quantitative chart chronology remains
+LTR; `DD/MM` dates, tickers, timeframes, numbers, and Latin terms are explicitly isolated. The chart
+exercise image verifies mobile wrapping, learner instructions, progress, and accessible relative
+placement controls. The settings image combines dark mode, very large text, and enabled reduced
+motion.
+
+Radio controls expose explicit `aria-checked`; charts have a concise, non-interpretive screen-reader
+description. Ordinary and read-only charts provide an expandable OHLC row for every visible candle;
+the OHLC label-placement assessment instead provides four relative-position controls so its
+accessible path does not reveal the numeric answer key. Hollow/filled candle bodies provide a
+non-color direction cue. Touch targets use a 44-point minimum; palette tests enforce WCAG AA
+normal-text contrast; system font scaling remains enabled up to `2x`, and the in-app preference adds
+bounded `1.15x`/`1.3x` scaling.
 
 Remaining accessibility work before native distribution is listed below; screenshots and automated
 roles do not replace a manual VoiceOver/TalkBack pass.
@@ -177,16 +213,16 @@ roles do not replace a manual VoiceOver/TalkBack pass.
 
 ## Unresolved limitations and exact next steps
 
-| Limitation                                                                                                                                                       | Impact                                                                                                                  | Required next step                                                                                                         |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| The iOS Expo Go launch reached the system `Open in Expo Go?` confirmation on a headless booted simulator; the agent could not provide the required physical tap. | iOS bundle and configuration are verified, but the native UI journey and SQLite adapter were not runtime-proven on iOS. | On an interactive simulator, tap `Open`, run onboarding → first lesson → force-quit/reopen, and attach screenshots/logs.   |
-| No Android emulator/device was connected.                                                                                                                        | Android Hermes bundle is verified, but the native Android UI and SQLite journey were not executed.                      | Run `pnpm --filter @chartpath/mobile android` on an emulator, complete the same restart journey, and attach evidence.      |
-| No manual VoiceOver or TalkBack pass was performed.                                                                                                              | Automated roles, labels, contrast, motion, and font-scale coverage cannot prove real assistive-technology usability.    | Test onboarding, drawing, feedback, glossary, and settings with both screen readers and the largest OS text size.          |
-| iOS backup exclusion is not configured or verified; only Android has `allowBackup: false`.                                                                       | Local SQLite data may be incorporated into an iCloud/device backup according to platform and user settings.             | Set and verify the intended iOS backup policy in a native build, then disclose the confirmed behavior.                     |
-| The required manual journey matrix was not fully executed by a human; complex interactions currently have automated component/domain evidence.                   | Automated correctness does not establish gesture ergonomics, comprehension, or end-to-end human usability.              | Execute and record all 11 journeys on phone, including chart gestures, review, capstone, and accessibility variants.       |
-| Partial capstone answers live only while the exercise screen remains open; only the complete 11-step answer is persisted.                                        | Leaving a long capstone before completion loses its draft stages, though no completed attempt is lost.                  | Add versioned capstone-draft persistence before a broader learner beta, or retain the current explicit in-product warning. |
-| No external learner study or editorial sign-off by a licensed financial educator was performed.                                                                  | The beta is technically and internally content-validated, not validated for learning outcomes or regulated use.         | Run a small beginner usability study and independent content/safety review before public distribution.                     |
-| No store signing, privacy form, production deployment, or device matrix was requested.                                                                           | This is a local beta, not a distributable release candidate.                                                            | Treat distribution as a separate explicitly authorized release project.                                                    |
+| Limitation                                                                                                                                     | Impact                                                                                                                                                 | Required next step                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| The iOS runtime journey was executed in Expo Go on one simulator, not in a standalone signed build or on physical hardware.                    | React Native UI and SQLite restart behavior are proven for that simulator, but standalone lifecycle, signing, and hardware behavior remain unverified. | Run the same journey in a release-profile standalone build on at least one physical iPhone.                                |
+| No Android emulator/device was connected.                                                                                                      | Android Hermes bundle is verified, but the native Android UI and SQLite journey were not executed.                                                     | Run `pnpm --filter @chartpath/mobile android` on an emulator, complete the same restart journey, and attach evidence.      |
+| No manual VoiceOver or TalkBack pass was performed.                                                                                            | Automated roles, labels, contrast, motion, and font-scale coverage cannot prove real assistive-technology usability.                                   | Test onboarding, drawing, feedback, glossary, and settings with both screen readers and the largest OS text size.          |
+| iOS backup exclusion is not configured or verified; only Android has `allowBackup: false`.                                                     | Local SQLite data may be incorporated into an iCloud/device backup according to platform and user settings.                                            | Set and verify the intended iOS backup policy in a native build, then disclose the confirmed behavior.                     |
+| The required manual journey matrix was not fully executed by a human; complex interactions currently have automated component/domain evidence. | Automated correctness does not establish gesture ergonomics, comprehension, or end-to-end human usability.                                             | Execute and record all 11 journeys on phone, including chart gestures, review, capstone, and accessibility variants.       |
+| Partial capstone answers live only while the exercise screen remains open; only the complete 11-step answer is persisted.                      | Leaving a long capstone before completion loses its draft stages, though no completed attempt is lost.                                                 | Add versioned capstone-draft persistence before a broader learner beta, or retain the current explicit in-product warning. |
+| No external learner study or editorial sign-off by a licensed financial educator was performed.                                                | The beta is technically and internally content-validated, not validated for learning outcomes or regulated use.                                        | Run a small beginner usability study and independent content/safety review before public distribution.                     |
+| No store signing, privacy form, production deployment, or device matrix was requested.                                                         | This is a local beta, not a distributable release candidate.                                                                                           | Treat distribution as a separate explicitly authorized release project.                                                    |
 
 ## Release decision
 
@@ -194,6 +230,6 @@ The local web beta is a **GO**: its core journey, persistence, content, dynamic 
 UI, dark/large-text settings, and deterministic learning logic are exercised end to end without
 external services.
 
-Native distribution remains **NO-GO** until both native runtime journeys, SQLite restart behavior,
-VoiceOver/TalkBack, signing, and a real device matrix are verified. This boundary is deliberate and
+Native distribution remains **NO-GO** until the Android runtime journey, a standalone iOS build,
+VoiceOver/TalkBack, signing, and a real-device matrix are verified. This boundary is deliberate and
 must not be represented as an app-store-ready product.

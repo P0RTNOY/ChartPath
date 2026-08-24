@@ -229,7 +229,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['evidence.volume', 'patterns.reversal', 'patterns.continuation'],
     difficulty: 3,
     promptHe:
-      'בחרו את כל ציפיות המחזור הסבירות בשני מבנים סינתטיים: מועמד ראש־וכתפיים ומשולש מתכנס. הבחירה צריכה לשמור על ההבחנה בין נטייה לבין תנאי אמת.',
+      'בחרו את כל ציפיות המחזור הסבירות בשני מבנים סינתטיים: מבנה שעשוי להיות ראש וכתפיים ומשולש מתכנס. הבחירה צריכה לשמור על ההבחנה בין נטייה לבין תנאי הכרחי.',
     interactionType: 'selection',
     options: [
       { id: 'hs-components-contract', labelHe: 'בראש־וכתפיים עשויה להופיע היחלשות בין הרכיבים' },
@@ -261,7 +261,7 @@ export const exercises05To08: readonly ContentExercise[] = [
       ],
     },
     explanationHe:
-      'בשני המבנים המחזור יכול להוסיף הקשר: היחלשות במהלך הבנייה והתרחבות באישור הן ציפיות קלאסיות, ובמשולש מקובל לבחון התכווצות עם הטווח. אף פרופיל אינו תנאי אמת; המחיר והכלל שהוגדרו מראש נשארים מרכזיים.',
+      'בשני המבנים המחזור יכול להוסיף הקשר: היחלשות במהלך הבנייה והתרחבות באישור הן ציפיות קלאסיות, ובמשולש מקובל לבחון התכווצות עם הטווח. אף פרופיל אינו תנאי הכרחי; המחיר והכלל שהוגדרו מראש נשארים מרכזיים.',
     alternativeExplanations: [
       {
         answerId: 'volume-is-required-verdict',
@@ -280,7 +280,7 @@ export const exercises05To08: readonly ContentExercise[] = [
       'u04-volume-e03',
       'הפרידו בין שלב בניית המבנה לבין רגע היציאה ממנו.',
       'חפשו התכווצות בתוך המבנה והתרחבות אפשרית באישור.',
-      'בחרו את ארבע הנטיות ההקשריות ודחו את הטענה שהמחזור הוא פוסק יחיד.',
+      'בחרו את ארבע הנטיות ההקשריות ודחו את הטענה שהמחזור הוא גורם מכריע יחיד.',
     ),
     sourceReferences: volumePatternRefs,
     workflowStepIds: ['context', 'setup', 'confirmation'],
@@ -291,7 +291,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     processCriteriaHe: [
       'הפרדת שלב הבנייה מרגע האישור',
       'שימוש במחזור כמשקל ראיה',
-      'שמירת הקשר המחיר',
+      'שמירה על הקשר המחיר',
     ],
     isRiskOrPositionSize: false,
   }),
@@ -300,7 +300,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['evidence.volume', 'markets.constraints'],
     difficulty: 3,
     promptHe:
-      'מוצגים שלושה נתונים: מחזור טיקים מספק מט״ח אחד, מחזור של קרן סל כתחליף למדד, ומחזור מזירת קריפטו אחת. איזו מסקנה משותפת היא ההגנתית ביותר?',
+      'מוצגים שלושה נתונים: מחזור טיקים מספק מט״ח אחד, מחזור של קרן סל כתחליף למדד, ומחזור מזירת קריפטו אחת. איזו מסקנה משותפת היא הזהירה ביותר?',
     interactionType: 'multiple-choice',
     options: [
       {
@@ -563,7 +563,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['patterns.reversal', 'breakouts.rules'],
     difficulty: 3,
     promptHe:
-      'בתחתית מעוגלת שבועית סינתטית אין קו צוואר יחיד וברור. איזה כלל אישור הוא ההגנתי והניתן ביותר לבדיקה מראש?',
+      'בתחתית מעוגלת שבועית סינתטית אין קו צוואר יחיד וברור. איזה כלל אישור הוא השמרני ביותר, ושאפשר לבדוק מראש?',
     interactionType: 'multiple-choice',
     options: [
       {
@@ -632,7 +632,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['patterns.reversal', 'structure.swings'],
     difficulty: 3,
     promptHe:
-      'במועמד לפסגה כפולה סמנו את שפל הביניים המשמעותי בין שתי הפסגות. האישור ייבחן רק אם המחיר יסגור מתחת לשפל זה.',
+      'במבנה שעשוי להיות פסגה כפולה סמנו את שפל הביניים המשמעותי בין שתי הפסגות. האישור ייבחן רק אם המחיר יסגור מתחת לשפל זה.',
     interactionType: 'point',
     chartSpec: chart('u05-reversal-e04', 50504, 'reversal', {
       direction: 'down',
@@ -905,7 +905,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['patterns.continuation', 'risk.r'],
     difficulty: 4,
     promptHe:
-      'בסיס משולש הוא 8 נקודות. פריצה מתרחשת ב־111, עצירה מבנית ב־108 והתנגדות משמעותית ב־116. מהו היעד הגאומטרי, ומהו ה־R המעשי עד הרמה המתערבת?',
+      'בסיס משולש הוא 8 נקודות. פריצה מתרחשת ב־111, עצירה מבנית ב־108 והתנגדות משמעותית ב־116. מהו היעד הגאומטרי, ומהו ה־R המעשי עד הרמה שבדרך?',
     interactionType: 'multiple-choice',
     options: [
       { id: 'target-119-r-1-67', labelHe: 'אומדן 119; עד 116 מתקבלים כ־1.67R' },
@@ -926,7 +926,7 @@ export const exercises05To08: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.target-as-promise'],
     },
     explanationHe:
-      'השלכת בסיס של 8 נקודות מ־111 נותנת אומדן 119. הסיכון ליחידה הוא 3 נקודות, אך ההתנגדות ב־116 נמצאת 5 נקודות מעל הכניסה, ולכן התכנון עד הרמה המתערבת הוא 5 ÷ 3, כלומר כ־1.67R.',
+      'השלכת בסיס של 8 נקודות מ־111 נותנת אומדן 119. הסיכון ליחידה הוא 3 נקודות, אך ההתנגדות ב־116 נמצאת 5 נקודות מעל הכניסה, ולכן התכנון עד הרמה שבדרך הוא 5 ÷ 3, כלומר כ־1.67R.',
     alternativeExplanations: [
       {
         answerId: 'target-119-r-2-67',
@@ -936,7 +936,7 @@ export const exercises05To08: readonly ContentExercise[] = [
       },
       {
         answerId: 'target-116-r-2-67',
-        explanationHe: '116 היא רמה מתערבת, לא תוצאת השלכת גובה המשולש; וגם 5 חלקי 3 אינם 2.67.',
+        explanationHe: '116 היא רמה שבדרך, לא תוצאת השלכת גובה המשולש; וגם 5 חלקי 3 אינם 2.67.',
       },
       {
         answerId: 'target-guaranteed-119',
@@ -956,8 +956,8 @@ export const exercises05To08: readonly ContentExercise[] = [
     termIds: ['term.breakout', 'term.measured-move', 'term.r', 'term.resistance'],
     role: 'transfer',
     category: 'calculation',
-    safetyNoteHe: 'השלכה גאומטרית היא אומדן; רמה מתערבת עשויה להצדיק ניהול לפניו.',
-    processCriteriaHe: ['חישוב גובה מהבסיס', 'חישוב הסיכון ליחידה', 'קדימות לרמה מתערבת'],
+    safetyNoteHe: 'השלכה גאומטרית היא אומדן; רמה שבדרך עשויה להצדיק ניהול לפניה.',
+    processCriteriaHe: ['חישוב גובה מהבסיס', 'חישוב הסיכון ליחידה', 'קדימות לרמה שבדרך'],
     isRiskOrPositionSize: true,
   }),
   reviewed({
@@ -1095,7 +1095,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     role: 'transfer',
     category: 'decision',
     safetyNoteHe: 'יעד תורן הוא אומדן מותנה; רמות ביניים ונקודת ביטול קודמות לו בתכנון.',
-    processCriteriaHe: ['בדיקת תנאי המבנה', 'זיהוי התנגדות מתערבת', 'ניהול יעד בשלבים'],
+    processCriteriaHe: ['בדיקת תנאי המבנה', 'זיהוי התנגדות שבדרך', 'ניהול יעד בשלבים'],
     isRiskOrPositionSize: false,
   }),
   reviewed({

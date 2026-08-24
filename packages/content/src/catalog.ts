@@ -60,7 +60,7 @@ const decisionReasonOptions: Readonly<Record<string, readonly ExerciseOption[]>>
     { id: 'volume-overrides-price', labelHe: 'המחזור לבדו מבטל את מבנה המחיר' },
   ],
   'u02-structure-e05': [
-    { id: 'below-swing-threshold', labelHe: 'השינוי קטן מסף הנדנדה שנקבע' },
+    { id: 'below-swing-threshold', labelHe: 'השינוי קטן מסף השינוי שנקבע' },
     { id: 'new-sequence-absent', labelHe: 'עדיין אין רצף מבני חדש' },
     { id: 'single-break-is-reversal', labelHe: 'שבירה יחידה מספיקה להכרזת היפוך מלא' },
   ],

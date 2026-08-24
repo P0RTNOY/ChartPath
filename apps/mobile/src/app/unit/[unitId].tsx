@@ -60,12 +60,12 @@ export default function UnitScreen() {
 
   return (
     <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
-      <TopBar back subtitle={unit.titleEn} title={unit.titleHe} />
+      <TopBar back subtitle={unit.titleEn} subtitleDirection="ltr" title={unit.titleHe} />
       <Card variant="accent">
         <View style={{ gap: theme.spacing.md }}>
           <Badge tone="teal">יחידה {unit.order}</Badge>
           <UiText>{unit.descriptionHe}</UiText>
-          <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
               <ProgressBar
                 accessibilityLabel="התקדמות ביחידה"
@@ -93,7 +93,7 @@ export default function UnitScreen() {
               onPress={() => router.push(`/lesson/${lesson.id}`)}
               variant={state?.status === 'in-progress' ? 'accent' : 'outlined'}
             >
-              <View style={{ alignItems: 'flex-start', flexDirection: 'row-reverse', gap: 13 }}>
+              <View style={{ alignItems: 'flex-start', flexDirection: 'row', gap: 13 }}>
                 <IconBubble tone={isComplete ? 'primary' : locked ? 'muted' : 'gold'}>
                   {isComplete ? (
                     <Glyph color={theme.colors.primary} name="check" />
@@ -115,11 +115,14 @@ export default function UnitScreen() {
                   <UiText color="textMuted" numberOfLines={3} variant="bodySmall">
                     {lesson.summaryHe}
                   </UiText>
-                  <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 6 }}>
+                  <View style={{ alignItems: 'center', flexDirection: 'row', gap: 6 }}>
                     <Glyph color={theme.colors.textMuted} name="clock" size={15} />
-                    <LtrText color="textMuted" variant="caption">
-                      {lesson.estimatedMinutes} min
-                    </LtrText>
+                    <UiText color="textMuted" variant="caption">
+                      <LtrText color="textMuted" variant="caption">
+                        {lesson.estimatedMinutes}
+                      </LtrText>{' '}
+                      דק׳
+                    </UiText>
                     <UiText color="textMuted" variant="caption">
                       • {lesson.exerciseIds.length} תרגילים
                     </UiText>

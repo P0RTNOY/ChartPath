@@ -24,6 +24,20 @@ const ALL_WORKFLOW_STEPS: readonly WorkflowStepId[] = [
   'review',
 ];
 
+const WORKFLOW_STEP_LABELS_HE: Readonly<Record<WorkflowStepId, string>> = {
+  context: 'הקשר',
+  structure: 'מבנה',
+  level: 'רמה',
+  setup: 'תצורה',
+  confirmation: 'אישור',
+  entry: 'כניסה',
+  invalidation: 'ביטול תוקף',
+  'position-size': 'גודל פוזיציה',
+  target: 'יעד',
+  management: 'ניהול',
+  review: 'תחקור',
+};
+
 interface ExerciseSeed {
   readonly id: string;
   readonly seed: number;
@@ -107,7 +121,7 @@ function authoredExercise(seed: ExerciseSeed): ContentExercise {
 const caseCWorkflow: readonly CapstoneStep[] = [
   {
     id: 'context',
-    promptHe: 'בחרו את ההקשר שהיה גלוי בהחלטה: מגמה שבועית עולה מול רעיון מכירה בחסר.',
+    promptHe: 'בחרו את ההקשר שהיה ידוע בזמן ההחלטה: מגמה שבועית עולה מול רעיון מכירה בחסר.',
     options: [
       { id: 'weekly-uptrend', labelHe: 'המגמה השבועית עולה' },
       { id: 'countertrend-short', labelHe: 'הרעיון הוא מכירה בחסר נגד המגמה' },
@@ -135,7 +149,7 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   },
   {
     id: 'level',
-    promptHe: 'סמנו את רמת התמיכה המתערבת 82.7 ואת אזור קו הצוואר 88.',
+    promptHe: 'סמנו את רמת התמיכה שבדרך, 82.7, ואת אזור קו הצוואר, 88.',
     options: [
       { id: 'support-82.7', labelHe: 'תמיכה שבועית 82.7' },
       { id: 'neckline-88', labelHe: 'אזור קו צוואר 88' },
@@ -200,12 +214,12 @@ const caseCWorkflow: readonly CapstoneStep[] = [
   },
   {
     id: 'target',
-    promptHe: 'תעדו שהיעד המדוד 72 קיים, אך התמיכה 82.7 משאירה רק כ־0.48R עד המכשול הראשון.',
+    promptHe: 'ציינו את היעד המדוד, 72, אך גם שהתמיכה 82.7 משאירה רק כ־0.48R עד המכשול הראשון.',
     rubric: { kind: 'risk', expected: { riskMultiple: 0.48 }, tolerance: { absolute: 0.02 } },
   },
   {
     id: 'management',
-    promptHe: 'בחרו את פעולת הניהול לאחר פסילת העסקה לפני כניסה.',
+    promptHe: 'בחרו מה לעשות לאחר שהתצורה נפסלה עוד לפני הכניסה.',
     options: [
       { id: 'trade', labelHe: 'לנהל פוזיציה כאילו נפתחה' },
       { id: 'wait', labelHe: 'להמשיך להמתין בתוך עסקה פתוחה' },
@@ -319,7 +333,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.bias-as-confirmation', 'misconception.forced-trade'],
     },
     explanationHe:
-      'אות קצר נגד הטווח הגבוה עשוי להיות ראוי לבדיקה, אך המקור אינו מעניק ליישור מסגרות יתרון מוכח. כאן אין כלל בדוק והתגמול עד הרמה המתערבת נמוך; לכן המתנה שומרת על כלליות התהליך בלי לטעון שהאות חסר ערך תמיד.',
+      'אות קצר נגד הטווח הגבוה עשוי להיות ראוי לבדיקה, אך המקור אינו מעניק ליישור מסגרות יתרון מוכח. כאן אין כלל בדוק והתגמול עד הרמה שבדרך נמוך; לכן המתנה שומרת על כלליות התהליך בלי לטעון שהאות חסר ערך תמיד.',
     alternativeExplanations: [
       {
         answerId: 'decision-trade',
@@ -370,7 +384,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     difficulty: 2,
     promptHe: 'סדרו את 11 כרטיסי תהליך העבודה הקנוני מן השאלה הראשונה ועד התחקור.',
     interactionType: 'sequence',
-    options: ALL_WORKFLOW_STEPS.map((id) => ({ id, labelHe: id })),
+    options: ALL_WORKFLOW_STEPS.map((id) => ({ id, labelHe: WORKFLOW_STEP_LABELS_HE[id] })),
     rubric: { kind: 'sequence', expectedOrder: ALL_WORKFLOW_STEPS },
     explanationHe:
       'הסדר הקנוני הוא: הקשר, מבנה, רמה, תצורה, אישור, כניסה, נקודת ביטול, גודל פוזיציה, יעד, ניהול ותחקור. הסדר מונע קביעת כמות או יעד לפני שהתרחיש והכשל שלו הוגדרו.',
@@ -415,7 +429,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['context.multitimeframe', 'workflow.eleven-step', 'review.process'],
     difficulty: 3,
     promptHe:
-      'השלימו רשומת יומן בלי לערבב זמנים. בחרו את ששת השדות שצריכים להישמר בנפרד: מה נצפה, מה הייתה התצורה, מה אישר, מה הפעיל כניסה, היכן היה המילוי ומה נבדק בתחקור.',
+      'השלימו רשומת יומן כך ששלבי התהליך נשמרים בנפרד. בחרו את ששת השדות: מה נצפה, מה הייתה התצורה, מה אישר, מה הפעיל כניסה, היכן היה מחיר הביצוע ומה נבדק בתחקור.',
     interactionType: 'selection',
     options: [
       { id: 'observation', labelHe: 'תצפית לפני החלטה' },
@@ -726,7 +740,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.invalidation-as-guaranteed-fill'],
     },
     explanationHe:
-      'סטופ מבני מתקדם רק לאחר היווצרות שפל מבני חדש לפי כלל הנדנדה. רעש תוך־יומי אינו מספיק, והזזת העצירה רחוק יותר משנה את הסיכון לאחר הכניסה.',
+      'עצירה מבנית מתקדמת רק לאחר היווצרות שפל מבני חדש לפי כלל עקבי לזיהוי נקודות מפנה. רעש תוך־יומי אינו מספיק, והזזת העצירה רחוק יותר משנה את הסיכון לאחר הכניסה.',
     alternativeExplanations: [
       {
         answerId: 'trail-on-any-dip',
@@ -945,11 +959,11 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['evidence.testing', 'markets.constraints', 'risk.management'],
     difficulty: 4,
     promptHe:
-      'כלל הראה שינוי חיובי ממוצע של 0.18% אחרי אות, אך אומדן העלות הלוך־ושוב הוא 0.22%, נצפו רק 34 עסקאות, ולא דווחו ירידה מרבית או יציבות בין תקופות. האם הוכחה סחירות נטו?',
+      'כלל הראה שינוי חיובי ממוצע של 0.18% אחרי אות, אך אומדן העלות הלוך־ושוב הוא 0.22%, נצפו רק 34 עסקאות, ולא דווחו ירידה מרבית או יציבות בין תקופות. האם הוכחה כדאיות נטו לאחר עלויות?',
     interactionType: 'decision',
     options: [
       { id: 'decision-trade', labelHe: 'כן; סימן חיובי ממוצע מספיק' },
-      { id: 'decision-insufficient', labelHe: 'לא מספיק מידע לסחירות נטו' },
+      { id: 'decision-insufficient', labelHe: 'אין מספיק מידע לכדאיות נטו לאחר עלויות' },
       { id: 'decision-reject-forever', labelHe: 'הכלל הופרך לכל שוק ולכל תקופה' },
     ],
     rubric: {
@@ -964,7 +978,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       misconceptionIds: ['misconception.costs-omitted', 'misconception.single-example-as-proof'],
     },
     explanationHe:
-      'יכולת חיזוי קטנה אינה זהה לסחירות. כאן העלות המשוערת גבוהה מן השינוי הגולמי, המדגם קטן וחסרים מדדי סיכון ויציבות. לכן אין די ראיות לסחירות נטו, אך גם אין בסיס לקביעה שהרעיון בלתי אפשרי בכל מקום.',
+      'יכולת חיזוי קטנה אינה זהה לכדאיות לאחר עלויות. כאן העלות המשוערת גבוהה מן השינוי הגולמי, המדגם קטן וחסרים מדדי סיכון ויציבות. לכן אין די ראיות לכדאיות נטו, אך גם אין בסיס לקביעה שהרעיון בלתי אפשרי בכל מקום.',
     alternativeExplanations: [
       {
         answerId: 'decision-trade',
@@ -1012,7 +1026,7 @@ export const exercises09To12: readonly ContentExercise[] = [
         labelHe: 'מדד — חישוב שאינו בהכרח נכס; מחזור המדד אינו מחזור רכיביו',
       },
       { id: 'futures-roll', labelHe: 'חוזים — פקיעה, גלגול, מכפיל והתחשבנות' },
-      { id: 'fx-provider', labelHe: 'מט״ח — מקור מבוזר, ספק, אזור זמן ונפח תלוי מקור' },
+      { id: 'fx-provider', labelHe: 'מט״ח — מקור מבוזר, ספק, אזור זמן ומחזור תלוי־מקור' },
       { id: 'crypto-venue', labelHe: 'קריפטו — זירה, מסחר רציף, מינוף, חיסולים ומימון' },
       { id: 'one-rule-fits-all', labelHe: 'אותו מקור מחזור ואותו כלל ביצוע מתאימים לכל השווקים' },
     ],
@@ -1074,11 +1088,11 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['markets.constraints', 'evidence.testing'],
     difficulty: 4,
     promptHe:
-      'רשומת בדיקה טוענת ש״הפריצה עבדה בחוזה ובקריפטו״ אך אינה מציינת זירה, מקור, אזור זמן, שעות/סשן, התאמה או גלגול, מרווח, עצירות מסחר ואירועים. סמנו את כל השדות שיש להוסיף לפני שאפשר להעריך את הטענה.',
+      'רשומת בדיקה טוענת ש״הפריצה עבדה בחוזה ובקריפטו״ אך אינה מציינת זירה, מקור, אזור זמן, שעות מסחר, התאמה או גלגול, מרווח, עצירות מסחר ואירועים. סמנו את כל השדות שיש להוסיף לפני שאפשר להעריך את הטענה.',
     interactionType: 'selection',
     options: [
       { id: 'venue-source', labelHe: 'זירה ומקור מחיר/מחזור' },
-      { id: 'timezone-session', labelHe: 'אזור זמן וסשן מסחר' },
+      { id: 'timezone-session', labelHe: 'אזור זמן ושעות מסחר' },
       { id: 'adjustment-roll', labelHe: 'שיטת התאמה וגלגול חוזה' },
       { id: 'spread-slippage', labelHe: 'מרווח והחלקה' },
       { id: 'halts-limits', labelHe: 'עצירות ומגבלות תנודה' },
@@ -1098,7 +1112,7 @@ export const exercises09To12: readonly ContentExercise[] = [
       mode: 'exact',
     },
     explanationHe:
-      'טענה ניתנת לביקורת רק כשהסדרה והביצוע ניתנים לשחזור. זירה, מקור, זמן, סשן, התאמות, גלגול, עלויות, מגבלות ואירועים יכולים לשנות גם את הגרף וגם את מחיר הביצוע.',
+      'טענה ניתנת לביקורת רק כשהסדרה והביצוע ניתנים לשחזור. זירה, מקור, זמן, שעות מסחר, התאמות, גלגול, עלויות, מגבלות ואירועים יכולים לשנות גם את הגרף וגם את מחיר הביצוע.',
     alternativeExplanations: [
       {
         answerId: 'pattern-name-only',
@@ -1211,7 +1225,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['workflow.eleven-step', 'risk.invalidation-execution', 'risk.r', 'review.process'],
     difficulty: 4,
     promptHe:
-      'במקרה ב׳ המעובד: הכניסה הייתה 50.8, ביום הבא המחיר חזר לטווח וסגר 48, העצירה 48.4 בוצעה ב־48.2, והעלות הייתה 0.15 ליחידה. הסיכון המתוכנן היה 2.55 ליחידה. איזו שחזור ותחקור נכונים?',
+      'במקרה ב׳ המעובד: הכניסה הייתה 50.8, ביום הבא המחיר חזר לטווח וסגר 48, העצירה 48.4 בוצעה ב־48.2, והעלות הייתה 0.15 ליחידה. הסיכון המתוכנן היה 2.55 ליחידה. איזה שחזור ואיזה תחקור נכונים?',
     interactionType: 'multiple-choice',
     options: [
       {
@@ -1318,7 +1332,8 @@ export const exercises09To12: readonly ContentExercise[] = [
       },
       {
         answerId: 'move-stop-to-improve-r',
-        explanationHe: 'שינוי הביטול רק כדי לשפר R אינו כן מבנית ומשנה את התזה במקום לבדוק אותה.',
+        explanationHe:
+          'שינוי הביטול רק כדי לשפר R אינו מוצדק מבחינה מבנית ומשנה את התזה במקום לבדוק אותה.',
         misconceptionId: 'misconception.position-size-before-risk',
       },
     ],
@@ -1349,7 +1364,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     safetyNoteHe: '״אין עסקה״ היא מסקנה מלאה; היא אינה תחזית שהמחיר לא ירד ואינה הוראה אישית.',
     processCriteriaHe: [
       'ההקשר קדם לתבנית.',
-      'הרמה המתערבת קודמת ליעד.',
+      'הרמה שבדרך קודמת ליעד.',
       'לא שונה ביטול כדי לכפות יחס.',
     ],
     isRiskOrPositionSize: true,
@@ -1371,7 +1386,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['workflow.eleven-step', 'risk.r', 'risk.management', 'review.process'],
     difficulty: 5,
     promptHe:
-      'במקרה ד׳ המעובד: כניסה 197.2, עצירה מבנית 194.8 ועלות 0.20 נותנות 2.60 סיכון ליחידה. היעד המעשי לפני התנגדות שבועית הוא 199.5. מה יידרש כדי להציג לפחות 1.5R, והאם השינוי כן מבנית?',
+      'במקרה ד׳ המעובד: כניסה 197.2, עצירה מבנית 194.8 ועלות 0.20 נותנות 2.60 סיכון ליחידה. היעד המעשי לפני התנגדות שבועית הוא 199.5. מה יידרש כדי להציג לפחות 1.5R, והאם השינוי מוצדק מבחינה מבנית?',
     interactionType: 'decision',
     options: [
       {
@@ -1449,7 +1464,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['workflow.eleven-step', 'review.process', 'risk.management'],
     difficulty: 5,
     promptHe:
-      'בנו רשומת כללים צרה לתרגול מדומה. סמנו את כל הרכיבים שחייבים להיכתב מראש: שוק ונכסים, מסגרות, שתי תצורות לכל היותר, טריגר, ביטול וסיכון, יעד וניהול, איסורי אירוע, מדדי תהליך, סקירה שבועית/חודשית ותנאי הפסקה.',
+      'בנו מסמך כללים מצומצם לתרגול מדומה. סמנו את כל הרכיבים שחייבים להיכתב מראש: שוק ונכסים, מסגרות, שתי תצורות לכל היותר, טריגר, ביטול וסיכון, יעד וניהול, מגבלות סביב אירועים, מדדי תהליך, סקירה שבועית וחודשית ותנאי הפסקה.',
     interactionType: 'selection',
     options: [
       { id: 'market-assets', labelHe: 'שוק, נכסים ומינימום נזילות' },

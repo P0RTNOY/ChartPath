@@ -46,7 +46,7 @@ export function ErrorState({
           </View>
         </Card>
         <Button fullWidth onPress={onRetry}>
-          ניסיון נוסף
+          נסו שוב
         </Button>
         {secondaryActionLabel && onSecondaryAction ? (
           <Button fullWidth onPress={onSecondaryAction} variant="danger">

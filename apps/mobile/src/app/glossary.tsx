@@ -9,11 +9,16 @@ import { Glyph } from '@/components/glyph';
 import { MainScreen } from '@/components/main-screen';
 import { TopBar } from '@/components/top-bar';
 
+function queryDirection(query: string): 'rtl' | 'ltr' {
+  const firstStrongCharacter = query.match(/[A-Za-z\u0590-\u05ff]/u)?.[0];
+  return firstStrongCharacter && /[A-Za-z]/.test(firstStrongCharacter) ? 'ltr' : 'rtl';
+}
+
 export default function GlossaryScreen() {
   const theme = useTheme();
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const ltrQuery = /[A-Za-z]/.test(query);
+  const ltrQuery = queryDirection(query) === 'ltr';
   const results = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('he');
     if (!normalized) return glossary;
@@ -34,7 +39,7 @@ export default function GlossaryScreen() {
           borderColor: theme.colors.border,
           borderRadius: 15,
           borderWidth: 1,
-          flexDirection: 'row-reverse',
+          flexDirection: 'row',
           gap: 10,
           minHeight: 54,
           paddingHorizontal: 14,
@@ -44,7 +49,7 @@ export default function GlossaryScreen() {
         <TextInput
           accessibilityLabel="חיפוש במילון בעברית או באנגלית"
           onChangeText={setQuery}
-          placeholder="חיפוש: תמיכה, Breakout…"
+          placeholder="חיפוש מונח: תמיכה, פריצה…"
           placeholderTextColor={theme.colors.textMuted}
           style={{
             color: theme.colors.text,
@@ -70,14 +75,17 @@ export default function GlossaryScreen() {
       <View
         style={{
           alignItems: 'center',
-          flexDirection: 'row-reverse',
+          flexDirection: 'row',
           justifyContent: 'space-between',
         }}
       >
         <Heading level={2}>{query ? 'תוצאות' : 'כל המונחים'}</Heading>
-        <LtrText color="textMuted" variant="caption">
-          {results.length} terms
-        </LtrText>
+        <UiText color="textMuted" variant="caption">
+          <LtrText color="textMuted" variant="caption">
+            {results.length}
+          </LtrText>{' '}
+          {results.length === 1 ? 'מונח' : 'מונחים'}
+        </UiText>
       </View>
       <View style={{ gap: 10 }}>
         {results.length === 0 ? (
@@ -96,7 +104,7 @@ export default function GlossaryScreen() {
                 variant={open ? 'accent' : 'outlined'}
               >
                 <View style={{ gap: 10 }}>
-                  <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}>
+                  <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}>
                     <View style={{ flex: 1 }}>
                       <Heading level={3}>{term.termHe}</Heading>
                       <LtrText color="textMuted" variant="bodySmall">
@@ -121,7 +129,14 @@ export default function GlossaryScreen() {
                         {term.definitionEn}
                       </LtrText>
                       {term.aliases.length ? (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        <View
+                          style={{
+                            direction: 'ltr',
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 6,
+                          }}
+                        >
                           {term.aliases.map((alias) => (
                             <Badge key={alias} tone="neutral">
                               <LtrText variant="caption">{alias}</LtrText>

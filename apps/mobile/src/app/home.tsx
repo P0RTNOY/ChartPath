@@ -85,7 +85,7 @@ export default function HomeScreen() {
           <View
             style={{
               alignItems: 'center',
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               justifyContent: 'space-between',
             }}
           >
@@ -105,7 +105,7 @@ export default function HomeScreen() {
           <UiText color="textMuted" variant="bodySmall">
             {currentLesson?.summaryHe ?? 'זה זמן טוב לחזרה ממוקדת על מיומנויות שכבר למדת.'}
           </UiText>
-          <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
               <ProgressBar
                 accessibilityLabel="התקדמות ביעד היומי"
@@ -113,9 +113,12 @@ export default function HomeScreen() {
                 value={(activeMinutes / Math.max(1, goalMinutes)) * 100}
               />
             </View>
-            <LtrText color="textMuted" variant="numeric">
-              {activeMinutes}/{goalMinutes} min
-            </LtrText>
+            <UiText color="textMuted" variant="caption">
+              <LtrText color="textMuted" variant="numeric">
+                {activeMinutes}/{goalMinutes}
+              </LtrText>{' '}
+              דק׳
+            </UiText>
           </View>
           <Button
             fullWidth
@@ -127,8 +130,8 @@ export default function HomeScreen() {
             {currentLesson
               ? progress[currentLesson.id]
                 ? 'המשך השיעור'
-                : 'התחלת השיעור'
-              : 'מעבר לחזרה'}
+                : 'התחילו את השיעור'
+              : 'עברו לחזרה'}
           </Button>
         </View>
       </Card>
@@ -137,14 +140,14 @@ export default function HomeScreen() {
         <View
           style={{
             alignItems: 'flex-end',
-            flexDirection: 'row-reverse',
+            flexDirection: 'row',
             justifyContent: 'space-between',
           }}
         >
           <View>
             <Heading level={2}>מפת הלמידה</Heading>
             <UiText color="textMuted" variant="bodySmall">
-              מתקדמים מהקשר ונתונים לתהליך שלם.
+              מתקדמים מהבנת ההקשר והנתונים אל תהליך מלא.
             </UiText>
           </View>
           <LtrText color="primary" variant="numeric">
@@ -164,7 +167,7 @@ export default function HomeScreen() {
             );
             const locked = !isUnitUnlocked(unit.id, progress);
             return (
-              <View key={unit.id} style={{ flexDirection: 'row-reverse', gap: 12 }}>
+              <View key={unit.id} style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ alignItems: 'center', width: 38 }}>
                   <View
                     style={{
@@ -211,7 +214,7 @@ export default function HomeScreen() {
                   variant={active ? 'accent' : 'outlined'}
                 >
                   <View style={{ gap: 7 }}>
-                    <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 8 }}>
+                    <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
                       <Heading level={3} style={{ flex: 1 }}>
                         {unit.titleHe}
                       </Heading>
@@ -224,7 +227,7 @@ export default function HomeScreen() {
                     <UiText color="textMuted" numberOfLines={2} variant="bodySmall">
                       {unit.descriptionHe}
                     </UiText>
-                    <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 9 }}>
+                    <View style={{ alignItems: 'center', flexDirection: 'row', gap: 9 }}>
                       <View style={{ flex: 1 }}>
                         <ProgressBar
                           showValue={false}
@@ -244,7 +247,7 @@ export default function HomeScreen() {
 
       {dailyPath.some((item) => item.reason === 'due-review') ? (
         <Card onPress={() => router.push('/review')} variant="outlined">
-          <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
             <IconBubble tone="gold">
               <Glyph name="review" />
             </IconBubble>

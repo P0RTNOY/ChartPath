@@ -3,7 +3,14 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { generateChart } from '@chartpath/chart-engine';
-import type { AttemptResult, ExerciseAnswer, GeneratedChart } from '@chartpath/domain';
+import type {
+  AttemptResult,
+  ChartAnchor,
+  ChartZone,
+  Exercise,
+  ExerciseAnswer,
+  GeneratedChart,
+} from '@chartpath/domain';
 import {
   Badge,
   Button,
@@ -30,6 +37,51 @@ export function generateStaticParams() {
 }
 
 type PlayerPhase = 'question' | 'feedback' | 'summary';
+
+interface ChartComparison {
+  readonly selectedPoints: readonly ChartAnchor[];
+  readonly selectedZone?: ChartZone;
+  readonly selectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
+  readonly expectedPoints: readonly ChartAnchor[];
+  readonly expectedZone?: ChartZone;
+  readonly expectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
+}
+
+function chartComparisonFor(
+  exercise: Exercise,
+  answer: ExerciseAnswer | null,
+): ChartComparison | undefined {
+  const rubric = exercise.rubric;
+  if (rubric.kind === 'point' && answer?.kind === 'point') {
+    return { selectedPoints: answer.points, expectedPoints: rubric.targets };
+  }
+  if (rubric.kind === 'line' && answer?.kind === 'line') {
+    return {
+      selectedPoints: [answer.line.start, answer.line.end],
+      selectedLine: answer.line,
+      expectedPoints: [],
+      expectedLine: rubric.target,
+    };
+  }
+  if (rubric.kind === 'zone' && answer?.kind === 'zone') {
+    return {
+      selectedPoints: [
+        { candleIndex: answer.zone.startCandleIndex, price: answer.zone.priceLow },
+        { candleIndex: answer.zone.endCandleIndex, price: answer.zone.priceHigh },
+      ],
+      selectedZone: answer.zone,
+      expectedPoints: [],
+      expectedZone: rubric.target,
+    };
+  }
+  if (rubric.kind === 'label-placement' && answer?.kind === 'label-placement') {
+    return {
+      selectedPoints: answer.placements.map((placement) => placement.anchor),
+      expectedPoints: rubric.targets.map((target) => target.target),
+    };
+  }
+  return undefined;
+}
 
 function generateExerciseChart(
   spec: Parameters<typeof generateChart>[0] | undefined,
@@ -106,6 +158,7 @@ export default function LessonPlayerScreen() {
     answer,
     result,
   );
+  const chartComparison = chartComparisonFor(exercise, answer);
 
   const submit = async () => {
     if (!answer) return;
@@ -180,7 +233,7 @@ export default function LessonPlayerScreen() {
             לא התוצאה הבודדת קובעת, אלא היכולת לתאר הקשר, ראיות וביטול תוקף באופן עקבי.
           </UiText>
         </View>
-        <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           <Card style={{ alignItems: 'center', flex: 1 }} variant="outlined">
             <LtrText align="center" color="primary" style={{ fontSize: 27, fontWeight: '800' }}>
               {correct}/{sessionResults.length}
@@ -221,7 +274,7 @@ export default function LessonPlayerScreen() {
       contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.xl }}
       scroll
     >
-      <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+      <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
         <Pressable
           accessibilityLabel="יציאה מהשיעור"
           accessibilityRole="button"
@@ -254,13 +307,15 @@ export default function LessonPlayerScreen() {
       </View>
 
       <View style={{ gap: theme.spacing.sm }}>
-        <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 8 }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
           <Badge tone={exercise.isAmbiguous ? 'warning' : 'info'}>
             {exercise.isAmbiguous ? 'מקרה עמום' : interactionLabel(exercise.interactionType)}
           </Badge>
-          <LtrText color="textMuted" variant="caption">
-            {exercise.id}
-          </LtrText>
+          {__DEV__ ? (
+            <LtrText color="textMuted" variant="caption">
+              {exercise.id}
+            </LtrText>
+          ) : undefined}
         </View>
         <Heading level={2}>{exercise.promptHe}</Heading>
         {exercise.promptEn ? (
@@ -304,7 +359,7 @@ export default function LessonPlayerScreen() {
               {submissionError}
             </UiText>
           ) : undefined}
-          <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}>
             <Button
               disabled={hintCount >= exercise.hints.length || submitting}
               onPress={() => setHintCount((value) => Math.min(exercise.hints.length, value + 1))}
@@ -327,7 +382,20 @@ export default function LessonPlayerScreen() {
 
       {phase === 'feedback' && result ? (
         <View style={{ gap: theme.spacing.lg }}>
-          {chart ? <OhlcvChart chart={chart} showAnnotations ticker="CPTH" /> : undefined}
+          {chart ? (
+            <OhlcvChart
+              chart={chart}
+              expectedLine={chartComparison?.expectedLine}
+              expectedPoints={chartComparison?.expectedPoints}
+              expectedZone={chartComparison?.expectedZone}
+              selectedLine={chartComparison?.selectedLine}
+              selectedPoints={chartComparison?.selectedPoints}
+              selectedZone={chartComparison?.selectedZone}
+              showAnnotations={!chartComparison}
+              ticker="CPTH"
+            />
+          ) : undefined}
+          {chartComparison ? <ChartComparisonLegend result={result} /> : undefined}
           <Feedback
             actionLabel={index === exercises.length - 1 || review === '1' ? 'סיכום' : 'לתרגיל הבא'}
             animationKey={`${exercise.id}-${result.feedbackCode}`}
@@ -356,7 +424,15 @@ export default function LessonPlayerScreen() {
                 : 'התרגיל נשמר. עברו על ההסבר ונסו לזהות את הכלל, לא רק את התוצאה.'
             }
             onAction={next}
-            title={result.correct ? 'הבחנה מדויקת' : 'כדאי לחדד את הראיות'}
+            title={
+              chartComparison
+                ? result.correct
+                  ? 'סימון מדויק'
+                  : 'כדאי להשוות בין הסימון שלך לתשובת הייחוס'
+                : result.correct
+                  ? 'הבחנה מדויקת'
+                  : 'כדאי לחדד את הראיות'
+            }
             tone={result.correct ? 'correct' : 'corrective'}
           />
         </View>
@@ -367,8 +443,8 @@ export default function LessonPlayerScreen() {
 
 function interactionLabel(type: string): string {
   const labels: Readonly<Record<string, string>> = {
-    'multiple-choice': 'בחירה',
-    selection: 'אבחון',
+    'multiple-choice': 'בחירה אחת',
+    selection: 'בחירה מרובה',
     sequence: 'סידור תהליך',
     point: 'סימון נקודה',
     zone: 'סימון אזור',
@@ -376,9 +452,63 @@ function interactionLabel(type: string): string {
     risk: 'חישוב סיכון',
     decision: 'החלטה',
     'label-placement': 'מיקום תוויות',
-    'timeframe-comparison': 'השוואת מסגרות',
+    'timeframe-comparison': 'השוואת מסגרות זמן',
     'mistake-diagnosis': 'אבחון טעות',
     'sequential-reveal': 'חשיפה הדרגתית',
   };
   return labels[type] ?? 'תרגול';
+}
+
+function ChartComparisonLegend({ result }: { readonly result: AttemptResult }) {
+  const theme = useTheme();
+  const matched = result.details.find((detail) =>
+    ['matchedPoints', 'matchedLabels'].includes(detail.key),
+  )?.value;
+  const required = result.details.find((detail) =>
+    ['requiredPoints', 'requiredLabels'].includes(detail.key),
+  )?.value;
+  return (
+    <Card variant="subtle">
+      <View style={{ gap: theme.spacing.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 7 }}>
+            <View
+              style={{
+                borderColor: theme.colors.primary,
+                borderRadius: 7,
+                borderWidth: 3,
+                height: 14,
+                width: 14,
+              }}
+            />
+            <UiText variant="caption">הסימון שלך</UiText>
+          </View>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 7 }}>
+            <View
+              style={{
+                backgroundColor: theme.colors.warning,
+                borderRadius: 7,
+                height: 14,
+                width: 14,
+              }}
+            />
+            <UiText variant="caption">תשובת הייחוס שנקבעה מראש</UiText>
+          </View>
+        </View>
+        {typeof matched === 'number' && typeof required === 'number' ? (
+          <UiText color="textMuted" variant="caption">
+            הותאמו{' '}
+            <LtrText color="textMuted" variant="caption">
+              {matched}
+            </LtrText>{' '}
+            מתוך{' '}
+            <LtrText color="textMuted" variant="caption">
+              {required}
+            </LtrText>{' '}
+            סימונים.
+          </UiText>
+        ) : undefined}
+      </View>
+    </Card>
+  );
 }

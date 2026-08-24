@@ -9,11 +9,13 @@ import { Glyph } from './glyph';
 export function TopBar({
   title,
   subtitle,
+  subtitleDirection = 'rtl',
   back = false,
   trailing,
 }: {
   readonly title: string;
   readonly subtitle?: string;
+  readonly subtitleDirection?: 'rtl' | 'ltr';
   readonly back?: boolean;
   readonly trailing?: React.ReactNode;
 }) {
@@ -22,14 +24,15 @@ export function TopBar({
     <View
       style={{
         alignItems: 'center',
-        flexDirection: 'row-reverse',
+        direction: theme.direction,
+        flexDirection: 'row',
         gap: theme.spacing.sm,
         minHeight: 54,
       }}
     >
       {back ? (
         <Pressable
-          accessibilityLabel="חזרה"
+          accessibilityLabel="חזרה למסך הקודם"
           accessibilityRole="button"
           hitSlop={8}
           onPress={() => router.back()}
@@ -50,7 +53,11 @@ export function TopBar({
       )}
       <View style={{ flex: 1 }}>
         <Heading level={2}>{title}</Heading>
-        {subtitle ? (
+        {subtitle && subtitleDirection === 'ltr' ? (
+          <LtrText color="textMuted" variant="caption">
+            {subtitle}
+          </LtrText>
+        ) : subtitle ? (
           <UiText color="textMuted" variant="caption">
             {subtitle}
           </UiText>
@@ -78,7 +85,8 @@ export function MetricPill({
         alignItems: 'center',
         backgroundColor: theme.colors.surfaceMuted,
         borderRadius: theme.radii.pill,
-        flexDirection: 'row-reverse',
+        direction: theme.direction,
+        flexDirection: 'row',
         gap: 6,
         minHeight: 38,
         paddingHorizontal: 12,

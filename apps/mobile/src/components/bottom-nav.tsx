@@ -11,7 +11,7 @@ const items: readonly {
   readonly icon: GlyphName;
 }[] = [
   { href: '/home', label: 'המסלול', icon: 'home' },
-  { href: '/review', label: 'חזרה', icon: 'review' },
+  { href: '/review', label: 'חזרות', icon: 'review' },
   { href: '/glossary', label: 'מילון', icon: 'glossary' },
   { href: '/progress', label: 'התקדמות', icon: 'progress' },
   { href: '/settings', label: 'הגדרות', icon: 'settings' },
@@ -28,7 +28,8 @@ export function BottomNav() {
         borderColor: theme.colors.border,
         borderTopWidth: 1,
         bottom: 0,
-        flexDirection: 'row-reverse',
+        direction: theme.direction,
+        flexDirection: 'row',
         justifyContent: 'space-around',
         left: 0,
         paddingBottom: Platform.OS === 'ios' ? 20 : 7,

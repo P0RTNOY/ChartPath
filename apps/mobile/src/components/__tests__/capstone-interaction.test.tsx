@@ -237,7 +237,7 @@ describe('CapstoneInteraction', () => {
       },
     });
 
-    await fireEvent.press(screen.getByRole('button', { name: 'אישור הסדר' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'אשרו את הסדר' }));
     expect(onChange.mock.calls.at(-1)![0]).toBeNull();
     const initialOrder = onChange.mock.calls.at(-1)![1].steps[0].answer.orderedIds;
     expect(initialOrder).not.toEqual(['a', 'b', 'c']);

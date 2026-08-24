@@ -37,9 +37,9 @@ export default function DeveloperCatalogScreen() {
   const interactions = [...new Set(exercises.map((exercise) => exercise.interactionType))];
   return (
     <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
-      <TopBar back subtitle={contentVersion.id} title="קטלוג מפתחים" />
+      <TopBar back subtitle={contentVersion.id} subtitleDirection="ltr" title="קטלוג מפתחים" />
       <Card variant="accent">
-        <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 14 }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 14 }}>
           <BrandMark />
           <View style={{ flex: 1 }}>
             <Heading level={2}>ChartPath UI + Content</Heading>
@@ -49,7 +49,7 @@ export default function DeveloperCatalogScreen() {
           </View>
         </View>
       </Card>
-      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {[
           ['units', units.length],
           ['lessons', lessons.length],
@@ -69,7 +69,7 @@ export default function DeveloperCatalogScreen() {
       </View>
       <View style={{ gap: 10 }}>
         <Heading level={2}>Interactions</Heading>
-        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
           {interactions.map((interaction) => (
             <Badge key={interaction} tone="info">
               <LtrText variant="caption">{interaction}</LtrText>
@@ -83,7 +83,7 @@ export default function DeveloperCatalogScreen() {
           <View style={{ gap: 12 }}>
             <Heading level={3}>Progress</Heading>
             <ProgressBar showValue value={68} />
-            <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <Badge tone="teal">נלמד</Badge>
               <Badge tone="warning">בתרגול</Badge>
               <Badge tone="info">חדש</Badge>
@@ -125,7 +125,7 @@ export default function DeveloperCatalogScreen() {
         {exercises.map((exercise) => {
           return (
             <Card key={exercise.id} variant="outlined">
-              <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}>
+              <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}>
                 <IconBubble tone="muted">
                   <Glyph name="chart" />
                 </IconBubble>

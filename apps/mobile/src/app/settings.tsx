@@ -27,7 +27,7 @@ function SettingRow({
     <View
       style={{
         alignItems: 'center',
-        flexDirection: 'row-reverse',
+        flexDirection: 'row',
         gap: theme.spacing.md,
         minHeight: 58,
       }}
@@ -62,7 +62,7 @@ function Segmented<T extends string>({
       style={{
         backgroundColor: theme.colors.surfaceMuted,
         borderRadius: 13,
-        flexDirection: 'row-reverse',
+        flexDirection: 'row',
         gap: 3,
         padding: 3,
       }}
@@ -185,12 +185,12 @@ export default function SettingsScreen() {
                 options={[
                   { value: 'system', label: 'רגיל' },
                   { value: 'large', label: 'גדול' },
-                  { value: 'extra-large', label: 'ענק' },
+                  { value: 'extra-large', label: 'גדול מאוד' },
                 ]}
                 value={settings.textScale}
               />
             }
-            description="הטקסט ממשיך לכבד גם את גודל המערכת"
+            description="גודל הטקסט מותאם גם להגדרות המכשיר"
             title="טקסט גדול"
           />
         </View>
@@ -204,7 +204,7 @@ export default function SettingsScreen() {
           </UiText>
           <View
             accessibilityRole="radiogroup"
-            style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
           >
             {[5, 10, 15, 20].map((minutes) => {
               const selected = settings.dailyGoalMinutes === minutes;
@@ -235,7 +235,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card onPress={() => router.push('/disclaimer')} variant="outlined">
-        <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 12 }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
           <IconBubble tone="gold">
             <Glyph name="info" />
           </IconBubble>
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
                 <UiText color="danger" variant="label">
                   האיפוס ימחק מהמכשיר את כל הניסיונות וההתקדמות, ולא ניתן לבטל אותו.
                 </UiText>
-                <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Button loading={working} onPress={() => void reset()} variant="danger">
                     מחיקה ואיפוס
                   </Button>

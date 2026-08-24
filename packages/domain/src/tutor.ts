@@ -28,7 +28,7 @@ export interface DisabledTutorProviderOptions {
 }
 
 const DEFAULT_FALLBACK_HE =
-  'ההסבר האוצר באפליקציה הוא הסמכות בתרגיל זה. המורה האופציונלי אינו פעיל בגרסת הבטא.';
+  'ההסבר שנכתב ונבדק מראש באפליקציה הוא הקובע בתרגיל הזה. המורה האופציונלי אינו פעיל בגרסת הבטא.';
 
 /** The beta provider performs no network or model call and can never override deterministic grading. */
 export function createDisabledTutorProvider(

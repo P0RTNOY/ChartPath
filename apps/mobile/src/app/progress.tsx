@@ -20,6 +20,16 @@ function dayKeys(): readonly string[] {
   });
 }
 
+function localDayLabel(day: string, spoken = false): string {
+  const [year, month, date] = day.split('-').map(Number);
+  return new Intl.DateTimeFormat('he-IL', {
+    day: spoken ? 'numeric' : '2-digit',
+    month: spoken ? 'long' : '2-digit',
+    timeZone: 'UTC',
+    ...(spoken ? { weekday: 'long' as const } : {}),
+  }).format(new Date(Date.UTC(year!, month! - 1, date!)));
+}
+
 export default function ProgressScreen() {
   const theme = useTheme();
   const learning = useLearning();
@@ -50,15 +60,15 @@ export default function ProgressScreen() {
   return (
     <MainScreen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
       <TopBar subtitle="התקדמות היא תהליך, לא תחזית" title="ההתקדמות שלי" />
-      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {[
           ['נקודות', String(projections.totalXp), 'spark'],
-          ['רצף נוכחי', `${projections.currentStreak}d`, 'flame'],
+          ['רצף נוכחי (ימים)', String(projections.currentStreak), 'flame'],
           ['דיוק', `${accuracy}%`, 'check'],
           ['שיעורים', `${completed}/${lessons.length}`, 'book'],
         ].map(([label, value, icon]) => (
           <Card key={label} style={{ flexBasis: '47%', flexGrow: 1 }} variant="outlined">
-            <View style={{ alignItems: 'center', flexDirection: 'row-reverse', gap: 10 }}>
+            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10 }}>
               <IconBubble tone="muted">
                 <Glyph name={icon as 'spark'} />
               </IconBubble>
@@ -82,12 +92,20 @@ export default function ProgressScreen() {
               דקות פעילות שנשמרו במכשיר
             </UiText>
           </View>
-          <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 8, height: 142 }}>
+          <View
+            style={{
+              alignItems: 'flex-end',
+              direction: 'ltr',
+              flexDirection: 'row',
+              gap: 8,
+              height: 142,
+            }}
+          >
             {days.map((day) => {
               const minutes = projections.dailyActivity[day]?.activeMinutes ?? 0;
               return (
                 <View
-                  accessibilityLabel={`${day}, ${minutes} דקות`}
+                  accessibilityLabel={`${localDayLabel(day, true)}, ${minutes} דקות`}
                   key={day}
                   style={{ alignItems: 'center', flex: 1, gap: 5, justifyContent: 'flex-end' }}
                 >
@@ -103,7 +121,7 @@ export default function ProgressScreen() {
                     }}
                   />
                   <LtrText color="textMuted" style={{ fontSize: 10 }}>
-                    {day.slice(8)}
+                    {localDayLabel(day)}
                   </LtrText>
                 </View>
               );
@@ -134,7 +152,7 @@ export default function ProgressScreen() {
         ) : (
           <Card variant="subtle">
             <UiText align="center" color="textMuted">
-              לאחר ניסיון ראשון יוצגו כאן שליטה, נקודות לחיזוק ומועד החזרה הבא.
+              לאחר הניסיון הראשון יוצגו כאן רמת השליטה, הנקודות לחיזוק ומועד החזרה הבא.
             </UiText>
           </Card>
         )}

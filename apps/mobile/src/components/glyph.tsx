@@ -35,6 +35,7 @@ export function Glyph({
   readonly size?: number;
 }) {
   const theme = useTheme();
+  const glyph = name === 'back' && theme.direction === 'rtl' ? '›' : glyphs[name];
   return (
     <Text
       accessibilityElementsHidden
@@ -46,7 +47,7 @@ export function Glyph({
         lineHeight: size + 3,
       }}
     >
-      {glyphs[name]}
+      {glyph}
     </Text>
   );
 }
