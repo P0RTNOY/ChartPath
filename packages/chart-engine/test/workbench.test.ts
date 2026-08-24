@@ -162,6 +162,10 @@ describe('deterministic replay', () => {
     expect(replay.drawingSnapshots.map(({ visibleCandleIndex }) => visibleCandleIndex)).toEqual([
       8, 2,
     ]);
+    expect(replay.drawingSnapshots.at(-1)).toEqual({
+      visibleCandleIndex: 2,
+      annotations: [drawings[0]],
+    });
   });
 });
 

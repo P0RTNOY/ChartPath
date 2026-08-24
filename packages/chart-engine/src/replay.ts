@@ -135,7 +135,10 @@ function moveReplayTo(state: ReplayState, requestedIndex: number): ReplayState {
 function snapshotReplayDrawings(state: ReplayState): ReplayState {
   const snapshot: ReplayDrawingSnapshot = {
     visibleCandleIndex: state.visibleCandleIndex,
-    annotations: [...state.learnerAnnotations],
+    // A checkpoint is historical evidence for what was actually visible at this
+    // cursor. Keep the authoritative drawing collection on the state, but never
+    // copy later-anchored geometry into an earlier replay checkpoint.
+    annotations: learnerAnnotationsVisibleAt(state.learnerAnnotations, state.visibleCandleIndex),
   };
   const drawingSnapshots = state.drawingSnapshots.filter(
     ({ visibleCandleIndex }) => visibleCandleIndex !== state.visibleCandleIndex,

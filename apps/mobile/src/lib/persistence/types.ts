@@ -2,13 +2,14 @@ import type {
   Attempt,
   DailyActivity,
   Difficulty,
+  GuidedAnalysisSession,
   LessonId,
   ReviewState,
   SkillId,
   SkillMastery,
 } from '@chartpath/domain';
 
-export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 2;
+export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 3;
 export const CURRENT_PROJECTOR_VERSION = 1;
 export const ATTEMPT_RECORD_SCHEMA_VERSION = 1;
 
@@ -86,7 +87,18 @@ export interface PersistenceSnapshot {
   readonly metadata: PersistenceMetadata;
   readonly settings: LearnerSettings;
   readonly attempts: readonly PersistedAttempt[];
+  readonly analysisSessions: readonly GuidedAnalysisSession[];
+  readonly quarantinedAnalysisSessions: readonly QuarantinedAnalysisSession[];
   readonly projections: LearningProjections;
+}
+
+export interface QuarantinedAnalysisSession {
+  readonly quarantineId: string;
+  readonly sessionId?: string;
+  readonly reason: string;
+  /** Canonical JSON retained so recovery never silently discards a learner draft. */
+  readonly payloadJson: string;
+  readonly quarantinedAt: string;
 }
 
 /** Fixture shape retained so beta schema 1 can always migrate forward. */
@@ -99,6 +111,20 @@ export interface PersistenceSnapshotV1 {
   readonly attempts: readonly PersistedAttempt[];
 }
 
+/** Fixture shape retained so payload schema 2 can always migrate forward. */
+export interface PersistenceSnapshotV2 {
+  readonly metadata: {
+    readonly schemaVersion: 2;
+    readonly contentVersion: string;
+    readonly projectorVersion: number;
+    readonly createdAt: string;
+    readonly updatedAt: string;
+  };
+  readonly settings: LearnerSettings;
+  readonly attempts: readonly PersistedAttempt[];
+  readonly projections: LearningProjections;
+}
+
 export interface RepositoryOptions {
   readonly contentVersion: string;
   /** Explicit clock keeps initialization and migrations reproducible in tests. */
@@ -106,6 +132,30 @@ export interface RepositoryOptions {
 }
 
 export interface AppendAttemptResult {
+  readonly attempt: PersistedAttempt;
+  readonly inserted: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface CreateOrResumeAnalysisSessionResult {
+  readonly session: GuidedAnalysisSession;
+  readonly created: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface SaveAnalysisSessionResult {
+  readonly session: GuidedAnalysisSession;
+  readonly saved: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface FinalizeAnalysisSessionInput {
+  readonly session: GuidedAnalysisSession;
+  readonly attemptRecord: NewAttemptRecord;
+}
+
+export interface FinalizeAnalysisSessionResult {
+  readonly session: GuidedAnalysisSession;
   readonly attempt: PersistedAttempt;
   readonly inserted: boolean;
   readonly snapshot: PersistenceSnapshot;

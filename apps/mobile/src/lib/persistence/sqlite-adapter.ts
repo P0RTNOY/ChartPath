@@ -1,18 +1,18 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import {
+  AnalysisSessionConflictError,
   AttemptConflictError,
   PersistenceCorruptionError,
   type PersistenceAdapter,
   type PersistenceMutation,
 } from './adapter';
+import type { GuidedAnalysisSession } from '@chartpath/domain';
 import type { PersistedAttempt } from './types';
 import { canonicalStringify, isObject } from './validation';
 
 const DEFAULT_DATABASE_NAME = 'chartpath.db';
-const MIGRATION_VERSION = 1;
-const MIGRATION_NAME = 'create_local_learning_store';
-const MIGRATION_CHECKSUM =
+const MIGRATION_1_CHECKSUM =
   'sha256:b71ddc422c78200f5b15b416aee6f07595fef159ae4cb0d80740f50c2fa3902d';
 
 const CREATE_IMMUTABILITY_TRIGGERS = `
@@ -52,6 +52,55 @@ const CREATE_SCHEMA = `
   ${CREATE_IMMUTABILITY_TRIGGERS}
 `;
 
+const CREATE_ANALYSIS_SESSION_TRIGGERS = `
+  CREATE TRIGGER IF NOT EXISTS analysis_sessions_reject_finalized_update
+  BEFORE UPDATE ON analysis_sessions
+  WHEN OLD.status = 'finalized' AND OLD.payload_json <> NEW.payload_json BEGIN
+    SELECT RAISE(ABORT, 'finalized analysis sessions are immutable');
+  END;
+  CREATE TRIGGER IF NOT EXISTS analysis_sessions_reject_delete
+  BEFORE DELETE ON analysis_sessions BEGIN
+    SELECT RAISE(ABORT, 'analysis sessions require explicit deletion');
+  END;
+`;
+
+const CREATE_ANALYSIS_SESSIONS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS analysis_sessions (
+    session_id TEXT PRIMARY KEY NOT NULL,
+    exercise_id TEXT NOT NULL,
+    content_version TEXT NOT NULL,
+    exercise_schema_version INTEGER NOT NULL,
+    chart_id TEXT NOT NULL,
+    generator_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    attempt_id TEXT,
+    schema_version INTEGER NOT NULL,
+    payload_json TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS analysis_sessions_status_updated_idx
+    ON analysis_sessions(status, updated_at);
+  ${CREATE_ANALYSIS_SESSION_TRIGGERS}
+`;
+
+const SQLITE_MIGRATIONS = [
+  {
+    version: 1,
+    name: 'create_local_learning_store',
+    checksum: MIGRATION_1_CHECKSUM,
+    appliedAt: '2026-08-23T00:00:00.000Z',
+    sql: CREATE_SCHEMA,
+  },
+  {
+    version: 2,
+    name: 'create_guided_analysis_sessions',
+    checksum: 'sha256:5a5c057716114c61e925393653a1d11fb9ed4d3a1d50ce14434f06720b00836b',
+    appliedAt: '2026-08-24T00:00:00.000Z',
+    sql: CREATE_ANALYSIS_SESSIONS_SCHEMA,
+  },
+] as const;
+
 interface SQLiteAdapterOptions {
   readonly databaseName?: string;
 }
@@ -79,6 +128,42 @@ function extractAttempts(serialized: string | null): readonly PersistedAttempt[]
 
 function byId(records: readonly PersistedAttempt[]): ReadonlyMap<string, PersistedAttempt> {
   return new Map(records.map((record) => [record.attempt.id, record]));
+}
+
+function extractAnalysisSessions(serialized: string | null): readonly GuidedAnalysisSession[] {
+  if (serialized === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized) as unknown;
+  } catch (error) {
+    throw new PersistenceCorruptionError('SQLite repository state is not valid JSON.', {
+      cause: error,
+    });
+  }
+  if (!isObject(parsed)) {
+    throw new PersistenceCorruptionError('SQLite repository state is not an object.');
+  }
+  const schemaVersion = isObject(parsed.metadata)
+    ? parsed.metadata.schemaVersion
+    : parsed.schemaVersion;
+  if (schemaVersion === 1 || schemaVersion === 2) return [];
+  if (!Array.isArray(parsed.analysisSessions)) {
+    throw new PersistenceCorruptionError('SQLite repository state has no analysis sessions.');
+  }
+  for (const session of parsed.analysisSessions) {
+    if (!isObject(session) || typeof session.sessionId !== 'string') {
+      throw new PersistenceCorruptionError(
+        'SQLite repository state has an invalid analysis session.',
+      );
+    }
+  }
+  return parsed.analysisSessions as unknown as readonly GuidedAnalysisSession[];
+}
+
+function sessionsById(
+  sessions: readonly GuidedAnalysisSession[],
+): ReadonlyMap<string, GuidedAnalysisSession> {
+  return new Map(sessions.map((session) => [session.sessionId, session]));
 }
 
 function extractUpdatedAt(serialized: string): string {
@@ -121,25 +206,35 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
           applied_at TEXT NOT NULL
         );
       `);
-      const applied = await transaction.getFirstAsync<{ checksum: string }>(
-        'SELECT checksum FROM schema_migrations WHERE version = ?',
-        MIGRATION_VERSION,
+      const latest = await transaction.getFirstAsync<{ version: number | null }>(
+        'SELECT MAX(version) AS version FROM schema_migrations',
       );
-      if (applied && applied.checksum !== MIGRATION_CHECKSUM) {
+      if ((latest?.version ?? 0) > SQLITE_MIGRATIONS.length) {
         throw new PersistenceCorruptionError(
-          `SQLite migration ${MIGRATION_VERSION} checksum does not match.`,
+          `SQLite migration ${String(latest?.version)} is newer than this app supports.`,
         );
       }
-      if (!applied) {
-        await transaction.execAsync(CREATE_SCHEMA);
-        await transaction.runAsync(
-          `INSERT INTO schema_migrations (version, name, checksum, applied_at)
-           VALUES (?, ?, ?, ?)`,
-          MIGRATION_VERSION,
-          MIGRATION_NAME,
-          MIGRATION_CHECKSUM,
-          '2026-08-23T00:00:00.000Z',
+      for (const migration of SQLITE_MIGRATIONS) {
+        const applied = await transaction.getFirstAsync<{ checksum: string }>(
+          'SELECT checksum FROM schema_migrations WHERE version = ?',
+          migration.version,
         );
+        if (applied && applied.checksum !== migration.checksum) {
+          throw new PersistenceCorruptionError(
+            `SQLite migration ${migration.version} checksum does not match.`,
+          );
+        }
+        if (!applied) {
+          await transaction.execAsync(migration.sql);
+          await transaction.runAsync(
+            `INSERT INTO schema_migrations (version, name, checksum, applied_at)
+             VALUES (?, ?, ?, ?)`,
+            migration.version,
+            migration.name,
+            migration.checksum,
+            migration.appliedAt,
+          );
+        }
       }
     });
   }
@@ -186,6 +281,47 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
     );
   }
 
+  private async upsertAnalysisSession(
+    database: SQLiteDatabase,
+    session: GuidedAnalysisSession,
+  ): Promise<void> {
+    const payload = canonicalStringify(session);
+    const existing = await database.getFirstAsync<{ payload_json: string; status: string }>(
+      'SELECT payload_json, status FROM analysis_sessions WHERE session_id = ?',
+      session.sessionId,
+    );
+    if (existing?.payload_json === payload) return;
+    if (existing?.status === 'finalized') {
+      throw new AnalysisSessionConflictError(
+        session.sessionId,
+        'Finalized SQLite analysis session is immutable.',
+      );
+    }
+    await database.runAsync(
+      `INSERT INTO analysis_sessions (
+        session_id, exercise_id, content_version, exercise_schema_version, chart_id,
+        generator_version, status, created_at, updated_at, attempt_id, schema_version, payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        status = excluded.status,
+        updated_at = excluded.updated_at,
+        attempt_id = excluded.attempt_id,
+        payload_json = excluded.payload_json`,
+      session.sessionId,
+      session.exerciseId,
+      session.contentVersionId,
+      session.exerciseSchemaVersion,
+      session.chart.id,
+      session.chart.generatorVersion,
+      session.status,
+      session.createdAt,
+      session.updatedAt,
+      session.attemptId ?? null,
+      session.schemaVersion,
+      payload,
+    );
+  }
+
   public async transact<T>(
     mutation: (currentValue: string | null) => PersistenceMutation<T>,
   ): Promise<T> {
@@ -200,6 +336,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       const currentValue = row?.payload_json ?? null;
       const next = mutation(currentValue);
       const nextAttempts = byId(extractAttempts(next.nextValue));
+      const nextSessions = sessionsById(extractAnalysisSessions(next.nextValue));
 
       // An explicit learner-authorized reset must be able to recover even when
       // the previous snapshot is too corrupt to parse. Normal writes retain the
@@ -218,6 +355,24 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
         }
       }
 
+      if (next.allowAnalysisSessionDeletion !== true) {
+        const previousSessions = sessionsById(extractAnalysisSessions(currentValue));
+        const removed = [...previousSessions.keys()].filter((id) => !nextSessions.has(id));
+        if (removed.length > 0) {
+          throw new Error('Analysis session deletion requires an explicit repository operation.');
+        }
+        for (const [id, previous] of previousSessions) {
+          const following = nextSessions.get(id);
+          if (
+            following &&
+            previous.status === 'finalized' &&
+            canonicalStringify(previous) !== canonicalStringify(following)
+          ) {
+            throw new AnalysisSessionConflictError(id, 'Finalized analysis session is immutable.');
+          }
+        }
+      }
+
       if (next.allowAttemptDeletion === true) {
         await transaction.execAsync(`
           DROP TRIGGER IF EXISTS attempts_reject_update;
@@ -226,7 +381,18 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
           ${CREATE_IMMUTABILITY_TRIGGERS}
         `);
       }
+      if (next.allowAnalysisSessionDeletion === true) {
+        await transaction.execAsync(`
+          DROP TRIGGER IF EXISTS analysis_sessions_reject_finalized_update;
+          DROP TRIGGER IF EXISTS analysis_sessions_reject_delete;
+          DELETE FROM analysis_sessions;
+          ${CREATE_ANALYSIS_SESSION_TRIGGERS}
+        `);
+      }
       for (const record of nextAttempts.values()) await this.insertAttempt(transaction, record);
+      for (const session of nextSessions.values()) {
+        await this.upsertAnalysisSession(transaction, session);
+      }
 
       if (next.nextValue === null) {
         await transaction.runAsync('DELETE FROM repository_state WHERE singleton_id = 1');
@@ -251,6 +417,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       nextValue: null,
       result: undefined,
       allowAttemptDeletion: true,
+      allowAnalysisSessionDeletion: true,
     }));
   }
 

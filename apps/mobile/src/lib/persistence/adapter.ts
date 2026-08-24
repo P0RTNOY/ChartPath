@@ -9,6 +9,8 @@ export interface PersistenceMutation<T> {
   readonly result: T;
   /** Reserved for the explicit learner-requested reset path. */
   readonly allowAttemptDeletion?: boolean;
+  /** Reserved for explicit reset/recovery paths; ordinary session writes are append-preserving. */
+  readonly allowAnalysisSessionDeletion?: boolean;
 }
 
 export interface PersistenceAdapter {
@@ -37,5 +39,22 @@ export class AttemptConflictError extends Error {
   public constructor(public readonly attemptId: string) {
     super(`Attempt ${attemptId} already exists with different immutable data.`);
     this.name = 'AttemptConflictError';
+  }
+}
+
+export class AnalysisSessionConflictError extends Error {
+  public constructor(
+    public readonly sessionId: string,
+    message?: string,
+  ) {
+    super(message ?? `Analysis session ${sessionId} conflicts with persisted state.`);
+    this.name = 'AnalysisSessionConflictError';
+  }
+}
+
+export class AnalysisSessionNotFoundError extends Error {
+  public constructor(public readonly sessionId: string) {
+    super(`Analysis session ${sessionId} does not exist.`);
+    this.name = 'AnalysisSessionNotFoundError';
   }
 }

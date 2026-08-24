@@ -3,6 +3,7 @@ import {
   PersistenceCorruptionError,
   UnsupportedPersistenceVersionError,
 } from './adapter';
+import { assertValidGuidedAnalysisSession, type GuidedAnalysisSession } from '@chartpath/domain';
 import { localDateForTimestamp, replayAttempts } from './projections';
 import {
   CURRENT_PERSISTENCE_SCHEMA_VERSION,
@@ -11,6 +12,7 @@ import {
   type MigrationResult,
   type PersistenceSnapshot,
   type PersistenceSnapshotV1,
+  type QuarantinedAnalysisSession,
 } from './types';
 import {
   assertNonEmptyString,
@@ -77,6 +79,124 @@ function normalizeAttempts(values: readonly unknown[]): PersistenceSnapshot['att
   return attempts;
 }
 
+function sessionIdFrom(value: unknown): string | undefined {
+  return isObject(value) && typeof value.sessionId === 'string' && value.sessionId.length > 0
+    ? value.sessionId
+    : undefined;
+}
+
+function analysisSessionIdentity(session: GuidedAnalysisSession): string {
+  return canonicalStringify({
+    chart: session.chart,
+    contentVersionId: session.contentVersionId,
+    exerciseId: session.exerciseId,
+    exerciseSchemaVersion: session.exerciseSchemaVersion,
+  });
+}
+
+function quarantineSession(
+  value: unknown,
+  index: number,
+  now: string,
+  reason: string,
+): QuarantinedAnalysisSession {
+  const sessionId = sessionIdFrom(value);
+  return {
+    quarantineId: `analysis-session:${sessionId ?? 'unknown'}:${index}`,
+    ...(sessionId === undefined ? {} : { sessionId }),
+    reason: reason.slice(0, 500),
+    payloadJson: canonicalStringify(value),
+    quarantinedAt: now,
+  };
+}
+
+function normalizeAnalysisSessions(
+  values: readonly unknown[],
+  now: string,
+): {
+  readonly sessions: readonly GuidedAnalysisSession[];
+  readonly quarantined: readonly QuarantinedAnalysisSession[];
+  readonly changed: boolean;
+} {
+  const sessions: GuidedAnalysisSession[] = [];
+  const quarantined: QuarantinedAnalysisSession[] = [];
+  const byId = new Map<string, string>();
+  const activeIdentities = new Set<string>();
+  let changed = false;
+
+  values.forEach((value, index) => {
+    try {
+      const session = JSON.parse(canonicalStringify(value)) as GuidedAnalysisSession;
+      assertValidGuidedAnalysisSession(session);
+      const canonical = canonicalStringify(session);
+      const previous = byId.get(session.sessionId);
+      if (previous !== undefined) {
+        changed = true;
+        if (previous !== canonical) {
+          quarantined.push(
+            quarantineSession(value, index, now, 'Duplicate session ID has conflicting data.'),
+          );
+        }
+        return;
+      }
+      const identity = analysisSessionIdentity(session);
+      if (session.status === 'active' && activeIdentities.has(identity)) {
+        changed = true;
+        quarantined.push(
+          quarantineSession(value, index, now, 'Duplicate active analysis identity.'),
+        );
+        return;
+      }
+      byId.set(session.sessionId, canonical);
+      if (session.status === 'active') activeIdentities.add(identity);
+      sessions.push(session);
+    } catch (error) {
+      changed = true;
+      quarantined.push(
+        quarantineSession(
+          value,
+          index,
+          now,
+          error instanceof Error ? error.message : 'Invalid guided analysis session.',
+        ),
+      );
+    }
+  });
+
+  sessions.sort(
+    (left, right) =>
+      Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
+      left.sessionId.localeCompare(right.sessionId),
+  );
+  return { sessions, quarantined, changed };
+}
+
+function normalizeQuarantinedSessions(values: readonly unknown[]): QuarantinedAnalysisSession[] {
+  return values.map((value, index) => {
+    if (!isObject(value)) {
+      throw new PersistenceCorruptionError(`Quarantined analysis session ${index} is invalid.`);
+    }
+    assertNonEmptyString(value.quarantineId, `quarantinedAnalysisSessions[${index}].quarantineId`);
+    if (value.sessionId !== undefined) {
+      assertNonEmptyString(value.sessionId, `quarantinedAnalysisSessions[${index}].sessionId`);
+    }
+    assertNonEmptyString(value.reason, `quarantinedAnalysisSessions[${index}].reason`);
+    if (typeof value.payloadJson !== 'string') {
+      throw new PersistenceCorruptionError(
+        `quarantinedAnalysisSessions[${index}].payloadJson must be a string.`,
+      );
+    }
+    assertUtcTimestamp(value.quarantinedAt, `quarantinedAnalysisSessions[${index}].quarantinedAt`);
+    return {
+      quarantineId: value.quarantineId,
+      ...(value.sessionId === undefined ? {} : { sessionId: value.sessionId }),
+      reason: value.reason,
+      payloadJson: value.payloadJson,
+      quarantinedAt: value.quarantinedAt,
+    };
+  });
+}
+
 export function createEmptySnapshot(contentVersion: string, now: string): PersistenceSnapshot {
   assertNonEmptyString(contentVersion, 'contentVersion');
   assertNow(now);
@@ -84,6 +204,8 @@ export function createEmptySnapshot(contentVersion: string, now: string): Persis
     metadata: createMetadata(contentVersion, now, now),
     settings: DEFAULT_SETTINGS,
     attempts: [],
+    analysisSessions: [],
+    quarantinedAnalysisSessions: [],
     projections: replayAttempts([], localDateForTimestamp(now)),
   };
 }
@@ -105,11 +227,38 @@ function migrateV1(
     metadata: createMetadata(targetContentVersion, legacy.createdAt, now),
     settings: normalizeSettings(legacy.settings),
     attempts,
+    analysisSessions: [],
+    quarantinedAnalysisSessions: [],
     projections: replayAttempts(attempts, localDateForTimestamp(now)),
   };
 }
 
-function normalizeV2(
+function migrateV2(
+  value: Record<string, unknown>,
+  targetContentVersion: string,
+  now: string,
+): PersistenceSnapshot {
+  if (!isObject(value.metadata)) {
+    throw new PersistenceCorruptionError('Stored metadata is missing.');
+  }
+  assertNonEmptyString(value.metadata.contentVersion, 'metadata.contentVersion');
+  assertUtcTimestamp(value.metadata.createdAt, 'metadata.createdAt');
+  assertUtcTimestamp(value.metadata.updatedAt, 'metadata.updatedAt');
+  if (!Array.isArray(value.attempts)) {
+    throw new PersistenceCorruptionError('Stored attempts must be an array.');
+  }
+  const attempts = normalizeAttempts(value.attempts);
+  return {
+    metadata: createMetadata(targetContentVersion, value.metadata.createdAt, now),
+    settings: normalizeSettings(value.settings),
+    attempts,
+    analysisSessions: [],
+    quarantinedAnalysisSessions: [],
+    projections: replayAttempts(attempts, localDateForTimestamp(now)),
+  };
+}
+
+function normalizeV3(
   value: Record<string, unknown>,
   targetContentVersion: string,
   now: string,
@@ -123,22 +272,33 @@ function normalizeV2(
   if (!Array.isArray(value.attempts)) {
     throw new PersistenceCorruptionError('Stored attempts must be an array.');
   }
+  if (!Array.isArray(value.analysisSessions)) {
+    throw new PersistenceCorruptionError('Stored analysis sessions must be an array.');
+  }
+  if (!Array.isArray(value.quarantinedAnalysisSessions)) {
+    throw new PersistenceCorruptionError('Stored quarantined analysis sessions must be an array.');
+  }
   const attempts = normalizeAttempts(value.attempts);
+  const normalizedSessions = normalizeAnalysisSessions(value.analysisSessions, now);
+  const existingQuarantines = normalizeQuarantinedSessions(value.quarantinedAnalysisSessions);
   const contentVersionChanged = value.metadata.contentVersion !== targetContentVersion;
   const projectorChanged = value.metadata.projectorVersion !== CURRENT_PROJECTOR_VERSION;
+  const changed = contentVersionChanged || projectorChanged || normalizedSessions.changed;
   return {
     snapshot: {
       metadata: createMetadata(
         targetContentVersion,
         value.metadata.createdAt,
-        contentVersionChanged || projectorChanged ? now : value.metadata.updatedAt,
+        changed ? now : value.metadata.updatedAt,
       ),
       settings: normalizeSettings(value.settings),
       attempts,
+      analysisSessions: normalizedSessions.sessions,
+      quarantinedAnalysisSessions: [...existingQuarantines, ...normalizedSessions.quarantined],
       // Projections are rebuildable and never trusted over the event log.
       projections: replayAttempts(attempts, localDateForTimestamp(now)),
     },
-    changed: contentVersionChanged || projectorChanged,
+    changed,
   };
 }
 
@@ -176,15 +336,26 @@ export function migratePersistence(
       contentVersionChanged: previousContentVersion !== targetContentVersion,
     };
   }
-  if (version !== CURRENT_PERSISTENCE_SCHEMA_VERSION) {
+  if (version === 2) {
+    const previousContentVersion = isObject(parsed.metadata)
+      ? parsed.metadata.contentVersion
+      : undefined;
+    return {
+      snapshot: migrateV2(parsed, targetContentVersion, now),
+      migrated: true,
+      fromSchemaVersion: 2,
+      contentVersionChanged: previousContentVersion !== targetContentVersion,
+    };
+  }
+  if (version !== 3) {
     throw new UnsupportedPersistenceVersionError(version);
   }
 
-  const normalized = normalizeV2(parsed, targetContentVersion, now);
+  const normalized = normalizeV3(parsed, targetContentVersion, now);
   return {
     snapshot: normalized.snapshot,
     migrated: normalized.changed,
-    fromSchemaVersion: CURRENT_PERSISTENCE_SCHEMA_VERSION,
+    fromSchemaVersion: 3,
     contentVersionChanged:
       isObject(parsed.metadata) && parsed.metadata.contentVersion !== targetContentVersion,
   };
