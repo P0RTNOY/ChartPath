@@ -2,8 +2,8 @@
 
 > Status snapshot: 2026-08-24. This document is an implementation contract for the
 > beta and records implemented foundations only where the repository contains the
-> corresponding code. Milestone 3 implementation and final repository verification
-> are complete; native distribution gates remain open. Release evidence belongs in
+> corresponding code. Milestone 3 is complete; Milestone 4 paper-execution verification
+> is recorded separately and native distribution gates remain open. Release evidence belongs in
 > `docs/RELEASE_READINESS.md`.
 
 ## Status language
@@ -32,7 +32,7 @@ The beta has four hard constraints:
 3. Only curated, schema-valid content and pure grading rules determine correctness.
 4. Learning history is durable and append-only; derived progress can be rebuilt.
 
-Live market data, brokerage connections, trade execution, social trading, public
+Live market data, brokerage connections, real trade execution, social trading, public
 leaderboards, subscriptions, and runtime AI-authored lessons are outside the beta.
 
 ## Repository layout and dependency boundaries
@@ -97,7 +97,7 @@ execute ad-hoc SQL or import content files directly.
 **Beta requirement.** Pure TypeScript definitions and functions for `Skill`,
 `Unit`, `Lesson`, `Exercise`, `ChartSpec`, `ChartAnnotation`, `AnswerRubric`,
 `Attempt`, `AttemptResult`, `Misconception`, `SkillMastery`, `ReviewState`,
-`DailyActivity`, and `ContentVersion` live here. It also owns deterministic grading,
+`DailyActivity`, `ContentVersion`, and versioned paper-execution contracts live here. It also owns deterministic grading,
 position-size and `R` calculations, mastery updates, prerequisite evaluation, daily
 path selection, and the spaced-repetition scheduler.
 
@@ -208,9 +208,9 @@ The first Lab task reuses reviewed exercise `u03-levels-e04` unchanged. Submissi
 until a learner trendline is complete and replay reaches decision candle 71. `gradeAnswer` then
 receives the existing line rubric and decision-bounded candle context. Reference geometry is not
 passed to the renderer before grading; afterward it is a dashed warning-colored layer distinct from
-the solid learner layer. Workbench drafts are in-memory in this milestone and do not award XP or
-alter append-only attempts. Persisted replay drafts and paper-execution events are future work and
-would require an explicit versioned contract.
+the solid learner layer. Workbench drafts are in-memory and do not award XP or alter append-only
+attempts. Guided and historical replay persistence arrived in later milestones; paper execution uses
+its own explicit versioned session/event contract rather than turning scratch geometry into an order.
 
 ### Source boundary
 
@@ -338,9 +338,66 @@ uses the practice finalization transaction so attempts and projections remain un
 historical evidence includes 18/18 focused component tests, 2/2 focused browser journeys across
 phone/tablet projects, 413/413 repository tests, 12/12 full browser journeys, 53 exported web routes,
 iOS and Android Hermes bundles, an iOS Expo Go Lab smoke check and ten original-resolution web
-captures. This evidence does not close native VoiceOver/TalkBack, native largest-text, gesture, lifecycle or
-physical-device gates. Paper trading, live feeds, streaming quotes, portfolios, simulated or real
-orders and brokerage integration are outside this milestone.
+captures. This evidence does not close native VoiceOver/TalkBack, native largest-text, gesture,
+lifecycle or physical-device gates. Milestone 3 did not include paper execution; Milestone 4 layers
+the separate educational simulator below on the immutable finalized analysis without adding live
+feeds, portfolios, real orders or brokerage integration.
+
+## Deterministic Paper Execution Foundation
+
+**Milestone 4 implementation contract; final evidence remains controlled by
+`docs/RELEASE_READINESS.md`.** `packages/domain/src/paper-execution.ts` owns schema-versioned pure
+contracts for `TradePlan`, `OrderIntent`, `WorkingOrder`, `SimulatedPosition`, `ExecutionEvent`,
+`ExecutionPolicy`, `CostModel`, `PaperExecutionSession` and `ExecutionDebrief`. React, Expo, storage,
+the system clock and screen pixels do not enter the reducer. Callers provide every ID, timestamp,
+candle and finalized historical identity.
+
+An execution session pins dataset/scenario ID and version, canonical checksum, analysis session and
+finalization, decision candle, candle count, learning-credit state, permitted direction/order types,
+`paper-execution-policy-v1` and `paper-cost-model-v1`. It can be created only from an exact, finalized
+historical analysis. Resume resolves all pinned evidence and fails closed; it never substitutes a
+dataset, silently repins a scenario or mutates the original analysis.
+
+### Order processing and events
+
+The reducer supports one plan, one working entry order and one position. Market entries fill at the
+next eligible candle open. Limit entries fill at the submitted limit with no favorable improvement.
+Entry stops and protective stops use an adverse opening reference after a gap. Targets fill at the
+submitted target with no favorable improvement. Opening-threshold evidence precedes range-only
+ambiguity; otherwise a candle touching both stop and target, or an intrabar entry followed by an
+unorderable exit touch, produces an explicit ambiguous state.
+
+The fixed v1 cost model applies a ten-basis-point total spread (half per side), five basis points of
+adverse slippage to market/stop fills, per-fill commission `max(1.00, 0.01 × quantity)`, a `0.01`
+price tick, whole-unit quantity and two-decimal currency rounding. Adverse buys round up and adverse
+sells round down. Partial fills, order-book/queue/liquidity inference and price improvement are not
+modeled. `docs/PAPER_EXECUTION_POLICY.md` is the normative plain-language contract.
+
+Every transition appends immutable deterministic events. Processed candles keep index, timestamp and
+fingerprint; reprocessing the same candle is idempotent, changed evidence fails, and indexes cannot
+be skipped. Multi-candle replay passes every intermediate candle through the reducer. A working
+order can fill, cancel or expire; a position closes at stop/target or becomes ambiguous. A debrief
+records process alignment, costs, model effects and outcome determinability independently of P&L.
+
+### Application, persistence and presentation boundary
+
+The application adapter owns exact resolver checks, autosave and the paper-execution route. Its
+cursor begins after the historical decision candle and never rewinds or changes the finalized Guided
+Analysis session. The persistence payload and native SQLite schema store execution sessions
+separately from append-only learning attempts. Revision checks, idempotent event/candle evidence,
+quarantine and explicit abandonment/reset protect reloads in draft, working, open and terminal
+states. Execution operations do not call ordinary attempt projection reducers.
+
+`OhlcvChart` receives an explicit cutoff-safe execution overlay model. Planned entry, working order,
+actual fill, protective stop, target, open position, exit and ambiguity differ by text, shape and
+line pattern, with color only secondary. An accessible event list exposes the same state without a
+gesture. Hebrew surrounds explicit LTR tickers, prices, dates, identifiers, axes and chronology.
+
+The installed `u10-capstone-e03` historical fixture concludes no trade. Its paper ticket is therefore
+an explicitly hypothetical simulator-mechanics exercise: the mismatch remains visible, the analysis
+is unchanged, and the execution grants no attempt, mastery, review, lesson progress, XP, streak or
+daily-activity credit. A future credited execution assessment requires a separately authored,
+reviewed rubric and historical publication/rights approval.
 
 ## Runtime flows
 
@@ -407,6 +464,12 @@ the scheduler receives an explicit clock and must tolerate device-clock changes.
 Elapsed time may support local diagnostics but must not materially reduce mastery.
 No real portfolio value, brokerage identifier, or free-form financial profile is
 stored.
+
+Paper-execution sessions are separate versioned local records, not learning attempts. They may
+contain explicitly fictional account/risk values, plan levels, pinned historical identity,
+processed-candle fingerprints and immutable simulator events. Their repository supports exact
+resume, revision conflict detection, quarantine and explicit abandonment/reset while preserving all
+attempts and projections. A simulated fill or debrief never invokes the learning-credit projector.
 
 Updates and deletes on `attempts` should be rejected by repository design and, where
 supported, SQLite triggers. Corrections are new events that reference the prior
@@ -568,6 +631,8 @@ The architecture is not “implemented” until evidence covers at least:
 - workspace dependency-boundary and TypeScript strict checks;
 - seed/parameter reproducibility and OHLC invariants;
 - decision-index tests proving future candles cannot influence grading;
+- execution-policy tests proving next-open timing, adverse gaps, cost rounding, honest ambiguity,
+  intermediate-candle processing, idempotent replay and exact checksum-bound recovery;
 - grader tolerance tests across render sizes and ambiguity answers;
 - table-driven risk calculations, including invalid/zero-distance inputs;
 - mastery bounds, lapses, due dates, and full projection replay;
@@ -575,6 +640,8 @@ The architecture is not “implemented” until evidence covers at least:
 - content validation for every published record;
 - RTL/LTR, screen-reader, touch-target, contrast, and reduced-motion behavior; and
 - critical offline app journeys with no network, AI key, or cloud credentials.
+- paper-ticket, working/open/terminal execution journeys and non-color chart/event alternatives at
+  phone/tablet widths, with native screen-reader and physical-device results claimed only when run.
 
 Update the status snapshot and `docs/RELEASE_READINESS.md` only from commands,
 screenshots, or manual journeys that were actually run.

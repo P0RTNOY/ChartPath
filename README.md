@@ -2,7 +2,9 @@
 
 ChartPath is a Hebrew-first, mobile learning beta for technical-analysis literacy and disciplined,
 risk-aware chart reasoning. It teaches process and uncertainty through deterministic synthetic
-charts; it does not provide signals, personalized advice, trade execution, or live market data.
+charts; it does not provide signals, personalized advice, real trade execution, or live market
+data. Its development-only paper-execution foundation is a simplified historical learning
+simulation, not a brokerage emulator.
 
 ## Workspace
 
@@ -26,6 +28,8 @@ pnpm mobile:web
 The application is guest-first and works without API keys or cloud services. Progress is stored on
 the device. See `docs/RELEASE_READINESS.md` for currently verified targets and known limitations,
 and `docs/HEBREW_INTERACTIVE_EXERCISE_AUDIT.md` for the Hebrew/RTL and chart-interaction review.
+The exact paper-fill, cost, gap, ambiguity, persistence, no-credit and accessibility assumptions are
+documented in `docs/PAPER_EXECUTION_POLICY.md`.
 
 ## Verification
 
@@ -46,4 +50,6 @@ Reproducible screenshot evidence is under `docs/screenshots/`.
 
 All charts are synthetic. Examples explain observations, prerequisites, uncertainty, invalidation,
 position sizing, and review. They are not recommendations to buy or sell any asset. Stops may execute
-away from their requested price because spreads, liquidity, gaps, and slippage exist.
+away from their requested price because spreads, liquidity, gaps, and slippage exist. Paper fills use
+fixed versioned assumptions for reproducibility and do not represent achievable market execution;
+the generated development fixture awards no course credit.

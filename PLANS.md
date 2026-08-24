@@ -51,11 +51,12 @@ Native UI/runtime, SQLite-on-device, and screen-reader verification remain distr
 
 ## Chart-simulator roadmap
 
-| Milestone                                 | Status   | Evidence / next work                                                                                                                                                 |
-| ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Interactive Chart Workbench foundation | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass.                                                |
-| 2. Persistent Guided Analysis Session     | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                     |
-| 3. Frozen Historical Replay Foundation    | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified. |
+| Milestone                                   | Status   | Evidence / next work                                                                                                                                                     |
+| ------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Interactive Chart Workbench foundation   | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass.                                                    |
+| 2. Persistent Guided Analysis Session       | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                         |
+| 3. Frozen Historical Replay Foundation      | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified.     |
+| 4. Deterministic Paper Execution Foundation | Complete | Pure one-plan/order/position engine, checksum-bound persistence, Hebrew ticket/overlays/debrief and final evidence; release gates remain in `docs/RELEASE_READINESS.md`. |
 
 Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
 data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
@@ -86,5 +87,23 @@ learning projections. Final evidence consists of 413 passing unit/integration te
 production-export browser journeys, 53 web routes, iOS and Android Hermes exports, 18/18 focused
 historical component tests, 2/2 focused phone/tablet historical browser journeys, an iOS Expo Go
 native Lab smoke check and ten inspected web screenshots. There are no provider
-keys, runtime market-data requests or real candles in the repository. Paper trading, live data,
-simulated or real orders, news and brokerage integration remain out of scope.
+keys, runtime market-data requests or real candles in the repository. Milestone 3 itself excluded
+paper execution; live data, real orders, news and brokerage integration remain out of scope.
+
+Milestone 4 is complete on local branch `codex/paper-execution-foundation` from the completed M3
+checkpoint `a521fd481bbbca465674f5b7608af4d9c1360e18`. It adds only deterministic educational paper
+execution: one confirmed plan, market/limit/stop entry, one working order/position, automatic
+stop/target or ambiguity resolution, versioned spread/slippage/commission assumptions, immutable
+events, exact offline resume, chart overlays and a process-first debrief. The normative mechanics
+and limitations are in `docs/PAPER_EXECUTION_POLICY.md`.
+
+The current fixture's reviewed conclusion is no trade. Its hypothetical short mechanics exercise
+does not revise that conclusion or award attempts, mastery, review, lesson progress, XP, streak or
+daily activity. Multiple positions, portfolios, position management, partial/manual exits, complex
+orders, live/delayed data, real order routing, brokerage connectivity, advice and P&L scoring remain
+out of scope. Final verification produced 486 passing tests across 43 suites, 18/18 production-export
+browser journeys across phone and tablet projects, 54 web routes, iOS and Android Hermes exports,
+eight inspected paper-execution screenshots and a limited iOS Expo Go native deep-link/recovery
+render smoke check. VoiceOver/TalkBack, OS largest-text behavior, native interaction/lifecycle
+recovery, physical-device ergonomics and human publication/editorial review remain release gates;
+they are not passing claims.

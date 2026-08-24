@@ -58,6 +58,7 @@ ads, ad SDKs, cross-app tracking, public profiles, social feeds, or leaderboards
 | Response duration                             | Optional local diagnostics; never a material mastery penalty | Local SQLite if implemented | Delete with attempts; do not upload by default         |
 | Content/schema versions                       | Migration and reproducibility                                | Local SQLite                | Retained with relevant attempts                        |
 | Guided-analysis drafts                        | Offline resume, replay integrity and final reflection        | Local SQLite                | Until explicit reset; finalized sessions are read-only |
+| Paper-execution sessions                      | Resume one fictional plan, events and deterministic debrief  | Local SQLite                | Until explicit reset/abandonment; attempts unaffected  |
 | Generated development candles                 | Exercise infrastructure validation only                      | Bundled application data    | Replaced only by a reviewed build; not learner data    |
 
 The app may generate a random installation-scoped identifier for database
@@ -237,6 +238,33 @@ dataset and rubric pins, canonical validation, market and educational provenance
 cutoff/future-leak validation and human editorial evidence. Databento is only a procurement lead;
 none of the researched providers is an approved bundled-data source.
 
+### Deterministic paper-execution boundary
+
+Paper execution stores a fictional account value/risk budget, plan levels, quantity, exact
+historical/analysis identity, processed-candle fingerprints, immutable simulator events and its
+debrief. It requests no actual balance, holdings, brokerage identity, credential, account number or
+order-route data. It is local-only under the existing guest storage/backup disclosure and adds no
+analytics, remote tutor, market-data call or other recipient.
+
+`paper-execution-policy-v1` and `paper-cost-model-v1` are visible simplified assumptions. Market
+entry occurs at the next open; limit and target fills have no favorable improvement; gaps through
+entry/protective stops use an adverse open; and unorderable intrabar threshold touches become
+ambiguous. Market/stop fills apply a ten-basis-point total spread, five basis points of adverse
+slippage, adverse tick rounding and commission. This consistency is a reproducibility control, not
+a promise that a real venue or broker behaves that way. Partial fills, order books, queue priority
+and unsupported liquidity inference are explicitly absent.
+
+The chart and accessible event list receive only processed candles. Repeated candles are idempotent;
+changed or skipped evidence and dataset/scenario/checksum mismatches fail closed. Execution state is
+separate from append-only attempts, and the current development fixture can never change mastery,
+review, lesson progress, XP, streak or daily activity. Reset/abandonment is explicit and does not
+rewrite the finalized analysis or learning history.
+
+The fixture's reviewed analysis concludes no trade. The mechanics exercise must keep the conflict
+visible and must not imply that a simulated result validates bypassing the analysis. Debriefs score
+process separately from P&L, do not celebrate profit or shame modeled loss, and state that historical
+simulation neither recommends an action nor predicts future performance.
+
 ## Financial-safety content rules
 
 These are **beta requirements** for every screen, lesson, exercise, notification,
@@ -375,6 +403,9 @@ No beta-readiness claim is valid until the release record contains evidence for:
 - for historical replay, exact dataset/checksum resume failures, cutoff-only scale/accessibility
   output, practice finalization with no attempt/projection mutation, and a human-approved rights and
   editorial publication record;
+- for paper execution, exact identity recovery; future isolation; next-open/gap/cost/rounding and
+  ambiguity tests; active-state reload without duplicate events; explicit fictional-data copy; zero
+  attempt/projection mutation; and non-color visual plus accessible event-state evidence;
 - Hebrew RTL plus LTR numbers/formulas, screen reader, large text, contrast, and
   reduced-motion manual journeys;
 - content review for advice, guarantees, profit-based rewards, and unsafe leverage;

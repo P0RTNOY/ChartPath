@@ -14,6 +14,10 @@ provider-neutral historical-replay flow is learner-accessible as an explicitly i
 scenario. The only historical-format candles in the repository are a ChartPath-generated
 development fixture, not real market observations.
 
+**Milestone 4 status (2026-08-24): implementation contract present; final verification evidence is
+tracked in `docs/RELEASE_READINESS.md`.** Paper execution is a local deterministic mechanics layer
+over a completed checksum-pinned analysis, not brokerage execution or a new trading curriculum.
+
 ## 1. Document status and evidence labels
 
 This specification distinguishes requested product behavior from source-backed curriculum evidence:
@@ -144,7 +148,7 @@ These content counts can be considered met only after the source references have
 
 ### 6.3 Non-goals for the first beta
 
-- Brokerage connections or trade execution.
+- Brokerage connections, real trade execution or order routing.
 - Live-market data dependencies.
 - Price alerts, signals, or recommendations.
 - Personalized financial advice.
@@ -169,10 +173,12 @@ runtime network request are configured. The historical registry is separate from
 curriculum catalog and currently has zero course-credit-eligible scenarios and four explicit
 publication blockers.
 
-Paper trading, portfolios, profit-and-loss scoring, live or delayed feeds, streaming quotes,
-simulated or real orders, news and brokerage connectivity remain out of scope. Databento and the
-other researched vendors in `docs/HISTORICAL_DATA_POLICY.md` are procurement candidates only, not
-approved sources or implemented integrations.
+The Milestone 4 paper-execution foundation is a narrow development-only educational simulation. It
+supports one plan/order/position, fixed versioned fills/costs, manual candle advancement and a
+process debrief. Portfolios, P&L scoring, partial/manual exits, position management, complex orders,
+live or delayed feeds, streaming quotes, real orders, news and brokerage connectivity remain out of
+scope. Databento and the other researched vendors in `docs/HISTORICAL_DATA_POLICY.md` are
+procurement candidates only, not approved sources or implemented integrations.
 
 Future capabilities do not belong in beta claims unless implemented and verified.
 
@@ -275,6 +281,29 @@ The implemented internal-practice journey is:
 8. Identity may be disclosed only under the authored reveal policy after finalization. Later outcome
    remains excluded from the original grade.
 
+### 8.10 Deterministic paper execution
+
+After an exact finalized historical analysis, the learner may open a progressive Hebrew paper
+ticket, review the scenario-permitted direction/order type, entry, protective stop, target,
+fictional account/risk values, quantity, modeled costs and explicit assumptions, then confirm once.
+The execution cursor begins after the decision candle. Every advance reveals and processes each new
+candle exactly once, emits immutable order/position events and saves the checkpoint.
+
+Market entry uses the next candle open. Limit entry and target fills receive no favorable price
+improvement. Entry/protective stops use the adverse open after a gap. Range-only stop-and-target or
+intrabar-entry/exit sequencing that OHLCV cannot establish becomes ambiguous, never an invented
+winner. The v1 model and exact costs are specified in `docs/PAPER_EXECUTION_POLICY.md`.
+
+The chart distinguishes planned entry, working order, actual fill, stop, target, open position, exit
+and ambiguity by labels, shapes and line patterns in addition to color. A cutoff-safe accessible
+event list is the non-gesture alternative. The debrief scores process alignment and outcome
+determinability separately from neutral simulated P&L/`R` information.
+
+The installed fixture's reviewed conclusion is no trade. Its paper ticket must explicitly describe
+the exercise as hypothetical simulator mechanics that contradicts—but never changes—that analysis.
+It grants no ordinary attempt, mastery, review, lesson completion, XP, streak or daily-activity
+credit.
+
 ## 9. Hebrew RTL, bilingual content, and accessibility
 
 ### 9.1 Directionality
@@ -354,6 +383,8 @@ Every learner-facing surface and editorial workflow must uphold these required p
 12. “No trade” and “not enough information” are valid answers.
 13. The application rewards process quality, not profit or aggressive risk-taking.
 14. Content is education, never personalized financial advice, a signal, or a recommendation to buy or sell.
+15. Paper fills, spread, slippage, commission, gaps and OHLCV ambiguity are labelled versioned
+    simulator assumptions, not market facts or promises of achievable execution.
 
 Additional product enforcement:
 
@@ -371,6 +402,9 @@ Additional product enforcement:
 - Response time may be retained for diagnostics but does not materially penalize mastery.
 - The app clearly explains what is stored locally and how a learner can clear it.
 - No brokerage credentials, holdings, trade history, or financial account connection is requested.
+- Paper execution stores only local fictional account/risk inputs, plan levels, pinned historical
+  identity, processed-candle evidence and immutable simulator events. These records are separate
+  from append-only learning attempts and introduce no network recipient or telemetry.
 - Cloud synchronization is future work and must require separate authentication, authorization, tenant isolation, retention, and deletion review.
 - Guided-session schema version 2 distinguishes synthetic seed/generator identity from historical
   scenario/dataset/version/checksum identity. Persistence payload schema version 4 and native SQLite
@@ -423,6 +457,9 @@ Publication is blocked when required fields, Hebrew content, prerequisite refere
 - Position-size grading includes expected per-unit costs and rejects invalid inputs.
 - Mastery is bounded, deterministic, and distinct from XP, streak, completion, and raw accuracy.
 - Failed reviews become due according to the documented deterministic scheduler.
+- Paper execution processes only post-decision candles in sequence, is idempotent across repeat and
+  reload, fails closed on evidence mismatch, reports honest OHLCV ambiguity and never awards credit
+  from simulated outcome.
 
 ### 14.3 Content integrity
 
@@ -455,6 +492,12 @@ cutoff-safe visual/accessibility output, offline resume, non-credit finalization
 light/dark/reduced-motion phone/tablet web captures. The full repository, browser and export command
 inventory passes. Browser automation and screenshots do not establish
 native screen-reader, native largest-text, gesture/lifecycle or physical-device usability.
+
+Milestone 4 acceptance additionally requires tested market/limit/stop symmetry, adverse entry and
+protective-stop gaps, exact cost/tick rounding, cancellation/expiration, same-candle ambiguity,
+intermediate-candle processing, active-session reload, checksum mismatch recovery, no duplicate
+events/credit, and inspected phone/tablet/dark/large-text/reduced-motion execution states. Export or
+browser evidence must not be represented as native VoiceOver/TalkBack or physical-device evidence.
 
 ### 14.6 Safety
 

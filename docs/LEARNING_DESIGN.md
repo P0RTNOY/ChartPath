@@ -634,6 +634,49 @@ and history, and non-credit practice finalization. Focused and full-suite eviden
 implemented flow; native screen-reader, gesture/lifecycle and physical-device usability verification
 remain pending.
 
+## 18.3 Deterministic Paper Execution Foundation
+
+Paper execution is a transfer exercise in process and simulator literacy after—not a replacement
+for—the completed analysis. It preserves the instructional order: context and evidence first, then
+entry/invalidation/size/target mechanics, then execution and review. The learner cannot use later
+candles to improve the original analysis or earn hindsight credit.
+
+The ticket progressively discloses order intent, plan levels, fictional risk arithmetic and a plain
+confirmation. Every value is labelled by authority:
+
+- **from the reviewed analysis** (`מן הניתוח שנבדק`) for the learner's conclusion and aligned plan
+  evidence;
+- **neutral calculation** (`חישוב נייטרלי`) for distance, quantity, costs and `R`; and
+- **simulator assumption** (`הנחת הסימולטור`) for fill timing, spread, slippage, gaps, tick rounding
+  and OHLCV ambiguity.
+
+The process debrief asks whether the plan matched the completed analysis; entry, invalidation and
+target were coherent; risk was calculable; required reasoning was preserved; modeled execution
+differed through gaps/costs; and the result was determinable from OHLCV. Entry/exit prices, costs and
+`R` may support reflection, but outcome does not become the learning grade. A profitable badly
+aligned plan is not praised; a coherent stopped plan is not failed because of outcome.
+
+The installed `u10-capstone-e03` fixture is deliberately important: its reviewed case-C conclusion
+is no trade (`ta-he-v2`, PDF 74–75 / printed 61–62, Chapter 19). The paper path is therefore an
+explicit hypothetical mechanics exercise that exposes an analysis mismatch. It cannot revise the
+finalized response or produce course credit. This prevents a simulator feature from teaching that a
+learner should take every analyzable chart.
+
+Educational concepts remain grounded in the reviewed workflow and risk material: context and
+separation in PDF 62–63 / printed 49–50 (Chapter 15); invalidation, stops, targets, `R`, size and
+costs in PDF 64–67 / printed 51–54 (Chapter 16); gaps in PDF 54 / printed 41 (Chapter 13) and PDF 59
+/ printed 46 (Chapter 14); evidence/cost/look-ahead limitations in PDF 68–71 / printed 55–58
+(Chapters 17–18); capstone process/fill review in PDF 72–74 / printed 59–61 (Chapter 19); and narrow
+simulation/review practice in PDF 76–79 / printed 63–66 (Chapter 20 and quick reference). The exact
+next-open, threshold, spread, slippage, commission and rounding rules are ChartPath v1 assumptions,
+not doctrine attributed to those pages.
+
+Accessible learning evidence uses the same current candle cutoff for the visual chart and ordered
+event description. Line patterns, shapes and text distinguish plan, working order, fills, risk
+levels, exit and ambiguity without color alone. Exact numeric fields and keyboard/non-gesture
+controls support learners who cannot place a chart gesture. Native screen-reader, largest OS text,
+gesture/lifecycle and physical-device validation remain pending until recorded from actual runs.
+
 ## 19. Verified evidence and tunable decisions
 
 ### Source verification completed

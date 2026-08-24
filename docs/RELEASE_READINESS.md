@@ -13,9 +13,10 @@ claim app-store, production, or human-learning validation.
 | Content version                | `2026.08-beta.1`                                                                       |
 | Content schema                 | `1`                                                                                    |
 | Guided-session schema          | `2`                                                                                    |
-| Persistence schema             | Web payload `4`; native SQLite migrations `3`                                          |
+| Persistence schema             | Web payload `5`; native SQLite migrations `4`                                          |
 | Historical-data schema         | `1`                                                                                    |
-| Branch                         | `codex/historical-replay-foundation`                                                   |
+| Paper-execution schema/policy  | `1`; `paper-execution-policy-v1`; `paper-cost-model-v1`                                |
+| Branch                         | `codex/paper-execution-foundation`                                                     |
 | Milestone 3 implementation tip | `37ebb67`; final documentation is committed separately                                 |
 | Foundation commit              | `f394380`                                                                              |
 | Catalog commit                 | `1e194e0`                                                                              |
@@ -60,6 +61,9 @@ claim app-store, production, or human-learning validation.
 - The historical registry reports zero course-credit-eligible scenarios and four publication
   blockers. No real candle, provider payload, provider key, or runtime market-data request is
   bundled or configured.
+- Milestone 4 defines a narrow local paper-execution simulation over an exact finalized historical
+  analysis. It has one plan/order/position, deterministic events, explicit gap/cost/ambiguity
+  assumptions and process-first debrief; it is not broker execution or a credited assessment.
 - Static pages are generated for every unit and lesson so supported web deep links survive refresh.
 - No authentication, cloud sync, analytics, live-market requests, brokerage connection, production
   service, or API key is required by the core journey.
@@ -384,3 +388,60 @@ explicit LTR isolation of checksum/dataset/date strings, clipping, overlap, char
 non-color status, blind-versus-revealed identity, reduced-motion copy, very-large text wrapping and
 phone/tablet composition. This is visual browser evidence only; it is not a native gesture,
 screen-reader, lifecycle or physical-device pass.
+
+## Deterministic Paper Execution Milestone 4 addendum
+
+Work was completed on branch `codex/paper-execution-foundation` from the Milestone 3 checkpoint
+`a521fd481bbbca465674f5b7608af4d9c1360e18`. The branch is local-only. This addendum does not change
+the native-distribution NO-GO or promote the generated historical fixture.
+
+The normative mechanics are in `docs/PAPER_EXECUTION_POLICY.md`. In summary: a market entry uses the
+next eligible candle open; limit and target fills use the exact submitted threshold without
+favorable improvement; entry and protective-stop gaps use an adverse open; opening-threshold
+evidence precedes range-only evidence; and unresolved stop/target or intrabar-entry/exit order
+becomes ambiguous. The fixed v1 costs are a ten-basis-point total spread, five basis points adverse
+slippage for market/stop fills, commission `max(1.00, 0.01 × quantity)`, `0.01` tick, whole units and
+two-decimal currency rounding. Partial fills, order books, queue/liquidity inference and brokerage
+behavior are not modeled.
+
+The installed scenario is a special no-credit case: reviewed `u10-capstone-e03` concludes no trade.
+Any short paper plan is an explicitly hypothetical mechanics exercise whose mismatch must remain
+visible. It cannot change the finalized analysis, create an ordinary attempt or affect mastery,
+review, lesson progress, XP, streak or daily activity.
+
+### Baseline before Milestone 4 changes
+
+| Check                 | Recorded result                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm check`          | PASS; 413/413 tests across 39 suites, plus content and historical validation.                                                  |
+| `pnpm build`          | PASS for domain, historical-data, UI, chart-engine and content.                                                                |
+| Web browser suite     | PASS after confirming a pre-existing lesson-navigation race; isolated rerun and final full rerun passed 12/12 with no retries. |
+| Production web export | PASS; 53 routes.                                                                                                               |
+| iOS export            | PASS; Hermes bundle and assets emitted.                                                                                        |
+| Android export        | PASS; Hermes bundle and assets emitted.                                                                                        |
+| Diff integrity        | PASS; clean baseline and `git diff --check`.                                                                                   |
+
+### Milestone 4 final gates
+
+Verification was rerun from the final implementation on 2026-08-24. Passing automated and visual
+evidence below does not change the native-distribution NO-GO or promote the generated fixture.
+
+| Gate                               | Recorded result                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain/policy tests                | **PASS.** The final domain run contributed 167/167 tests across seven suites, including deterministic market/limit/stop behavior in both directions, gaps, no-improvement, costs/rounding, cancellation/expiration, ambiguity and numeric boundaries.                                    |
+| Replay isolation/idempotency       | **PASS.** Tests establish sequential cutoff-only candle processing, equivalent batch/step progression, idempotent identical repeats, and rejection of changed or skipped candles.                                                                                                        |
+| Persistence/recovery               | **PASS.** The final mobile run contributed 132/132 tests across 26 suites; focused persistence coverage passed 31 tests across four suites for lifecycle reload, exact identity/version recovery, quarantine/reset, append-only events and zero duplicate credit.                        |
+| Hebrew UI/component accessibility  | **PASS WITH MANUAL NATIVE GATES OPEN.** Fourteen UI tests and 23 focused paper-execution screen tests cover progressive confirmation, validation, Hebrew labels, explicit LTR isolation, non-color overlay semantics and the accessible immutable event list.                            |
+| Browser E2E                        | **PASS.** `pnpm e2e` passed 18/18 journeys in 3.2 minutes with no failures or retries across Pixel 7 and iPad projects, including market-to-gap-stop debrief, working-order reload/idempotency and same-candle ambiguity.                                                                |
+| Full `pnpm check` / build          | **PASS.** `pnpm check` passed 486/486 tests across 43 suites: domain 167, historical 81, UI 14, chart-engine 57, content 35 and mobile 132; 60/60 content records and one capstone validated. `pnpm build` passed all packages.                                                          |
+| Historical validation              | **PASS.** `pnpm historical:validate` validated 96 generated candles, one recorded gap and checksum `sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`; the registry remains one scenario, zero credit and five publication blockers.                              |
+| Web/iOS/Android exports            | **PASS AS BUNDLE EVIDENCE.** Web export emitted 54 routes and 76 files (4,908,845 bytes); iOS emitted 25 files/23 assets (5,347,612 bytes, 1,882 modules); Android emitted 29 files/27 assets (6,519,544 bytes, 1,971 modules). Exports are not device-interaction evidence.             |
+| Original-resolution visual set     | **PASS FOR BROWSER PRESENTATION.** Eight final-export images were inspected at original resolution: seven `390×844` phone captures and one `1024×768` tablet capture. RTL/LTR hierarchy, clipping, chronology, progressive state, non-color cues, contrast and responsive layout passed. |
+| Native smoke                       | **LIMITED PASS.** Expo Go 57.0.9 on an iPhone 17 Pro iOS 26.5 simulator bundled 2,050 native modules and deep-linked to the paper-execution route. The expected Hebrew RTL fail-closed recovery screen rendered; this did not exercise the full execution lifecycle.                     |
+| VoiceOver/TalkBack/physical device | **PENDING GATE.** Neither screen-reader focus/speech nor a physical-device run was performed. Native largest OS text, gestures, force-close/reopen recovery and ergonomics remain unverified.                                                                                            |
+| Human publication/editorial review | **BLOCKED.** Fixture licensing/publication plus independent Hebrew, source, pedagogy, financial-safety and accessibility approval remain absent.                                                                                                                                         |
+
+The final visual inspection covered exact dimensions, Hebrew RTL hierarchy, LTR prices/quantities,
+clipping and wrapping, chart chronology, planned-versus-actual fill distinction, line/shape/text
+status independent of color, dark contrast, very-large in-app text, reduced-motion state and
+phone/tablet composition. The exact files are recorded in `docs/screenshots/README.md`.

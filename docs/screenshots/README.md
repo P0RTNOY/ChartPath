@@ -63,3 +63,29 @@ revealed identity, dark contrast, very-large text, reduced-motion messaging and 
 composition. The set confirms browser presentation and persisted browser state only. It does not
 establish native rendering, gestures, VoiceOver/TalkBack focus or speech, native largest OS text,
 force-close/reopen behavior, physical-device ergonomics or application-bundle secrecy.
+
+The final Milestone 4 paper-execution evidence was generated from the final production web export
+with `pnpm screenshots:paper` and inspected at original resolution:
+
+- `paper-execution-ticket-light-phone.png` — progressive confirmed-plan inputs and order types;
+- `paper-execution-working-light-phone.png` — submitted working order and distinct planned/working
+  overlays;
+- `paper-execution-open-light-phone.png` — open simulated position with planned levels and actual
+  fill distinguished;
+- `paper-execution-debrief-light-phone.png` — deterministic process-first gap-stop debrief;
+- `paper-execution-ambiguous-light-phone.png` — explicit same-candle ambiguity with no invented exit;
+- `paper-execution-dark-phone.png` — dark-theme contrast and state cues;
+- `paper-execution-large-reduced-phone.png` — very-large in-app text and reduced-motion state; and
+- `paper-execution-light-tablet.png` — wide two-column tablet composition.
+
+The seven phone images are exactly `390×844`; the tablet image is exactly `1024×768`. Inspection
+confirmed Hebrew RTL hierarchy, explicit LTR prices/quantities, chart chronology, clipping and
+wrapping, progressive confirmation, cutoff-safe states, event ordering, planned-versus-actual fill
+distinction, line/shape/text cues independent of color, dark contrast, large text, reduced-motion
+messaging and phone/tablet responsiveness. Component and browser tests additionally cover the
+accessible event list and Hebrew control names.
+
+As with earlier sets, web captures establish browser presentation only. They do not establish native
+rendering, native gestures, VoiceOver/TalkBack focus or speech, OS largest-text layout,
+force-close/reopen recovery or physical-device ergonomics. Leave those gates pending until an actual
+native run is recorded in `docs/RELEASE_READINESS.md`.

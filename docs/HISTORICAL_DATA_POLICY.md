@@ -4,7 +4,8 @@
 
 **Status:** normative licensing and publication gate
 
-**Scope:** frozen historical datasets and replay scenarios; never live or delayed runtime feeds
+**Scope:** frozen historical datasets, replay scenarios and checksum-bound paper execution; never
+live or delayed runtime feeds
 
 This document records a conservative engineering assessment, not legal advice. Provider products,
 prices, exchange entitlements, and terms can change. An assessment below is evidence only for the
@@ -15,6 +16,11 @@ ChartPath currently bundles **no real historical candles**. The canonical histor
 demonstrated with generated synthetic development data. That fixture must remain visibly labelled
 `development-only`, must not masquerade as a reviewed real-market scenario, and must not award the
 ordinary published-course mastery or XP projections.
+
+Milestone 4 may process that same generated fixture through a local deterministic paper-execution
+model. Doing so does not change its licensing, editorial, publication or course-credit status. A
+simulated fill is derived development evidence, not proof that the underlying dataset may be
+published and not permission to capture or redistribute real provider values.
 
 ## 1. Rights and status vocabulary
 
@@ -73,6 +79,12 @@ Therefore:
    the exact dataset record passes the evidence checklist below.
 5. A private repository is not treated as a licensing exemption. Contributors, build systems,
    backups, artifacts, and future releases can all expand distribution or retention.
+
+Paper-execution records inherit the exact dataset ID/version/checksum and scenario identity. If
+rights are revoked, a dataset is withdrawn, or exact evidence is unavailable, resume fails closed;
+the application must not retain a substitute candle set merely to preserve a simulated outcome.
+Screenshots, exports and event logs containing recoverable real values are distribution and require
+the same permission review as the underlying chart.
 
 ## 4. Evidence required before real-data publication
 

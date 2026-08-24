@@ -102,6 +102,11 @@ A scenario references, rather than embeds:
 - deterministic rubric/grader identity; and
 - future-leak validation status, validator version, and evidence timestamp.
 
+An execution-enabled development scenario additionally declares the exact execution-policy and
+cost-model IDs plus permitted directions and entry-order types. These permissions authorize only
+the simulator mechanics available for that scenario; they are not a signal, reviewed answer or
+course-credit override.
+
 The decision candle, knowledge cutoff, initial range, and replay boundary must be in range. No
 permitted boundary may exceed the decision candle before finalization. A scenario cannot substitute a
 new rubric for the referenced reviewed educational content without an explicit new content version
@@ -265,3 +270,28 @@ market identity.
 
 The fixture proves engineering behavior only. It does not prove provider accuracy, exchange-calendar
 coverage, real-data rights, human editorial approval, native accessibility, or production readiness.
+
+## 9. Paper-execution binding
+
+A `PaperExecutionSession` references canonical historical evidence; it never embeds a replacement
+dataset. Its identity includes dataset ID/version/checksum, scenario ID/version, finalized analysis
+session ID/time, decision candle, candle count, learning-credit state, permitted directions/order
+types, execution schema and the versioned policy/cost records. Exact resolution is required at
+creation and resume.
+
+Execution begins only after the decision candle. Each eligible candle is processed in ascending
+index order and persisted with timestamp plus a deterministic fingerprint. Repeating an identical
+candle is a no-op; an altered fingerprint, missing intermediate index, incompatible policy/cost
+version or mismatched dataset/scenario identity is a fail-closed recovery state. The engine never
+looks ahead to determine a fill, threshold sequence, debrief, chart scale or accessible text.
+
+The v1 policy uses next-open market entry, exact/no-improvement limit and target fills, adverse-open
+entry/protective-stop gaps, and explicit ambiguity where OHLCV cannot order intrabar events. The v1
+cost model and its known limitations are normative in `docs/PAPER_EXECUTION_POLICY.md`; these are
+simulator assumptions rather than historical-data fields or source-provider facts.
+
+Execution sessions, events and fictional risk inputs remain separate from canonical candles,
+Guided Analysis records and append-only attempts. Removing/resetting a paper execution cannot alter
+the historical dataset or analysis, and completing it cannot make an internal scenario publishable
+or eligible for course credit. The current fixture still represents a reviewed no-trade analysis;
+its permitted short mechanics exercise must expose that mismatch and remain development-only.

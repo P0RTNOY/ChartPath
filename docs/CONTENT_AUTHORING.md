@@ -332,6 +332,39 @@ ordinary published-course mastery/XP. A scenario cannot become publishable unles
 redistribution and retention permission is verified and independent human editorial review is
 recorded.
 
+### 5.3 Paper-execution scenario contract
+
+Paper execution is not a second answer key or a reason to rewrite the resolved exercise. An enabled
+scenario declares stable execution-policy/cost-model IDs, permitted direction(s), permitted
+market/limit/stop entry types, original Hebrew development/no-credit disclosure and the exact
+finalized historical analysis from which a session can be created. The session continues to pin the
+dataset/scenario/content/checksum identity.
+
+Authors must keep three labels distinct in prose and accessibility text:
+
+- `מן הניתוח שנבדק` for evidence inherited from the reviewed analysis;
+- `חישוב נייטרלי` for arithmetic derived from learner inputs; and
+- `הנחת הסימולטור` for ChartPath's versioned fill/cost/ambiguity mechanics.
+
+The v1 next-open, exact-limit/target, adverse-gap, spread, slippage, commission and rounding rules
+are documented in [PAPER_EXECUTION_POLICY.md](./PAPER_EXECUTION_POLICY.md). They are not attributed
+to the book as universal execution facts. Authoring may explain what the model will do, its limits,
+and why OHLCV is ambiguous; it may not infer order-book liquidity, promise achievable fills, invent a
+recommended risk percentage or turn a simulated outcome into a buy/sell instruction.
+
+The current `u10-capstone-e03` source (PDF 74–75 / printed 61–62, Chapter 19, case C) concludes no
+trade. The development fixture may allow a hypothetical short mechanics path only when the ticket
+and debrief say that it conflicts with the checked analysis, does not change that conclusion and
+receives no learning credit. Offering long, treating the simulation as the reviewed answer, or
+celebrating a favorable result would be an editorial defect.
+
+Additional traceability for learner explanations may use: workflow/context, PDF 62–63 / printed
+49–50 (Chapter 15); invalidation, stop, target, `R`, sizing and costs, PDF 64–67 / printed 51–54
+(Chapter 16); stops/gaps, PDF 54 / printed 41 and PDF 59 / printed 46 (Chapters 13–14); costs and
+look-ahead, PDF 68–71 / printed 55–58 (Chapters 17–18); capstone fills/review, PDF 72–74 / printed
+59–61 (Chapter 19); and narrow simulation/review, PDF 76–79 / printed 63–66 (Chapter 20 and quick
+reference). Record the narrow applicable range rather than attaching this entire list to every line.
+
 ## 6. Hebrew-first and mixed-direction authoring
 
 Hebrew is required for published beta titles, summaries, prompts, options, hints, explanations,
@@ -590,6 +623,12 @@ adjustment/session policy, editorial status, deterministic rubric identity, or p
 validation. A structurally valid generated development fixture may remain `development-only`; that
 truthful blocker is not converted into verified permission or hidden merely to make catalog
 validation pass.
+
+An execution-enabled scenario must additionally fail validation for unknown policy/cost IDs, no
+permitted direction/order type, an unsupported order type, missing Hebrew assumptions/no-credit
+copy, incompatible cutoff, or any attempt to award credit while the historical publication gate is
+closed. Scenario permission never makes the referenced analysis directionally supportive; that
+alignment is explicit process evidence in the plan/debrief.
 
 ### Human review record
 
