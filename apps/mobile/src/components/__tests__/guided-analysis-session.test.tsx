@@ -13,11 +13,13 @@ import {
   type GuidedAnalysisSession,
 } from '@chartpath/domain';
 import { ChartPathThemeProvider } from '@chartpath/ui';
+import { router } from 'expo-router';
 
 import type { LearningContextValue } from '@/state/learning';
 import { CURRENT_PERSISTENCE_SCHEMA_VERSION, type PersistenceSnapshot } from '@/lib/persistence';
 
 let mockLearning: LearningContextValue;
+const mockRouterPush = jest.mocked(router.push);
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -101,6 +103,8 @@ function snapshot(analysisSessions: readonly GuidedAnalysisSession[]): Persisten
     attempts: [],
     analysisSessions,
     quarantinedAnalysisSessions: [],
+    paperExecutionSessions: [],
+    quarantinedPaperExecutionSessions: [],
     projections: {
       projectorVersion: 1,
       lastAppliedAttemptId: null,
@@ -208,6 +212,13 @@ function learningValue(current: GuidedAnalysisSession): LearningContextValue {
     abandonAnalysisSession: jest.fn(async () => current),
     restartAnalysisSession: jest.fn(async () => current),
     finalizeAnalysisSession: jest.fn(async () => result()),
+    createOrResumePaperExecutionSession: jest.fn(),
+    savePaperExecutionPlan: jest.fn(),
+    submitPaperExecutionSession: jest.fn(),
+    advancePaperExecutionSession: jest.fn(),
+    completePaperExecutionReplay: jest.fn(),
+    cancelPaperExecutionOrder: jest.fn(),
+    abandonPaperExecutionSession: jest.fn(),
     discardQuarantinedAnalysisSessions: jest.fn(),
     resetData: jest.fn(),
     reload: jest.fn(),
@@ -324,7 +335,14 @@ describe('GuidedAnalysisSessionView', () => {
     expect(screen.getByText('תוצאה היסטורית אינה מבטיחה תוצאה עתידית.')).toBeTruthy();
     expect(screen.getByText('אין כאן המלצה עדכנית לקנייה, מכירה או פעולה.')).toBeTruthy();
     expect(screen.getByTestId('historical-no-credit')).toBeTruthy();
+    expect(screen.getByTestId('paper-execution-launch-card')).toBeTruthy();
+    expect(screen.getByText(/תרגול מכניקת ביצוע בלבד/)).toBeTruthy();
     expect(screen.queryByText('מיומנויות שהודגמו')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('paper-execution-launch'));
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/paper-execution?analysisSessionId=historical-ui-session',
+    );
 
     await fireEvent.press(screen.getByRole('button', { name: 'ניתוח חדש' }));
     expect(mockLearning.createOrResumeAnalysisSession).toHaveBeenCalledWith({

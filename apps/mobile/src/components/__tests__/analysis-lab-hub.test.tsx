@@ -54,6 +54,8 @@ function learning(sessions: readonly GuidedAnalysisSession[]): LearningContextVa
     snapshot: {
       analysisSessions: sessions,
       quarantinedAnalysisSessions: [],
+      paperExecutionSessions: [],
+      quarantinedPaperExecutionSessions: [],
       attempts: [],
       projections: {},
       settings: {},
@@ -68,6 +70,13 @@ function learning(sessions: readonly GuidedAnalysisSession[]): LearningContextVa
     saveAnalysisSession: jest.fn(),
     abandonAnalysisSession: jest.fn(),
     finalizeAnalysisSession: jest.fn(),
+    createOrResumePaperExecutionSession: jest.fn(),
+    savePaperExecutionPlan: jest.fn(),
+    submitPaperExecutionSession: jest.fn(),
+    advancePaperExecutionSession: jest.fn(),
+    completePaperExecutionReplay: jest.fn(),
+    cancelPaperExecutionOrder: jest.fn(),
+    abandonPaperExecutionSession: jest.fn(),
     resetData: jest.fn(),
     reload: jest.fn(),
   } as LearningContextValue;

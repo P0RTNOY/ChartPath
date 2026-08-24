@@ -207,6 +207,9 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
     management.result?.correct &&
     management.answer?.kind === 'decision' &&
     ['wait', 'reject', 'no-trade', 'insufficient-evidence'].includes(management.answer.decision);
+  const paperExecution = learning.snapshot?.paperExecutionSessions.find(
+    ({ source }) => source.analysisSessionId === session.sessionId,
+  );
 
   const startNew = async () => {
     setStarting(true);
@@ -297,6 +300,42 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
           <UiText color="textMuted" variant="bodySmall">
             ״אין עסקה״ היא תשובת תהליך מלאה במקרה הזה, ולא תחזית למחיר מאוחר יותר.
           </UiText>
+        </Card>
+      ) : undefined}
+
+      {historical ? (
+        <Card testID="paper-execution-launch-card" variant="outlined">
+          <View style={{ gap: theme.spacing.sm }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge tone="warning">הניתוח קבע: אין עסקה</Badge>
+              <Badge tone="neutral">תרגול מכניקת ביצוע בלבד</Badge>
+            </View>
+            <Heading level={2}>תרגול ביצוע על נייר</Heading>
+            <UiText>
+              אפשר לבנות תכנית שורט היפותטית ולראות כיצד מודל דטרמיניסטי מעבד שוק, לימיט או סטופ.
+              התרגול לא משנה את מסקנת הניתוח, אינו הוראת מסחר ואינו מקבל קרדיט למידה.
+            </UiText>
+            <UiText color="textMuted" variant="caption">
+              מרווח, החלקה, עלויות, מילויי פער וסדר אירועים הם הנחות סימולטור בגרסה — לא הבטחת ביצוע
+              של ברוקר.
+            </UiText>
+            <Button
+              fullWidth
+              onPress={() =>
+                router.push(
+                  `/paper-execution?analysisSessionId=${encodeURIComponent(session.sessionId)}` as Href,
+                )
+              }
+              testID="paper-execution-launch"
+              variant="secondary"
+            >
+              {paperExecution
+                ? paperExecution.debrief
+                  ? 'פתיחת תחקיר הביצוע'
+                  : 'המשך סימולציית הביצוע'
+                : 'פתיחת תרגול ביצוע על נייר'}
+            </Button>
+          </View>
         </Card>
       ) : undefined}
 

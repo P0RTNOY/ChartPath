@@ -167,6 +167,23 @@ describe('OhlcvChart accessibility', () => {
             priceLow: 106,
             priceHigh: 108,
           }}
+          executionOverlays={[
+            {
+              id: 'known-plan',
+              kind: 'planned-entry',
+              labelHe: 'כניסה מתוכננת 104.00',
+              price: 104,
+              visibleFromCandleIndex: 1,
+            },
+            {
+              id: 'future-fill',
+              kind: 'fill',
+              labelHe: 'מילוי עתידי 107.00',
+              price: 107,
+              candleIndex: 2,
+              visibleFromCandleIndex: 2,
+            },
+          ]}
           highlightedCandleIndices={[1, 2]}
           learnerAnnotations={[
             {
@@ -211,12 +228,112 @@ describe('OhlcvChart accessibility', () => {
     expect(screen.queryByTestId('ohlcv-chart-selected-point-0')).toBeNull();
     expect(screen.queryByTestId('ohlcv-chart-selected-zone')).toBeNull();
     expect(
+      screen.getByTestId('ohlcv-chart-execution-planned-entry-known-plan', {
+        includeHiddenElements: true,
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('ohlcv-chart-execution-fill-future-fill')).toBeNull();
+    expect(screen.getByLabelText(/כניסה מתוכננת .*104.00/)).toBeTruthy();
+    expect(screen.queryByLabelText(/מילוי עתידי .*107.00/)).toBeNull();
+    expect(
       screen.getByTestId('ohlcv-chart-highlight-1', { includeHiddenElements: true }),
     ).toBeTruthy();
 
     await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני הנרות' }));
     expect(screen.getByLabelText(/נר 1: פתיחה 102.00/)).toBeTruthy();
     expect(screen.queryByLabelText(/נר 2:/)).toBeNull();
+  });
+
+  it('distinguishes every execution state by shape, text, and an accessible legend', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider mode="dark" reducedMotion textScale={1.3}>
+        <OhlcvChart
+          chart={chart}
+          executionOverlays={[
+            {
+              id: 'plan',
+              kind: 'planned-entry',
+              labelHe: 'כניסה מתוכננת 103.00',
+              price: 103,
+              visibleFromCandleIndex: 0,
+            },
+            {
+              id: 'working',
+              kind: 'working-order',
+              labelHe: 'הוראה עובדת 103.00',
+              price: 103,
+              visibleFromCandleIndex: 0,
+            },
+            {
+              id: 'fill',
+              kind: 'fill',
+              labelHe: 'מילוי בפועל 104.00',
+              price: 104,
+              candleIndex: 1,
+              visibleFromCandleIndex: 1,
+            },
+            {
+              id: 'stop',
+              kind: 'protective-stop',
+              labelHe: 'עצירה מגינה 99.00',
+              price: 99,
+              visibleFromCandleIndex: 0,
+            },
+            {
+              id: 'target',
+              kind: 'target',
+              labelHe: 'יעד מותנה 108.00',
+              price: 108,
+              visibleFromCandleIndex: 0,
+            },
+            {
+              id: 'position',
+              kind: 'open-position',
+              labelHe: 'פוזיציה מדומה פתוחה',
+              entryPrice: 104,
+              startCandleIndex: 1,
+              visibleFromCandleIndex: 1,
+            },
+            {
+              id: 'exit',
+              kind: 'exit',
+              labelHe: 'יציאה מדומה 107.00',
+              price: 107,
+              candleIndex: 2,
+              visibleFromCandleIndex: 2,
+            },
+            {
+              id: 'ambiguous',
+              kind: 'ambiguous',
+              labelHe: 'סדר האירועים אינו ניתן לקביעה',
+              candleIndex: 2,
+              relevantPrices: [99, 108],
+              visibleFromCandleIndex: 2,
+            },
+          ]}
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    for (const kind of [
+      'planned-entry',
+      'working-order',
+      'fill',
+      'protective-stop',
+      'target',
+      'open-position',
+      'exit',
+      'ambiguous',
+    ]) {
+      expect(
+        screen.getByTestId(new RegExp(`ohlcv-chart-execution-${kind}`), {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
+    }
+    expect(screen.getByTestId('ohlcv-chart-execution-legend')).toBeTruthy();
+    expect(screen.getByLabelText(/שכבת ביצוע נוכחית:.*כניסה מתוכננת/)).toBeTruthy();
+    expect(screen.getByText('סדר האירועים אינו ניתן לקביעה')).toBeTruthy();
   });
 
   it('produces identical cutoff output for identical prefixes with different tails', async () => {

@@ -56,8 +56,44 @@ export interface OhlcvChartProps {
   readonly interactionHint?: string;
   readonly accessibilityLabel?: string;
   readonly presentationPolicy?: 'standard' | 'blind';
+  /** Cutoff-aware paper-execution marks. Callers must derive these only from the submitted plan
+   * and events already emitted by the deterministic execution engine. */
+  readonly executionOverlays?: readonly ExecutionChartOverlay[];
   readonly testID?: string;
 }
+
+export type ExecutionChartOverlay =
+  | {
+      readonly id: string;
+      readonly kind: 'planned-entry' | 'working-order' | 'protective-stop' | 'target';
+      readonly labelHe: string;
+      readonly price: number;
+      readonly visibleFromCandleIndex: number;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'fill' | 'exit';
+      readonly labelHe: string;
+      readonly price: number;
+      readonly candleIndex: number;
+      readonly visibleFromCandleIndex: number;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'open-position';
+      readonly labelHe: string;
+      readonly entryPrice: number;
+      readonly startCandleIndex: number;
+      readonly visibleFromCandleIndex: number;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'ambiguous';
+      readonly labelHe: string;
+      readonly candleIndex: number;
+      readonly relevantPrices: readonly number[];
+      readonly visibleFromCandleIndex: number;
+    };
 
 function chartDescription(
   candles: readonly OhlcvCandle[],
@@ -164,6 +200,7 @@ export function OhlcvChart({
   interactionHint,
   accessibilityLabel,
   presentationPolicy = 'standard',
+  executionOverlays = [],
   testID = 'ohlcv-chart',
 }: OhlcvChartProps) {
   const theme = useTheme();
@@ -213,12 +250,30 @@ export function OhlcvChart({
   )
     ? selectedAnnotationId
     : undefined;
+  const safeExecutionOverlays = executionOverlays.filter((overlay) => {
+    if (overlay.visibleFromCandleIndex > cutoff) return false;
+    if ('candleIndex' in overlay && overlay.candleIndex > cutoff) return false;
+    if ('startCandleIndex' in overlay && overlay.startCandleIndex > cutoff) return false;
+    return true;
+  });
   const plotWidth = Math.max(1, width - AXIS_LEFT - AXIS_RIGHT);
   const firstIndex = frame?.firstCandleIndex ?? 0;
   const lastIndex = frame?.lastCandleIndex ?? firstIndex;
   const candleSpan = Math.max(1, lastIndex - firstIndex + 1);
-  const priceLow = projection.bounds?.minPrice ?? 0;
-  const priceHigh = projection.bounds?.maxPrice ?? 1;
+  const executionPrices = safeExecutionOverlays.flatMap((overlay) => {
+    if ('price' in overlay) return [overlay.price];
+    if ('entryPrice' in overlay) return [overlay.entryPrice];
+    return [...overlay.relevantPrices];
+  });
+  const candlePriceLow = projection.bounds?.minPrice ?? 0;
+  const candlePriceHigh = projection.bounds?.maxPrice ?? 1;
+  const unpaddedPriceLow = Math.min(candlePriceLow, ...executionPrices);
+  const unpaddedPriceHigh = Math.max(candlePriceHigh, ...executionPrices);
+  const executionPadding = Math.max(0.01, (unpaddedPriceHigh - unpaddedPriceLow) * 0.04);
+  const priceLow = executionPrices.length
+    ? Math.max(0, unpaddedPriceLow - executionPadding)
+    : candlePriceLow;
+  const priceHigh = executionPrices.length ? unpaddedPriceHigh + executionPadding : candlePriceHigh;
   const xForIndex = (index: number): number =>
     AXIS_LEFT + ((index - firstIndex + 0.5) / candleSpan) * plotWidth;
   const yForPrice = (price: number): number =>
@@ -390,23 +445,184 @@ export function OhlcvChart({
     );
   };
 
+  const renderExecutionOverlay = (overlay: ExecutionChartOverlay) => {
+    const right = width - AXIS_RIGHT;
+    if (overlay.kind === 'ambiguous') {
+      const top = yForPrice(Math.max(...overlay.relevantPrices));
+      const bottom = yForPrice(Math.min(...overlay.relevantPrices));
+      return (
+        <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+          <Rect
+            fill={theme.colors.warning}
+            fillOpacity={0.1}
+            height={Math.max(18, bottom - top)}
+            stroke={theme.colors.warning}
+            strokeDasharray="2 3"
+            strokeWidth={3}
+            width={Math.max(22, candleWidth + 14)}
+            x={xForIndex(overlay.candleIndex) - Math.max(22, candleWidth + 14) / 2}
+            y={Math.min(top, bottom)}
+          />
+          <SvgText
+            fill={theme.colors.warning}
+            fontSize="16"
+            fontWeight="700"
+            textAnchor="middle"
+            x={xForIndex(overlay.candleIndex)}
+            y={Math.min(top, bottom) - 4}
+          >
+            ?
+          </SvgText>
+        </G>
+      );
+    }
+    if (overlay.kind === 'fill' || overlay.kind === 'exit') {
+      const x = xForIndex(overlay.candleIndex);
+      const y = yForPrice(overlay.price);
+      return overlay.kind === 'fill' ? (
+        <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+          <Line
+            stroke={theme.colors.info}
+            strokeWidth={3}
+            x1={AXIS_LEFT}
+            x2={right}
+            y1={y}
+            y2={y}
+          />
+          <Circle
+            cx={x}
+            cy={y}
+            fill={theme.colors.info}
+            r={6}
+            stroke={theme.colors.surfaceRaised}
+            strokeWidth={2}
+          />
+        </G>
+      ) : (
+        <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+          <Line
+            stroke={theme.colors.chartNeutral}
+            strokeWidth={3}
+            x1={x - 7}
+            x2={x + 7}
+            y1={y - 7}
+            y2={y + 7}
+          />
+          <Line
+            stroke={theme.colors.chartNeutral}
+            strokeWidth={3}
+            x1={x - 7}
+            x2={x + 7}
+            y1={y + 7}
+            y2={y - 7}
+          />
+        </G>
+      );
+    }
+    if (overlay.kind === 'open-position') {
+      const startX = xForIndex(overlay.startCandleIndex);
+      const y = yForPrice(overlay.entryPrice);
+      return (
+        <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+          <Line
+            stroke={theme.colors.info}
+            strokeDasharray="1 4"
+            strokeLinecap="round"
+            strokeWidth={5}
+            x1={startX}
+            x2={right}
+            y1={y}
+            y2={y}
+          />
+          <Line
+            stroke={theme.colors.info}
+            strokeWidth={3}
+            x1={startX}
+            x2={startX}
+            y1={y - 10}
+            y2={y + 10}
+          />
+        </G>
+      );
+    }
+    const y = yForPrice(overlay.price);
+    const style = {
+      'planned-entry': { dash: '2 5', width: 2, color: theme.colors.primary },
+      'working-order': { dash: '8 3 2 3', width: 3, color: theme.colors.info },
+      'protective-stop': { dash: '4 3', width: 3, color: theme.colors.danger },
+      target: { dash: '10 5', width: 3, color: theme.colors.success },
+    }[overlay.kind];
+    return (
+      <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+        <Line
+          stroke={style.color}
+          strokeDasharray={style.dash}
+          strokeWidth={style.width}
+          x1={AXIS_LEFT}
+          x2={right}
+          y1={y}
+          y2={y}
+        />
+        {overlay.kind === 'planned-entry' ? (
+          <Rect
+            fill={theme.colors.surfaceRaised}
+            height={10}
+            stroke={style.color}
+            strokeWidth={2}
+            transform={`rotate(45 ${right - 8} ${y})`}
+            width={10}
+            x={right - 13}
+            y={y - 5}
+          />
+        ) : overlay.kind === 'working-order' ? (
+          <Circle
+            cx={right - 8}
+            cy={y}
+            fill={theme.colors.surfaceRaised}
+            r={6}
+            stroke={style.color}
+            strokeWidth={3}
+          />
+        ) : (
+          <SvgText
+            fill={style.color}
+            fontSize="11"
+            fontWeight="700"
+            textAnchor="middle"
+            x={right - 8}
+            y={y - 5}
+          >
+            {overlay.kind === 'protective-stop' ? 'S' : 'T'}
+          </SvgText>
+        )}
+      </G>
+    );
+  };
+
   const baseDescription =
     presentationPolicy === 'blind'
       ? blindChartDescription(candles)
       : (accessibilityLabel ?? chartDescription(candles, ticker, chart.spec.timeframe));
-  const description = safeSelectedPoints.length
-    ? `${baseDescription}. ${isolateLtrRunsInHebrew(
-        safeSelectedPoints.length === 1
-          ? 'הסימון שלך כולל נקודה אחת'
-          : `הסימון שלך כולל ${safeSelectedPoints.length} נקודות`,
+  const executionDescription = safeExecutionOverlays.length
+    ? `. ${isolateLtrRunsInHebrew(
+        `שכבת ביצוע נוכחית: ${safeExecutionOverlays.map(({ labelHe }) => labelHe).join(', ')}`,
       )}`
-    : safeExpectedPoints.length
+    : '';
+  const description = `${
+    safeSelectedPoints.length
       ? `${baseDescription}. ${isolateLtrRunsInHebrew(
-          safeExpectedPoints.length === 1
-            ? 'מוצגת נקודת ייחוס אחת'
-            : `מוצגות ${safeExpectedPoints.length} נקודות ייחוס`,
+          safeSelectedPoints.length === 1
+            ? 'הסימון שלך כולל נקודה אחת'
+            : `הסימון שלך כולל ${safeSelectedPoints.length} נקודות`,
         )}`
-      : baseDescription;
+      : safeExpectedPoints.length
+        ? `${baseDescription}. ${isolateLtrRunsInHebrew(
+            safeExpectedPoints.length === 1
+              ? 'מוצגת נקודת ייחוס אחת'
+              : `מוצגות ${safeExpectedPoints.length} נקודות ייחוס`,
+          )}`
+        : baseDescription
+  }${executionDescription}`;
   if (candles.length === 0) {
     return (
       <View
@@ -553,6 +769,7 @@ export function OhlcvChart({
       ) : undefined}
       {safeSemanticAnnotations.map(renderAnnotation)}
       {safeLearnerAnnotations.map(renderLearnerAnnotation)}
+      {safeExecutionOverlays.map(renderExecutionOverlay)}
       {safeExpectedZone ? (
         <Rect
           fill={theme.colors.warning}
@@ -732,6 +949,46 @@ export function OhlcvChart({
       <UiText color="textMuted" variant="caption">
         מקרא: נר עולה = גוף חלול; נר יורד = גוף מלא.
       </UiText>
+      {safeExecutionOverlays.length ? (
+        <View
+          accessibilityLabel="מקרא שכבות סימולציית ביצוע"
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+          testID={`${testID}-execution-legend`}
+        >
+          {safeExecutionOverlays.map((overlay) => (
+            <View
+              key={overlay.id}
+              style={{
+                alignItems: 'center',
+                borderColor: theme.colors.border,
+                borderRadius: theme.radii.sm,
+                borderWidth: 1,
+                flexDirection: 'row',
+                gap: 6,
+                minHeight: 36,
+                paddingHorizontal: 8,
+              }}
+            >
+              <LtrText color="primary" variant="label">
+                {overlay.kind === 'fill'
+                  ? '●'
+                  : overlay.kind === 'exit'
+                    ? '×'
+                    : overlay.kind === 'ambiguous'
+                      ? '?'
+                      : overlay.kind === 'protective-stop'
+                        ? 'S'
+                        : overlay.kind === 'target'
+                          ? 'T'
+                          : overlay.kind === 'working-order'
+                            ? '○'
+                            : '◇'}
+              </LtrText>
+              <UiText variant="caption">{overlay.labelHe}</UiText>
+            </View>
+          ))}
+        </View>
+      ) : undefined}
       {interactionStatus ? (
         <UiText accessibilityLiveRegion="polite" color="warning" variant="caption">
           {interactionStatus}
