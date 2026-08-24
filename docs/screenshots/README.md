@@ -21,3 +21,9 @@ menu and is not part of ChartPath.
 contract. The reported hindsight exercise now presents only its written case and explicitly says
 that no graph inference is required. The candle-label exercise explicitly says the graph is part of
 the question and displays the audited chart interaction.
+
+The `workbench-*` images were generated independently with `pnpm screenshots:workbench` against the
+production static export. They record the new Lab at phone and tablet widths, the graded learner and
+reference trendline overlay, and the combined dark / largest in-app text / reduced-motion state.
+They were inspected at their original `390×844` and `1024×768` resolutions. These web captures do
+not establish native gesture or screen-reader usability.

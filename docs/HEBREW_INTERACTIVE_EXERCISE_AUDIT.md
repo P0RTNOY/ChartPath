@@ -150,3 +150,31 @@ present in Expo Go; fully terminating and reopening Expo Go registered the nativ
 second launch verified both the brand mark and full OHLCV chart. Current native evidence is stored as
 `native-ios-rtl-onboarding.png`, `native-ios-rtl-clarification.png`, and
 `native-ios-rtl-chart.png`.
+
+## Chart Workbench interaction audit
+
+The new `/lab` route was reviewed on 2026-08-24 at `390×844` and `1024×768` in the production web
+export. The app shell, instructions, toolbar, replay controls, and guided panel remain Hebrew-first
+RTL. The chart container, ticker, timeframe, dates, candle order, prices, OHLCV row, viewport range,
+and exact numeric inputs declare LTR direction. At tablet width the guided panel and chart sit side
+by side; at phone width they form one scrollable column. Tool controls wrap without losing their
+48-point minimum target, axes do not clip, and this detail route has no bottom navigation to obstruct
+the drawing surface.
+
+Automated interaction coverage now verifies crosshair candle selection, exact OHLCV, point and
+level scratch geometry, two-anchor trendline/zone construction in the pure reducer, undo, redo,
+specific deletion, clear confirmation, replay-preserved drawings, hidden reference geometry,
+decision-gated deterministic grading, accessible exact coordinate input, reduced-motion copy, and
+phone/tablet composition. The browser journey constructs the exact reviewed trendline through replay,
+zooms the viewport, submits it, and observes the authored feedback and separate reference overlay on
+both declared viewports.
+
+Original-resolution evidence is stored as `workbench-light-phone.png`,
+`workbench-light-tablet.png`, `workbench-feedback-light-phone.png`, and
+`workbench-dark-large-reduced-phone.png`. Inspection found no reversed chronology, clipped chart
+axis, broken toolbar wrapping, low-contrast dark surface, or learner/reference ambiguity. The dark
+phone capture also combines the in-app largest text setting and reduced motion.
+
+Native Gesture Handler bundles successfully for iOS and Android, but pinch/pan was not manually
+performed on a native simulator or physical device in this milestone. VoiceOver, TalkBack, largest
+operating-system text, and native touch ergonomics therefore remain unverified manual gates.

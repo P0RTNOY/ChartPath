@@ -159,6 +159,61 @@ screen-reader labels, sufficiently large targets, non-color status cues, explici
 LTR wrappers for tickers/numbers/formulas, and a reduced-motion mode. The package
 must not infer whether an answer is correct from visual geometry.
 
+## Interactive Chart Workbench foundation
+
+**Implemented 2026-08-24.** The learner-facing `/lab` route establishes a reusable analysis surface
+without changing the lesson catalog, attempt schema, or source-backed grading contracts.
+
+### Pure workbench state
+
+`packages/domain/src/workbench.ts` owns learner-authored analysis state. `ChartTool` is an exhaustive
+discriminated union for inspect, point, horizontal level, trendline, zone, and selection. Finished
+`LearnerChartAnnotation` records contain only candle indexes and prices; raw screen pixels are never
+authoritative. `AnalysisDraft` keeps the active tool, a pending two-anchor drawing, selected
+annotation, and undo/redo history. Its reducer implements construction, specific deletion, clear,
+undo, and redo without importing React or a platform API.
+
+Learner annotations remain distinct from generated `ChartAnnotation` semantics. The app converts
+only the authored task's relevant learner geometry into the existing `LineAnswer`, `PointAnswer`, or
+`ZoneAnswer` contract. Scratch annotations cannot silently become official answers.
+
+### Viewport and replay boundary
+
+`packages/chart-engine/src/viewport.ts` owns bounded candle windows and bidirectional conversion
+between chart coordinates and screen rectangles. Pan and zoom clamp to the candles currently
+permitted by replay, preserve chronological left-to-right mapping, and define a minimum visible
+candle count. Renderers receive the resulting viewport; they do not invent their own answer-space
+normalization.
+
+`packages/chart-engine/src/replay.ts` is a pure state machine. It supports reset, one-candle advance,
+fixed-group advance, and advance to the authored decision candle. Every transition is capped at that
+decision boundary. `replayChartSlice` composes the existing decision slicer so candles and semantic
+annotations are filtered together at the current position. Learner drawings are retained in chart
+coordinates and explicitly snapshotted as replay advances; drawings whose endpoints are still in
+the future are not rendered early.
+
+### Mobile adapter and grading
+
+`apps/mobile/src/components/chart-workbench.tsx` owns gestures, accessible controls, selected-candle
+inspection, exact OHLCV presentation, responsive composition, and local orchestration. Native pinch
+and horizontal pan use Gesture Handler; web, keyboard, and assistive-technology users receive named
+pan/zoom buttons plus exact candle/price inputs. `OhlcvChart` applies an explicit LTR direction to
+the quantitative surface inside the RTL shell.
+
+The first Lab task reuses reviewed exercise `u03-levels-e04` unchanged. Submission stays disabled
+until a learner trendline is complete and replay reaches decision candle 71. `gradeAnswer` then
+receives the existing line rubric and decision-bounded candle context. Reference geometry is not
+passed to the renderer before grading; afterward it is a dashed warning-colored layer distinct from
+the solid learner layer. Workbench drafts are in-memory in this milestone and do not award XP or
+alter append-only attempts. Persisted replay drafts and paper-execution events are future work and
+would require an explicit versioned contract.
+
+### Source boundary
+
+The guided scenario cites `ta-he-v2`, physical PDF page 31 / printed page 18, Chapter 6 and Figure
+6.1. Learner-facing task, hints, explanation, safety note, and rubric come from the existing reviewed
+content record. Controls and navigation add no new technical-analysis doctrine.
+
 ## Runtime flows
 
 ### Startup and content loading

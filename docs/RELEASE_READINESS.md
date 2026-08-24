@@ -251,3 +251,27 @@ external services.
 Native distribution remains **NO-GO** until the Android runtime journey, a standalone iOS build,
 VoiceOver/TalkBack, signing, and a real-device matrix are verified. This boundary is deliberate and
 must not be represented as an app-store-ready product.
+
+## Chart Workbench Milestone 1 addendum
+
+Verified on branch `codex/chart-workbench-foundation` on 2026-08-24. This addendum covers the new
+interactive analysis surface; it does not revise the local-beta/native-distribution decision above.
+
+| Check                          | Result                                                                                                                                                                                               |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline before implementation | `pnpm check` PASS with 186 tests; `pnpm build` PASS; `pnpm test:e2e:web` PASS 4/4; `git diff --check` PASS.                                                                                          |
+| Pure workbench packages        | Domain 54/54 and chart engine 55/55 tests pass, including coordinate conversion, viewport bounds, drawing history, replay boundaries, and future-data isolation.                                     |
+| Mobile/component suite         | 16 suites and 60/60 tests pass, including Chart Lab RTL/LTR, crosshair, precise input, replay, drawing history, deletion, clear confirmation, grading layers, reduced motion, and responsive layout. |
+| Full repository check          | `pnpm check` PASS with 205 tests and all 60 reviewed exercises validated.                                                                                                                            |
+| Package build                  | `pnpm build` PASS for domain, UI, chart engine, and content.                                                                                                                                         |
+| Production web export          | PASS; 50 static routes including `/lab`.                                                                                                                                                             |
+| Browser journeys               | PASS 6/6 with no retries on Pixel 7 and iPad Pro 11 Chromium profiles; the Lab journey opens from Home, draws the reviewed line through replay, zooms, submits, and receives deterministic feedback. |
+| Native bundle exports          | PASS; iOS Hermes bundle emitted from 1,858 modules and Android Hermes bundle from 1,947 modules.                                                                                                     |
+| Visual inspection              | PASS for 390×844 light, graded overlay, dark + largest in-app text + reduced motion, and 1024×768 light tablet captures.                                                                             |
+| Diff integrity                 | `git diff --check` PASS.                                                                                                                                                                             |
+
+The Lab uses `u03-levels-e04`, backed by physical PDF page 31 / printed page 18. It introduces no
+new curriculum claim, external data, AI grading, paper trading, analytics, or network dependency.
+Draft drawings are intentionally session-local. Native pinch/pan runtime behavior, physical-device
+ergonomics, screen readers, and the largest operating-system text size were not executed and remain
+unverified.

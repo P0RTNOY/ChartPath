@@ -1,6 +1,6 @@
 # ChartPath beta execution plan
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 
 ## Initial state
 
@@ -48,3 +48,15 @@ Updated: 2026-08-23
 
 Native UI/runtime, SQLite-on-device, and screen-reader verification remain distribution gates; see
 `docs/RELEASE_READINESS.md`.
+
+## Chart-simulator roadmap
+
+| Milestone                                 | Status   | Evidence / next work                                                                                                  |
+| ----------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1. Interactive Chart Workbench foundation | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass. |
+| 2. Historical replay and paper execution  | Planned  | Add licensed/frozen historical inputs and simulated order journaling without live brokerage connectivity.             |
+
+Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
+data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
+web export, iOS and Android Hermes bundles, and four new Workbench screenshots. Native pinch/pan,
+physical-device ergonomics, and VoiceOver/TalkBack remain manual gates rather than passing claims.
