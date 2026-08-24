@@ -17,6 +17,8 @@ import {
   type AtomicAnswerRubric,
   type AtomicExerciseAnswer,
   type GuidedAnalysisSession,
+  type PaperExecutionSession,
+  type TradePlanInput,
 } from '@chartpath/domain';
 
 import { InMemoryPersistenceAdapter, LearningRepository } from '@/lib/persistence';
@@ -84,6 +86,7 @@ function publishableHistoricalRegistry(): HistoricalContentRegistry {
     humanReviewer: 'test-independent-review-record',
     reviewedAt: '2026-08-24T00:00:00.000Z',
   };
+  scenario.paperExecution!.publicationStatus = 'published';
   return { datasets: [dataset], scenarios: [scenario] };
 }
 
@@ -137,6 +140,43 @@ function submitEveryStep(session: GuidedAnalysisSession): GuidedAnalysisSession 
       submittedAt: answered.updatedAt,
     });
   }, session);
+}
+
+function paperPlan(
+  entryIntent: TradePlanInput['entryIntent'] = {
+    type: 'market',
+    estimatedEntryPrice: 107.86,
+  },
+): TradePlanInput {
+  return {
+    planId: 'caller-plan-id-is-not-authoritative',
+    direction: 'short',
+    entryIntent,
+    protectiveStopPrice: 109.5,
+    targetPrice: 105,
+    fictionalAccountValue: 100_000,
+    intendedRiskAmount: 500,
+    quantity: 100,
+    authoredAtCandleIndex: 999,
+    processEvidence: {
+      analysisDecision: 'short',
+      entryMatchesAnalysis: false,
+      invalidationMatchesAnalysis: false,
+      targetMatchesAnalysis: false,
+      requiredReasoningBypassed: true,
+    },
+  };
+}
+
+async function finalizeHistoricalAnalysis(current: () => LearningContextValue): Promise<string> {
+  let session = await current().createOrResumeAnalysisSession({
+    kind: 'historical',
+    scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+  });
+  session = submitEveryStep(session);
+  await current().saveAnalysisSession(session);
+  await current().finalizeAnalysisSession(session);
+  return session.sessionId;
 }
 
 describe('guided analysis learning integration', () => {
@@ -493,6 +533,209 @@ describe('guided analysis learning integration', () => {
       lessonId: lesson.id,
       attempt: { exerciseId: exercise.id },
     });
+    await harness.view.unmount();
+  });
+
+  it('creates execution only from finalized analysis and processes every revealed candle once', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    let activeAnalysis!: GuidedAnalysisSession;
+    await act(async () => {
+      activeAnalysis = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+    });
+    await expect(
+      harness.current().createOrResumePaperExecutionSession(activeAnalysis.sessionId, paperPlan()),
+    ).rejects.toThrow(/analysis-not-finalized/);
+
+    let finalized!: GuidedAnalysisSession;
+    await act(async () => {
+      const completed = submitEveryStep(activeAnalysis);
+      await harness.current().saveAnalysisSession(completed);
+      await harness.current().finalizeAnalysisSession(completed);
+    });
+    finalized = harness
+      .current()
+      .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === activeAnalysis.sessionId)!;
+    const beforeLearning = JSON.stringify({
+      attempts: harness.current().snapshot!.attempts,
+      projections: harness.current().snapshot!.projections,
+    });
+
+    let execution!: PaperExecutionSession;
+    await act(async () => {
+      execution = await harness
+        .current()
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+    });
+    expect(execution).toMatchObject({
+      status: 'draft',
+      source: {
+        analysisSessionId: finalized.sessionId,
+        canonicalChecksum: DEVELOPMENT_HISTORICAL_SCENARIO.dataset.canonicalChecksum,
+        decisionCandleIndex: 72,
+        learningCredit: 'none',
+      },
+      plan: {
+        authoredAtCandleIndex: 72,
+        processEvidence: {
+          analysisDecision: 'no-trade',
+          entryMatchesAnalysis: false,
+          invalidationMatchesAnalysis: false,
+          targetMatchesAnalysis: false,
+          requiredReasoningBypassed: true,
+        },
+      },
+      lastProcessedCandleIndex: 72,
+    });
+    expect(execution.plan.planId).toMatch(/^paper-plan-/);
+    await act(async () => {
+      const resumed = await harness
+        .current()
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+      expect(resumed.sessionId).toBe(execution.sessionId);
+      execution = await harness
+        .current()
+        .submitPaperExecutionSession(execution.sessionId, 'confirm-market-submit');
+      execution = await harness.current().advancePaperExecutionSession(execution.sessionId, 13);
+    });
+    expect(execution.status).toBe('closed');
+    expect(execution.position?.status).toBe('closed-stop');
+    expect(execution.debrief?.processQuality).toBe('needs-review');
+    expect(execution.processedCandles.map(({ index }) => index)).toEqual(
+      Array.from({ length: 13 }, (_, offset) => 73 + offset),
+    );
+    expect(execution.events.filter(({ type }) => type === 'order-filled')).toHaveLength(1);
+    expect(execution.events.filter(({ type }) => type === 'position-closed-stop')).toHaveLength(1);
+    const canonicalAfterClose = JSON.stringify(execution);
+
+    await act(async () => {
+      const repeated = await harness
+        .current()
+        .advancePaperExecutionSession(execution.sessionId, 13);
+      expect(JSON.stringify(repeated)).toBe(canonicalAfterClose);
+      await harness.current().reload();
+    });
+    await waitFor(() => expect(harness.current().status).toBe('ready'));
+    expect(
+      JSON.stringify(
+        harness
+          .current()
+          .snapshot!.paperExecutionSessions.find(
+            ({ sessionId }) => sessionId === execution.sessionId,
+          ),
+      ),
+    ).toBe(canonicalAfterClose);
+    expect(
+      JSON.stringify({
+        attempts: harness.current().snapshot!.attempts,
+        projections: harness.current().snapshot!.projections,
+      }),
+    ).toBe(beforeLearning);
+    await harness.view.unmount();
+  });
+
+  it('resumes and explicitly cancels a working order after provider reload', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const first = await renderLearning(repository);
+    let analysisSessionId!: string;
+    let finalized!: GuidedAnalysisSession;
+    await act(async () => {
+      analysisSessionId = await finalizeHistoricalAnalysis(first.current);
+    });
+    finalized = first
+      .current()
+      .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === analysisSessionId)!;
+    const workingPlan = {
+      ...paperPlan({ type: 'limit', limitPrice: 120 }),
+      protectiveStopPrice: 121,
+    };
+    let working!: PaperExecutionSession;
+    await act(async () => {
+      working = await first
+        .current()
+        .createOrResumePaperExecutionSession(finalized.sessionId, workingPlan);
+      working = await first
+        .current()
+        .submitPaperExecutionSession(working.sessionId, 'confirm-working-submit');
+    });
+    expect(working.status).toBe('working');
+    await first.view.unmount();
+
+    const resumed = await renderLearning(repository);
+    expect(
+      resumed
+        .current()
+        .snapshot!.paperExecutionSessions.find(({ sessionId }) => sessionId === working.sessionId),
+    ).toEqual(working);
+    let cancelled!: PaperExecutionSession;
+    await act(async () => {
+      cancelled = await resumed
+        .current()
+        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel');
+    });
+    expect(cancelled.status).toBe('cancelled');
+    expect(cancelled.workingOrder?.status).toBe('cancelled');
+    expect(cancelled.events.at(-1)).toMatchObject({
+      type: 'order-cancelled',
+      confirmationId: 'confirm-working-cancel',
+    });
+    const revision = cancelled.revision;
+    await act(async () => {
+      cancelled = await resumed
+        .current()
+        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel');
+    });
+    expect(cancelled.revision).toBe(revision);
+    expect((await repository.load()).attempts).toEqual([]);
+    await resumed.view.unmount();
+  });
+
+  it('fails closed after a checksum mismatch while preserving explicit audited abandon', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const registry = structuredClone(
+      historicalContentRegistry,
+    ) as Mutable<HistoricalContentRegistry>;
+    const harness = await renderLearning(repository, registry);
+    let analysisSessionId!: string;
+    let finalized!: GuidedAnalysisSession;
+    let draft!: PaperExecutionSession;
+    await act(async () => {
+      analysisSessionId = await finalizeHistoricalAnalysis(harness.current);
+    });
+    finalized = harness
+      .current()
+      .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === analysisSessionId)!;
+    await act(async () => {
+      draft = await harness
+        .current()
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+    });
+    registry.datasets[0]!.candles[0]!.close += 0.01;
+    await expect(
+      harness.current().savePaperExecutionPlan(draft.sessionId, paperPlan()),
+    ).rejects.toThrow(/dataset-modified/);
+
+    let abandoned!: PaperExecutionSession;
+    await act(async () => {
+      abandoned = await harness
+        .current()
+        .abandonPaperExecutionSession(draft.sessionId, 'confirm-explicit-recovery');
+    });
+    expect(abandoned.status).toBe('cancelled');
+    expect(abandoned.events.at(-1)).toMatchObject({
+      type: 'execution-abandoned',
+      confirmationId: 'confirm-explicit-recovery',
+    });
+    expect((await repository.load()).attempts).toEqual([]);
     await harness.view.unmount();
   });
 });
