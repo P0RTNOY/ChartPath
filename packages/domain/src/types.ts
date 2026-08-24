@@ -361,6 +361,9 @@ export type ExerciseAnswer = AtomicExerciseAnswer | CapstoneAnswer;
 export type ExerciseInteractionType =
   AnswerRubric['kind'] | 'timeframe-comparison' | 'mistake-diagnosis' | 'sequential-reveal';
 
+/** Whether a chart is learner-visible evidence for the graded answer. */
+export type ChartPresentation = 'hidden' | 'answer-evidence';
+
 export interface ExerciseOption {
   readonly id: string;
   readonly labelHe: string;
@@ -392,6 +395,7 @@ export interface Exercise {
   readonly interactionType: ExerciseInteractionType;
   readonly options?: readonly ExerciseOption[];
   readonly chartSpec?: ChartSpec;
+  readonly chartPresentation?: ChartPresentation;
   readonly rubric: AnswerRubric;
   readonly explanationHe: string;
   readonly explanationEn?: string;

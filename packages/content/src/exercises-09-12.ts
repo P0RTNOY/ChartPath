@@ -73,6 +73,7 @@ function authoredExercise(seed: ExerciseSeed): ContentExercise {
     difficulty: seed.difficulty,
     promptHe: seed.promptHe,
     interactionType: seed.interactionType,
+    chartPresentation: 'hidden',
     options: seed.options,
     chartSpec: {
       id: `${seed.id}-chart`,
@@ -264,7 +265,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['context.multitimeframe', 'workflow.eleven-step'],
     difficulty: 2,
     promptHe:
-      'אותה סדרה סינתטית מוצגת בגרף שבועי, יומי ושעתי סביב אירוע עוגן משותף. סדרו את הגרפים לפי תפקידם: הקשר אסטרטגי, תצורה טקטית וטריגר ביצועי.',
+      'סדרו את שלוש מסגרות הזמן לפי תפקידן בתהליך: שבועית, יומית ושעתית — מן ההקשר האסטרטגי ועד לטריגר הביצועי.',
     interactionType: 'sequence',
     options: [
       { id: 'weekly-context', labelHe: 'שבועי — הקשר אסטרטגי' },
@@ -315,7 +316,7 @@ export const exercises09To12: readonly ContentExercise[] = [
     skillIds: ['context.multitimeframe', 'workflow.eleven-step'],
     difficulty: 3,
     promptHe:
-      'בגרף השבועי נמשכת מגמת שיאים ושפלים יורדים. בגרף השעתי הופיע אות שורי תקין, אך התנגדות שבועית מגבילה את היעד ל־0.8R ואין במערכת כלל בדוק לעסקאות נגד המגמה. מהי החלטת התהליך?',
+      'לפי תיאור המקרה, במגמה השבועית נמשכים שיאים ושפלים יורדים. במסגרת השעתית הופיע אות שורי תקין, אך התנגדות שבועית מגבילה את היעד ל־0.8R ואין במערכת כלל בדוק לעסקאות נגד המגמה. מהי החלטת התהליך?',
     interactionType: 'decision',
     options: [
       { id: 'decision-trade', labelHe: 'לבצע כרגיל כי האות השעתי תקין' },

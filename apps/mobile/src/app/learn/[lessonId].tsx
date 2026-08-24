@@ -121,7 +121,8 @@ export default function LessonPlayerScreen() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [sessionResults, setSessionResults] = useState<readonly AttemptResult[]>([]);
   const exercise = exercises[index];
-  const chart = generateExerciseChart(exercise?.chartSpec);
+  const chartIsAnswerEvidence = exercise?.chartPresentation === 'answer-evidence';
+  const chart = chartIsAnswerEvidence ? generateExerciseChart(exercise?.chartSpec) : undefined;
 
   if (learning.status === 'loading') return <LoadingState label="מחזירים אותך לתרגיל האחרון…" />;
   if (learning.status === 'error' || !learning.snapshot)
@@ -323,6 +324,16 @@ export default function LessonPlayerScreen() {
             {exercise.promptEn}
           </LtrText>
         ) : undefined}
+        <Card padding="sm" variant={chartIsAnswerEvidence ? 'accent' : 'subtle'}>
+          <View style={{ gap: 4 }} testID="answer-basis">
+            <UiText variant="label">איך לענות</UiText>
+            <UiText color="textMuted" variant="bodySmall">
+              {chartIsAnswerEvidence
+                ? 'הגרף הוא חלק מהשאלה. היעזרו בו יחד עם ההנחיה הכתובה.'
+                : 'כל המידע הדרוש נמצא בתיאור השאלה ובאפשרויות; אין צורך להסיק מגרף.'}
+            </UiText>
+          </View>
+        </Card>
       </View>
 
       {phase === 'question' ? (

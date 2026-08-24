@@ -30,10 +30,24 @@ describe('onboarding', () => {
       expect.arrayContaining([expect.objectContaining({ direction: 'rtl' })]),
     );
     expect(screen.getByText('מסלול ברור לקריאת גרפים')).toBeTruthy();
+    expect(screen.getByText('תרגול חזותי')).toHaveStyle({
+      direction: undefined,
+      textAlign: 'left',
+      writingDirection: 'rtl',
+    });
     expect(screen.getByText(/אין צורך בחשבון ואין סנכרון ענן/)).toBeTruthy();
     expect(screen.queryByText(/במכשיר בלבד/)).toBeNull();
 
     await fireEvent.press(screen.getByRole('button', { name: 'המשך כאורח' }));
+    expect(screen.getByText('הבהרה חשובה')).toHaveStyle({
+      direction: undefined,
+      textAlign: 'left',
+      writingDirection: 'rtl',
+    });
+    expect(screen.getByText(/התכנים והתרגילים מיועדים ללימוד בלבד/)).toHaveStyle({
+      textAlign: 'left',
+      writingDirection: 'rtl',
+    });
     await fireEvent.press(screen.getByRole('checkbox'));
     await fireEvent.press(screen.getByRole('button', { name: 'המשך' }));
     await fireEvent.press(screen.getByRole('radio', { name: '15 דקות ביום' }));

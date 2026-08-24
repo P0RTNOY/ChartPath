@@ -68,6 +68,7 @@ const common = {
   editorialStatus: 'reviewed' as const,
   schemaVersion: CONTENT_SCHEMA_VERSION,
   contentVersionId: CONTENT_VERSION_ID,
+  chartPresentation: 'hidden' as const,
   isRiskOrPositionSize: false,
 };
 
@@ -159,7 +160,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u00-scenarios-e02',
     skillIds: ['safe.ta-boundaries'],
     difficulty: 1,
-    promptHe: 'בחרו רק משפטים שהם תצפיות ישירות על מחיר, מחזור או זמן — לא פרשנויות.',
+    promptHe: 'אילו משפטים מנוסחים כתצפיות מדידות על מחיר, מחזור או זמן — ולא כפרשנות או תחזית?',
     interactionType: 'selection',
     options: [
       { id: 'observed-close', labelHe: 'הנר האחרון נסגר ב־102.4.' },
@@ -291,7 +292,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     skillIds: ['safe.ta-boundaries'],
     difficulty: 2,
     promptHe:
-      'בחלון ההחלטה סומנו קווים רק לאחר שהמהלך כבר הושלם, ולא הוגדר מראש כלל לזיהוי התבנית. מהי ההחלטה העקבית עם הכללים?',
+      'לפי תיאור המקרה: הקווים סומנו רק לאחר שהמהלך הושלם, ולא נקבע מראש כלל לזיהוי התבנית. איזו החלטה שומרת על תהליך עקבי?',
     interactionType: 'decision',
     options: [
       { id: 'trade', labelHe: 'לפעול לפי הצורה שנראית כעת.' },
@@ -367,7 +368,7 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u00-scenarios-e05',
     skillIds: ['safe.ta-boundaries'],
     difficulty: 2,
-    promptHe: 'עברו על סיכום הלמידה ובחרו את כל המשפטים שמתאימים לתחקור אחראי.',
+    promptHe: 'בחרו את כל המשפטים שמתאימים לסיכום למידה ולתחקור אחראי.',
     interactionType: 'selection',
     options: [
       { id: 'education-framing', labelHe: 'המקרה מיועד לתרגול תהליך, לא כהמלצה.' },
@@ -432,7 +433,9 @@ export const exercises01To04: readonly ContentExercise[] = [
     id: 'u01-chart-data-e01',
     skillIds: ['data.ohlcv'],
     difficulty: 1,
-    promptHe: 'מקמו על הנר העולה והנר היורד את תוויות הפתיחה, השיא, השפל והסגירה במקום המתאים.',
+    promptHe:
+      'מקמו על הנר העולה את תוויות הפתיחה, השיא, השפל והסגירה; ועל הנר היורד מקמו את תוויות הפתיחה והסגירה.',
+    chartPresentation: 'answer-evidence',
     interactionType: 'selection',
     options: [
       { id: 'high-top', labelHe: 'שיא — נר עולה' },
@@ -781,6 +784,7 @@ export const exercises01To04: readonly ContentExercise[] = [
   {
     ...common,
     id: 'u02-structure-e01',
+    chartPresentation: 'answer-evidence',
     skillIds: ['structure.dow-trends'],
     difficulty: 2,
     promptHe:
@@ -974,6 +978,7 @@ export const exercises01To04: readonly ContentExercise[] = [
   {
     ...common,
     id: 'u02-structure-e04',
+    chartPresentation: 'answer-evidence',
     skillIds: ['structure.swings'],
     difficulty: 2,
     promptHe:
@@ -1098,6 +1103,7 @@ export const exercises01To04: readonly ContentExercise[] = [
   {
     ...common,
     id: 'u03-levels-e01',
+    chartPresentation: 'answer-evidence',
     skillIds: ['levels.zones'],
     difficulty: 2,
     promptHe:
@@ -1278,6 +1284,7 @@ export const exercises01To04: readonly ContentExercise[] = [
   {
     ...common,
     id: 'u03-levels-e04',
+    chartPresentation: 'answer-evidence',
     skillIds: ['levels.lines'],
     difficulty: 3,
     promptHe: 'סמנו שתי נקודות עוגן על השפלים העולים כדי לשרטט את קו המגמה הבסיסי.',

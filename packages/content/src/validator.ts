@@ -110,6 +110,15 @@ const REQUIRED_INTERACTIONS = [
   'sequential-reveal',
 ] as const;
 
+const CHART_DEPENDENT_INTERACTIONS = new Set([
+  'point',
+  'zone',
+  'line',
+  'label-placement',
+  'timeframe-comparison',
+  'sequential-reveal',
+]);
+
 const uncertaintyDecisions = new Set(['wait', 'reject', 'no-trade', 'insufficient-evidence']);
 const hebrewPattern = /[\u0590-\u05ff]/;
 
@@ -847,6 +856,25 @@ function validateChartReproduction(catalog: ContentCatalog, issues: ValidationIs
   for (const exercise of catalog.exercises) {
     const path = `exercises.${exercise.id}.chartSpec`;
     const spec = exercise.chartSpec;
+    if (
+      CHART_DEPENDENT_INTERACTIONS.has(exercise.interactionType) &&
+      exercise.chartPresentation !== 'answer-evidence'
+    ) {
+      add(
+        issues,
+        'hidden-required-chart',
+        `exercises.${exercise.id}.chartPresentation`,
+        'Chart-dependent interactions must present the chart as answer evidence.',
+      );
+    }
+    if (exercise.chartPresentation === 'answer-evidence' && !spec) {
+      add(
+        issues,
+        'missing-evidence-chart',
+        path,
+        'An exercise marked as chart evidence needs a deterministic chart spec.',
+      );
+    }
     if (!spec) {
       add(
         issues,

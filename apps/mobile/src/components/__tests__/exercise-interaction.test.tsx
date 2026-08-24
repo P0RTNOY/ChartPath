@@ -146,7 +146,7 @@ describe('ExerciseInteraction', () => {
     });
   });
 
-  it('requires staged analysis updates before a sequential answer can be submitted', async () => {
+  it('reveals chart evidence in stages before allowing the final answer', async () => {
     const exercise = exercises.find((candidate) => candidate.id === 'u06-breakouts-e04')!;
     const chart = generateChart(exercise.chartSpec!);
     const onChange = jest.fn();
@@ -156,20 +156,14 @@ describe('ExerciseInteraction', () => {
       </ChartPathThemeProvider>,
     );
 
-    expect(screen.getByText(/אי אפשר להגיש את הבחירה הזמנית/)).toBeTruthy();
-    expect(screen.getAllByRole('radio').length).toBeGreaterThan(1);
-    const chooseAnalysis = async () => fireEvent.press(screen.getAllByRole('radio')[0]!);
-    const reveal = async () =>
-      fireEvent.press(screen.getByRole('button', { name: /תעדו את הניתוח וחשפו/ }));
-
-    await chooseAnalysis();
-    expect(onChange).toHaveBeenLastCalledWith(null);
-    for (let update = 0; update < 6; update += 1) {
-      await reveal();
-      if (update < 5) await chooseAnalysis();
+    expect(screen.getByText(/אפשר לבחור תשובה רק לאחר חשיפת חלון ההחלטה/)).toBeTruthy();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    for (let reveal = 0; reveal < 6; reveal += 1) {
+      await fireEvent.press(screen.getByRole('button', { name: /חשיפת.*נרות נוספים/ }));
     }
-    expect(screen.getByText(/הגעתם לחלון ההחלטה לאחר/)).toBeTruthy();
-    await chooseAnalysis();
+    expect(screen.getByText(/הגעתם לחלון ההחלטה/)).toBeTruthy();
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(1);
+    await fireEvent.press(screen.getAllByRole('radio')[0]!);
     expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'multiple-choice' });
   });
 

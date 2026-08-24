@@ -39,6 +39,8 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
   await page.getByRole('button', { name: 'התחילו את השיעור' }).click();
   await expect(page.getByRole('heading', { name: 'תרחישים, לא נבואות' })).toBeVisible();
   await page.getByRole('button', { name: 'התחילו את השיעור' }).click();
+  await expect(page.getByTestId('answer-basis')).toContainText('אין צורך להסיק מגרף');
+  await expect(page.getByTestId('ohlcv-chart')).toHaveCount(0);
 
   await answerExercise(page, ['לתאר מבנה ותרחיש מותנה, בלי להבטיח כיוון או תוצאה.'], 'לתרגיל הבא');
   await answerExercise(
@@ -81,6 +83,10 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
 
   await page.goto('/lesson/lesson-u00-scenarios');
   await expect(page.getByRole('button', { name: 'תרגול מחדש' })).toBeVisible();
+
+  await page.goto('/learn/lesson-u01-chart-data?exerciseId=u01-chart-data-e01');
+  await expect(page.getByTestId('answer-basis')).toContainText('הגרף הוא חלק מהשאלה');
+  await expect(page.getByTestId('ohlcv-chart')).toBeVisible();
 });
 
 test('glossary search and accessibility preferences work without an account', async ({ page }) => {

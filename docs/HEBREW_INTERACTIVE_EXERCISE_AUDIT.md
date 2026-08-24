@@ -53,6 +53,34 @@ rather than replaced.
 | `u05-reversal-e04`   | Pattern confirmation    | Mark the intervening low in a possible double top   |
 | `u06-breakouts-e04`  | Breakout decisions      | Reveal candles progressively to the decision window |
 
+## Chart relevance audit
+
+Every one of the 60 published exercises was checked against its generated candles, semantic
+annotations, prompt, options, and rubric. The previous content contract caused the lesson player to
+show an OHLCV chart beside every question, even when the answer came entirely from a written case,
+a calculation, or a general principle. In several cases the decoration was actively misleading:
+
+- `u00-scenarios-e02` claimed a close of 102.4, volume of 1.3 million, and a duration of 18 candles,
+  while the generated chart showed different values and 72 candles.
+- `u00-scenarios-e04` discussed lines added after the outcome, but a static chart could not show when
+  those lines were added.
+- Several comparison questions described two, three, or four panels while the generic player showed
+  a single unrelated series.
+- Multiple calculation exercises named entry, stop, or target prices outside the generated chart's
+  visible range.
+
+The content model now records whether a chart is `answer-evidence` or `hidden`. Only the seven
+interactions in the inventory above present charts; the other 53 exercises are text-only in both the
+question and feedback phases. Every exercise also states one of two instructions directly below the
+prompt: use the graph together with the written instruction, or answer from the written case and
+options without inferring from a graph. Catalog validation rejects hiding a chart required by a
+direct chart interaction, and a regression test locks the reviewed seven-exercise allowlist.
+
+The reported hindsight question was rewritten to begin with “לפי תיאור המקרה”, and its unrelated
+chart was removed from the learner experience. Other prompts that falsely referred to displayed
+panels were similarly rewritten as explicit textual cases. The candle-label prompt now accurately
+names the six labels that are graded, rather than asking for eight and grading six.
+
 ## Interaction improvements
 
 ### Completion and mobile controls
@@ -69,6 +97,9 @@ rather than replaced.
   validates the visible candle and price range inline, and uses mode-specific action text.
 - Label placement preserves previous labels and advances to the next unfinished label.
 - Sequential reveal ends in a clear completion state instead of leaving a stale disabled action.
+- Sequential reveal now withholds its answer choices until the generated false-breakout sequence
+  reaches the authored failure candle. The learner first inspects the staged evidence, then answers
+  a question that refers to the visible return into the range.
 
 ### Validation and feedback
 
@@ -104,3 +135,18 @@ assistive-technology pass. Before native distribution, complete the chart intera
 phone with VoiceOver and TalkBack, the largest operating-system text size, and reduced motion. An
 editorial review by a native Hebrew financial educator and a beginner usability study also remain
 appropriate release gates.
+
+## Native RTL follow-up
+
+A subsequent Expo Go inspection found that the iOS Fabric renderer mirrors physical text-alignment
+edges inside an RTL root. The earlier web-oriented `right` alignment therefore appeared on the left
+in native onboarding lists and clarification paragraphs. The shared text primitive now resolves
+logical start/end separately for native and web, while the native app explicitly starts in RTL mode.
+English subtitles retain their own LTR writing direction and visual left alignment.
+
+The same initial Expo Go process showed red `Unimplemented component` placeholders for
+`RNSVGSvgView`. Dependency validation showed the compatible SVG package and component were already
+present in Expo Go; fully terminating and reopening Expo Go registered the native component. A cold
+second launch verified both the brand mark and full OHLCV chart. Current native evidence is stored as
+`native-ios-rtl-onboarding.png`, `native-ios-rtl-clarification.png`, and
+`native-ios-rtl-chart.png`.

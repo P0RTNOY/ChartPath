@@ -15,8 +15,9 @@ describe('shared direction-aware navigation', () => {
 
     expect(screen.getByText('›', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByText('Scenarios, not predictions')).toHaveStyle({
-      direction: 'ltr',
-      textAlign: 'left',
+      direction: undefined,
+      // The native RTL root mirrors physical edges; this renders visually left-aligned.
+      textAlign: 'right',
       writingDirection: 'ltr',
     });
     expect(screen.getByRole('button', { name: 'חזרה למסך הקודם' })).toBeTruthy();

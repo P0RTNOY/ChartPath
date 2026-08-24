@@ -6,12 +6,15 @@ import { CONTENT_SCHEMA_VERSION, CONTENT_VERSION_ID } from './version.js';
 
 type ExerciseDraft = Omit<
   ContentExercise,
-  'contentVersionId' | 'editorialStatus' | 'schemaVersion'
->;
+  'contentVersionId' | 'editorialStatus' | 'schemaVersion' | 'chartPresentation'
+> & {
+  readonly chartPresentation?: ContentExercise['chartPresentation'];
+};
 
 function reviewed(exercise: ExerciseDraft): ContentExercise {
   return {
     ...exercise,
+    chartPresentation: exercise.chartPresentation ?? 'hidden',
     editorialStatus: 'reviewed',
     schemaVersion: CONTENT_SCHEMA_VERSION,
     contentVersionId: CONTENT_VERSION_ID,
@@ -106,7 +109,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['evidence.volume'],
     difficulty: 2,
     promptHe:
-      'בתרשים הסינתטי מגמת עלייה עם ארבעה גלי דחף ושלושה תיקונים. בחרו את צירוף התיאורים המתאים למחזור אם הוא תומך, אך אינו מוכיח, את המגמה.',
+      'לפי תיאור המקרה, במגמת עלייה נצפו ארבעה גלי דחף ושלושה תיקונים. בחרו את צירוף תיאורי המחזור שתומך במגמה, אך אינו מוכיח אותה.',
     promptEn:
       'On the synthetic uptrend, select the volume descriptions that support—but do not prove—the trend.',
     interactionType: 'selection',
@@ -426,7 +429,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['patterns.reversal'],
     difficulty: 2,
     promptHe:
-      'בתרשים הסינתטי שלוש פסגות דומות מופיעות בתוך טווח, ללא מגמת עלייה קודמת, והפסגה הימנית טרם הושלמה. כיצד יש לסווג את תווית “ראש וכתפיים עליון” בנר ההחלטה?',
+      'לפי תיאור המקרה, שלוש פסגות דומות מופיעות בתוך טווח, ללא מגמת עלייה קודמת, והפסגה הימנית טרם הושלמה. כיצד יש לסווג את התווית “ראש וכתפיים עליון” בנר ההחלטה?',
     interactionType: 'decision',
     options: [
       { id: 'reject-pattern', labelHe: 'לדחות את התווית בשלב זה' },
@@ -629,25 +632,32 @@ export const exercises05To08: readonly ContentExercise[] = [
   }),
   reviewed({
     id: 'u05-reversal-e04',
+    chartPresentation: 'answer-evidence',
     skillIds: ['patterns.reversal', 'structure.swings'],
     difficulty: 3,
     promptHe:
       'במבנה שעשוי להיות פסגה כפולה סמנו את שפל הביניים המשמעותי בין שתי הפסגות. האישור ייבחן רק אם המחיר יסגור מתחת לשפל זה.',
     interactionType: 'point',
-    chartSpec: chart('u05-reversal-e04', 50504, 'reversal', {
-      direction: 'down',
-      regime: 'uptrend',
-      variant: 'positive',
-      pattern: 'double-top',
-      eventIndex: 54,
-    }),
+    chartSpec: chart(
+      'u05-reversal-e04',
+      50504,
+      'reversal',
+      {
+        direction: 'down',
+        regime: 'uptrend',
+        variant: 'positive',
+        pattern: 'double-top',
+        eventIndex: 54,
+      },
+      53,
+    ),
     rubric: {
       kind: 'point',
       targets: [{ candleIndex: 30, price: 98.8521 }],
       tolerance: { horizontal: 0.045, vertical: 0.045 },
       matching: 'all',
       allowExtraPoints: false,
-      decisionCandleIndex: 54,
+      decisionCandleIndex: 53,
       misconceptionIds: [
         'misconception.pattern-without-context',
         'misconception.confirmation-as-entry',
@@ -759,7 +769,7 @@ export const exercises05To08: readonly ContentExercise[] = [
     skillIds: ['patterns.continuation', 'breakouts.rules'],
     difficulty: 3,
     promptHe:
-      'שלושה לוחות סינתטיים מציגים משולש סימטרי, עולה ויורד. בחרו את כל התאמות המבנה והמשמעות שנכונות לפני פריצה.',
+      'התאימו בין שלושת מבני המשולש המתוארים — סימטרי, עולה ויורד — לבין המשמעות הזהירה שלהם לפני פריצה.',
     interactionType: 'selection',
     options: [
       {
@@ -1284,16 +1294,17 @@ export const exercises05To08: readonly ContentExercise[] = [
   }),
   reviewed({
     id: 'u06-breakouts-e04',
+    chartPresentation: 'answer-evidence',
     skillIds: ['breakouts.rules', 'breakouts.failure', 'risk.invalidation-execution'],
     difficulty: 4,
     promptHe:
-      'בכל חלון חשיפה בחרו את הניתוח הנוכחי על סמך הנרות הגלויים בלבד. בחלון ההחלטה בחרו את תכנית הכניסה שמבדילה בין מעבר תוך־יומי, סגירה ובדיקה חוזרת, ומגדירה כלל כשל מראש.',
+      'חשפו את הנרות בהדרגה ועקבו אחר ניסיון הפריצה. בחלון האחרון בחרו את התיאור שמתאים למה שנראה בגרף ושומר על כלל כשל שנקבע מראש.',
     interactionType: 'multiple-choice',
     options: [
       {
         id: 'tradeoffs-and-failure-rule',
         labelHe:
-          'מעבר מוקדם אך פגיע; סגירה מסננת פתיל; בדיקה חוזרת עשויה לשפר יחס אך לא להגיע; כשל לפי הכלל שנכתב',
+          'הפריצה התקדמה תחילה, אך החזרה העמוקה והסגירה מחדש בתוך הטווח מפעילות את כלל הכשל שנקבע מראש.',
       },
       { id: 'retest-always-best', labelHe: 'בדיקה חוזרת תמיד עדיפה ותמיד מתרחשת' },
       { id: 'close-guarantees', labelHe: 'כניסה בסגירה מבטיחה שהמחיר לא יחזור לטווח' },
@@ -1309,7 +1320,7 @@ export const exercises05To08: readonly ContentExercise[] = [
         relativeVolume: 'spike',
         eventIndex: 46,
       },
-      53,
+      56,
     ),
     rubric: {
       kind: 'multiple-choice',
