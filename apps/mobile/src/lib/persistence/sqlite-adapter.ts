@@ -3,11 +3,12 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import {
   AnalysisSessionConflictError,
   AttemptConflictError,
+  PaperExecutionSessionConflictError,
   PersistenceCorruptionError,
   type PersistenceAdapter,
   type PersistenceMutation,
 } from './adapter';
-import type { GuidedAnalysisSession } from '@chartpath/domain';
+import type { GuidedAnalysisSession, PaperExecutionSession } from '@chartpath/domain';
 import type { PersistedAttempt } from './types';
 import { canonicalStringify, isObject } from './validation';
 
@@ -84,6 +85,45 @@ const CREATE_ANALYSIS_SESSIONS_SCHEMA = `
   ${CREATE_ANALYSIS_SESSION_TRIGGERS}
 `;
 
+const CREATE_PAPER_EXECUTION_SESSION_TRIGGERS = `
+  CREATE TRIGGER IF NOT EXISTS paper_execution_sessions_reject_terminal_update
+  BEFORE UPDATE ON paper_execution_sessions
+  WHEN OLD.status IN ('closed', 'ambiguous', 'cancelled', 'rejected', 'completed')
+    AND OLD.payload_json <> NEW.payload_json BEGIN
+    SELECT RAISE(ABORT, 'terminal paper execution sessions are immutable');
+  END;
+  CREATE TRIGGER IF NOT EXISTS paper_execution_sessions_reject_delete
+  BEFORE DELETE ON paper_execution_sessions BEGIN
+    SELECT RAISE(ABORT, 'paper execution sessions require explicit deletion');
+  END;
+`;
+
+const CREATE_PAPER_EXECUTION_SESSIONS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS paper_execution_sessions (
+    session_id TEXT PRIMARY KEY NOT NULL,
+    analysis_session_id TEXT NOT NULL,
+    scenario_id TEXT NOT NULL,
+    scenario_version TEXT NOT NULL,
+    dataset_id TEXT NOT NULL,
+    dataset_version TEXT NOT NULL,
+    dataset_checksum TEXT NOT NULL,
+    execution_policy_version TEXT NOT NULL,
+    cost_model_version TEXT NOT NULL,
+    learning_credit TEXT NOT NULL CHECK (learning_credit IN ('course', 'none')),
+    status TEXT NOT NULL,
+    last_processed_candle_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    payload_json TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS paper_execution_sessions_status_updated_idx
+    ON paper_execution_sessions(status, updated_at);
+  CREATE INDEX IF NOT EXISTS paper_execution_sessions_analysis_idx
+    ON paper_execution_sessions(analysis_session_id);
+  ${CREATE_PAPER_EXECUTION_SESSION_TRIGGERS}
+`;
+
 const MIGRATE_ANALYSIS_SESSIONS_TO_HISTORICAL_SCHEMA = `
   DROP TRIGGER IF EXISTS analysis_sessions_reject_finalized_update;
   DROP TRIGGER IF EXISTS analysis_sessions_reject_delete;
@@ -150,6 +190,13 @@ const SQLITE_MIGRATIONS = [
     appliedAt: '2026-08-24T00:00:00.000Z',
     sql: MIGRATE_ANALYSIS_SESSIONS_TO_HISTORICAL_SCHEMA,
   },
+  {
+    version: 4,
+    name: 'create_paper_execution_sessions',
+    checksum: 'sha256:69b340db961bc3b8e26e8e70544ae5dbe62cb5f0b9e72a9f83ab6ea715e64016',
+    appliedAt: '2026-08-24T00:00:00.000Z',
+    sql: CREATE_PAPER_EXECUTION_SESSIONS_SCHEMA,
+  },
 ] as const;
 
 interface SQLiteAdapterOptions {
@@ -214,6 +261,46 @@ function extractAnalysisSessions(serialized: string | null): readonly GuidedAnal
 function sessionsById(
   sessions: readonly GuidedAnalysisSession[],
 ): ReadonlyMap<string, GuidedAnalysisSession> {
+  return new Map(sessions.map((session) => [session.sessionId, session]));
+}
+
+function extractPaperExecutionSessions(
+  serialized: string | null,
+): readonly PaperExecutionSession[] {
+  if (serialized === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized) as unknown;
+  } catch (error) {
+    throw new PersistenceCorruptionError('SQLite repository state is not valid JSON.', {
+      cause: error,
+    });
+  }
+  if (!isObject(parsed)) {
+    throw new PersistenceCorruptionError('SQLite repository state is not an object.');
+  }
+  const schemaVersion = isObject(parsed.metadata)
+    ? parsed.metadata.schemaVersion
+    : parsed.schemaVersion;
+  if ([1, 2, 3, 4].includes(Number(schemaVersion))) return [];
+  if (!Array.isArray(parsed.paperExecutionSessions)) {
+    throw new PersistenceCorruptionError(
+      'SQLite repository state has no paper execution sessions.',
+    );
+  }
+  for (const session of parsed.paperExecutionSessions) {
+    if (!isObject(session) || typeof session.sessionId !== 'string') {
+      throw new PersistenceCorruptionError(
+        'SQLite repository state has an invalid paper execution session.',
+      );
+    }
+  }
+  return parsed.paperExecutionSessions as unknown as readonly PaperExecutionSession[];
+}
+
+function paperExecutionSessionsById(
+  sessions: readonly PaperExecutionSession[],
+): ReadonlyMap<string, PaperExecutionSession> {
   return new Map(sessions.map((session) => [session.sessionId, session]));
 }
 
@@ -385,6 +472,59 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
     );
   }
 
+  private async upsertPaperExecutionSession(
+    database: SQLiteDatabase,
+    session: PaperExecutionSession,
+    allowSchemaMigration = false,
+  ): Promise<void> {
+    const payload = canonicalStringify(session);
+    const existing = await database.getFirstAsync<{ payload_json: string; status: string }>(
+      'SELECT payload_json, status FROM paper_execution_sessions WHERE session_id = ?',
+      session.sessionId,
+    );
+    if (existing?.payload_json === payload) return;
+    if (
+      existing &&
+      ['closed', 'ambiguous', 'cancelled', 'rejected', 'completed'].includes(existing.status) &&
+      !allowSchemaMigration
+    ) {
+      throw new PaperExecutionSessionConflictError(
+        session.sessionId,
+        'Terminal SQLite paper execution session is immutable.',
+      );
+    }
+    await database.runAsync(
+      `INSERT INTO paper_execution_sessions (
+        session_id, analysis_session_id, scenario_id, scenario_version, dataset_id,
+        dataset_version, dataset_checksum, execution_policy_version, cost_model_version,
+        learning_credit, status, last_processed_candle_index, created_at, updated_at,
+        schema_version, payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        status = excluded.status,
+        last_processed_candle_index = excluded.last_processed_candle_index,
+        updated_at = excluded.updated_at,
+        schema_version = excluded.schema_version,
+        payload_json = excluded.payload_json`,
+      session.sessionId,
+      session.source.analysisSessionId,
+      session.source.scenarioId,
+      session.source.scenarioVersion,
+      session.source.datasetId,
+      session.source.datasetVersion,
+      session.source.canonicalChecksum,
+      session.executionPolicy.version,
+      session.costModel.version,
+      session.source.learningCredit,
+      session.status,
+      session.lastProcessedCandleIndex,
+      session.createdAt,
+      session.updatedAt,
+      session.schemaVersion,
+      payload,
+    );
+  }
+
   public async transact<T>(
     mutation: (currentValue: string | null) => PersistenceMutation<T>,
   ): Promise<T> {
@@ -400,6 +540,9 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       const next = mutation(currentValue);
       const nextAttempts = byId(extractAttempts(next.nextValue));
       const nextSessions = sessionsById(extractAnalysisSessions(next.nextValue));
+      const nextPaperExecutions = paperExecutionSessionsById(
+        extractPaperExecutionSessions(next.nextValue),
+      );
 
       // An explicit learner-authorized reset must be able to recover even when
       // the previous snapshot is too corrupt to parse. Normal writes retain the
@@ -439,6 +582,38 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
         }
       }
 
+      if (
+        next.allowPaperExecutionSessionDeletion !== true &&
+        next.allowPaperExecutionSessionMigration !== true
+      ) {
+        const previousPaperExecutions = paperExecutionSessionsById(
+          extractPaperExecutionSessions(currentValue),
+        );
+        const removed = [...previousPaperExecutions.keys()].filter(
+          (id) => !nextPaperExecutions.has(id),
+        );
+        if (removed.length > 0) {
+          throw new Error(
+            'Paper execution session deletion requires an explicit repository operation.',
+          );
+        }
+        for (const [id, previous] of previousPaperExecutions) {
+          const following = nextPaperExecutions.get(id);
+          if (
+            following &&
+            ['closed', 'ambiguous', 'cancelled', 'rejected', 'completed'].includes(
+              previous.status,
+            ) &&
+            canonicalStringify(previous) !== canonicalStringify(following)
+          ) {
+            throw new PaperExecutionSessionConflictError(
+              id,
+              'Terminal paper execution session is immutable.',
+            );
+          }
+        }
+      }
+
       if (next.allowAttemptDeletion === true) {
         await transaction.execAsync(`
           DROP TRIGGER IF EXISTS attempts_reject_update;
@@ -466,12 +641,38 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
           ${CREATE_ANALYSIS_SESSION_TRIGGERS}
         `);
       }
+      if (next.allowPaperExecutionSessionDeletion === true) {
+        await transaction.execAsync(`
+          DROP TRIGGER IF EXISTS paper_execution_sessions_reject_terminal_update;
+          DROP TRIGGER IF EXISTS paper_execution_sessions_reject_delete;
+          DELETE FROM paper_execution_sessions;
+          ${CREATE_PAPER_EXECUTION_SESSION_TRIGGERS}
+        `);
+      }
+      if (
+        next.allowPaperExecutionSessionMigration === true &&
+        next.allowPaperExecutionSessionDeletion !== true
+      ) {
+        await transaction.execAsync(`
+          DROP TRIGGER IF EXISTS paper_execution_sessions_reject_terminal_update;
+          DROP TRIGGER IF EXISTS paper_execution_sessions_reject_delete;
+          DELETE FROM paper_execution_sessions;
+          ${CREATE_PAPER_EXECUTION_SESSION_TRIGGERS}
+        `);
+      }
       for (const record of nextAttempts.values()) await this.insertAttempt(transaction, record);
       for (const session of nextSessions.values()) {
         await this.upsertAnalysisSession(
           transaction,
           session,
           next.allowAnalysisSessionMigration === true,
+        );
+      }
+      for (const session of nextPaperExecutions.values()) {
+        await this.upsertPaperExecutionSession(
+          transaction,
+          session,
+          next.allowPaperExecutionSessionMigration === true,
         );
       }
 
@@ -499,6 +700,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
       result: undefined,
       allowAttemptDeletion: true,
       allowAnalysisSessionDeletion: true,
+      allowPaperExecutionSessionDeletion: true,
     }));
   }
 

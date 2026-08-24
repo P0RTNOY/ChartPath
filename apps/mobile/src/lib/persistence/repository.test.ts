@@ -518,7 +518,7 @@ describe('LearningRepository', () => {
     expect(await adapter.dump()).not.toBe('{not valid json');
   });
 
-  it('migrates a schema-2 snapshot with no sessions to schema 4', async () => {
+  it('migrates a schema-2 snapshot with no sessions to the current schema', async () => {
     const seed = new LearningRepository(new InMemoryPersistenceAdapter(), {
       contentVersion: 'catalog-1',
       now: () => CREATED_AT,
@@ -537,7 +537,7 @@ describe('LearningRepository', () => {
 
     const migrated = await repository.initialize();
 
-    expect(migrated.metadata.schemaVersion).toBe(4);
+    expect(migrated.metadata.schemaVersion).toBe(CURRENT_PERSISTENCE_SCHEMA_VERSION);
     expect(migrated.analysisSessions).toEqual([]);
     expect(migrated.quarantinedAnalysisSessions).toEqual([]);
   });
@@ -602,7 +602,7 @@ describe('LearningRepository', () => {
 
     const migrated = await repository.initialize();
 
-    expect(migrated.metadata.schemaVersion).toBe(4);
+    expect(migrated.metadata.schemaVersion).toBe(CURRENT_PERSISTENCE_SCHEMA_VERSION);
     expect(migrated.attempts).toEqual(seeded.snapshot.attempts);
     expect(migrated.settings).toEqual(legacyV3.settings);
     expect(migrated.projections).toEqual(seeded.snapshot.projections);

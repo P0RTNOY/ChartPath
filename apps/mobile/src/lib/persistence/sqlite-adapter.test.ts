@@ -56,6 +56,7 @@ describe('SQLitePersistenceAdapter recovery', () => {
       executed.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS analysis_sessions')),
     ).toBe(true);
     expect(executed.some((sql) => sql.includes('DELETE FROM analysis_sessions'))).toBe(true);
+    expect(executed.some((sql) => sql.includes('DELETE FROM paper_execution_sessions'))).toBe(true);
   });
 
   it('mirrors a canonical active session through the versioned SQLite table', async () => {
@@ -219,6 +220,112 @@ describe('SQLitePersistenceAdapter recovery', () => {
     expect(mirrored?.parameters[10]).toBe('2026-08');
     expect(mirrored?.parameters[11]).toBe(checksum);
     expect(mirrored?.parameters[12]).toBe('none');
+  });
+
+  it('creates and mirrors versioned checksum-pinned paper execution sessions', async () => {
+    let repositoryPayload: string | null = null;
+    const executed: { readonly sql: string; readonly parameters: readonly unknown[] }[] = [];
+    const database: FakeDatabase = {
+      execAsync: jest.fn(async (sql: string) => {
+        executed.push({ sql, parameters: [] });
+      }),
+      getFirstAsync: jest.fn(async (sql: string) => {
+        if (sql.includes('schema_migrations')) return null;
+        if (sql.includes('repository_state')) {
+          return repositoryPayload === null ? null : { payload_json: repositoryPayload };
+        }
+        return null;
+      }),
+      runAsync: jest.fn(async (sql: string, ...parameters: unknown[]) => {
+        executed.push({ sql, parameters });
+        if (sql.includes('INSERT INTO repository_state')) {
+          repositoryPayload = String(parameters[0]);
+        }
+        return {};
+      }),
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (transaction: FakeDatabase) => Promise<void>): Promise<void> =>
+          operation(database),
+      ),
+    };
+    jest.mocked(openDatabaseAsync).mockResolvedValue(database as never);
+    const adapter = new SQLitePersistenceAdapter({ databaseName: 'paper-execution-test.db' });
+    const checksum = `sha256:${'c'.repeat(64)}`;
+    const session = {
+      schemaVersion: 1,
+      sessionId: 'paper-session-1',
+      source: {
+        analysisSessionId: 'historical-analysis-1',
+        scenarioId: 'scenario-1',
+        scenarioVersion: '1.0.0',
+        datasetId: 'dataset-1',
+        datasetVersion: '1.0.0',
+        canonicalChecksum: checksum,
+        learningCredit: 'none',
+      },
+      executionPolicy: { version: 'paper-execution-policy-v1' },
+      costModel: { version: 'paper-cost-model-v1' },
+      status: 'working',
+      lastProcessedCandleIndex: 71,
+      createdAt: '2026-08-24T08:31:00.000Z',
+      updatedAt: '2026-08-24T08:32:00.000Z',
+    };
+    const nextValue = JSON.stringify({
+      metadata: {
+        schemaVersion: 5,
+        updatedAt: session.updatedAt,
+      },
+      attempts: [],
+      analysisSessions: [],
+      paperExecutionSessions: [session],
+    });
+
+    await adapter.transact(() => ({ nextValue, result: undefined }));
+
+    const migration = executed.find((entry) =>
+      entry.sql.includes('CREATE TABLE IF NOT EXISTS paper_execution_sessions'),
+    );
+    expect(migration?.sql).toContain('dataset_checksum TEXT NOT NULL');
+    expect(migration?.sql).toContain('execution_policy_version TEXT NOT NULL');
+    expect(migration?.sql).toContain('paper_execution_sessions_reject_terminal_update');
+    const mirrored = executed.find(
+      (entry) =>
+        entry.parameters.length > 0 && entry.sql.includes('INSERT INTO paper_execution_sessions'),
+    );
+    expect(mirrored?.parameters.slice(0, 12)).toEqual([
+      'paper-session-1',
+      'historical-analysis-1',
+      'scenario-1',
+      '1.0.0',
+      'dataset-1',
+      '1.0.0',
+      checksum,
+      'paper-execution-policy-v1',
+      'paper-cost-model-v1',
+      'none',
+      'working',
+      71,
+    ]);
+
+    const terminal = { ...session, status: 'closed', updatedAt: '2026-08-24T09:00:00.000Z' };
+    const terminalValue = JSON.stringify({
+      metadata: { schemaVersion: 5, updatedAt: terminal.updatedAt },
+      attempts: [],
+      analysisSessions: [],
+      paperExecutionSessions: [terminal],
+    });
+    await adapter.transact(() => ({ nextValue: terminalValue, result: undefined }));
+    await expect(
+      adapter.transact(() => ({
+        nextValue: JSON.stringify({
+          metadata: { schemaVersion: 5, updatedAt: '2026-08-24T09:01:00.000Z' },
+          attempts: [],
+          analysisSessions: [],
+          paperExecutionSessions: [{ ...terminal, revision: 99 }],
+        }),
+        result: undefined,
+      })),
+    ).rejects.toThrow('Terminal paper execution session is immutable.');
   });
 
   it('narrowly permits the v3-to-v4 rewrite of a finalized session mirror', async () => {

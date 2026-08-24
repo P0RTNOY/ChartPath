@@ -13,6 +13,10 @@ export interface PersistenceMutation<T> {
   readonly allowAnalysisSessionDeletion?: boolean;
   /** Reserved for the forward schema migration that rewrites finalized session envelopes. */
   readonly allowAnalysisSessionMigration?: boolean;
+  /** Reserved for explicit erasure/recovery; ordinary paper sessions are append-preserving. */
+  readonly allowPaperExecutionSessionDeletion?: boolean;
+  /** Reserved for a forward schema migration of physical paper-session mirrors. */
+  readonly allowPaperExecutionSessionMigration?: boolean;
 }
 
 export interface PersistenceAdapter {
@@ -58,5 +62,22 @@ export class AnalysisSessionNotFoundError extends Error {
   public constructor(public readonly sessionId: string) {
     super(`Analysis session ${sessionId} does not exist.`);
     this.name = 'AnalysisSessionNotFoundError';
+  }
+}
+
+export class PaperExecutionSessionConflictError extends Error {
+  public constructor(
+    public readonly sessionId: string,
+    message?: string,
+  ) {
+    super(message ?? `Paper execution session ${sessionId} conflicts with persisted state.`);
+    this.name = 'PaperExecutionSessionConflictError';
+  }
+}
+
+export class PaperExecutionSessionNotFoundError extends Error {
+  public constructor(public readonly sessionId: string) {
+    super(`Paper execution session ${sessionId} does not exist.`);
+    this.name = 'PaperExecutionSessionNotFoundError';
   }
 }

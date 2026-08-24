@@ -1,8 +1,12 @@
 import {
   analysisChartIdentitiesEqual,
   assertValidGuidedAnalysisSession,
+  assertValidPaperExecutionSession,
+  executionIdentitiesEqual,
   reduceGuidedAnalysisSession,
+  reducePaperExecutionSession,
   type GuidedAnalysisSession,
+  type PaperExecutionSession,
   type ReviewState,
 } from '@chartpath/domain';
 
@@ -10,12 +14,15 @@ import {
   AnalysisSessionConflictError,
   AnalysisSessionNotFoundError,
   AttemptConflictError,
+  PaperExecutionSessionConflictError,
+  PaperExecutionSessionNotFoundError,
   type PersistenceAdapter,
 } from './adapter';
 import { createEmptySnapshot, migratePersistence } from './migrations';
 import { localDateForTimestamp, replayAttempts } from './projections';
 import type {
   AppendAttemptResult,
+  CreateOrResumePaperExecutionSessionResult,
   CreateOrResumeAnalysisSessionResult,
   FinalizeAnalysisSessionInput,
   FinalizeAnalysisSessionResult,
@@ -26,6 +33,7 @@ import type {
   PersistenceSnapshot,
   RepositoryOptions,
   SaveAnalysisSessionResult,
+  SavePaperExecutionSessionResult,
 } from './types';
 import {
   assertNonEmptyString,
@@ -53,6 +61,108 @@ function compareStrings(left: string, right: string): number {
 
 function cloneSession(session: GuidedAnalysisSession): GuidedAnalysisSession {
   return JSON.parse(canonicalStringify(session)) as GuidedAnalysisSession;
+}
+
+function clonePaperExecutionSession(session: PaperExecutionSession): PaperExecutionSession {
+  return JSON.parse(canonicalStringify(session)) as PaperExecutionSession;
+}
+
+function paperExecutionLogicalIdentity(session: PaperExecutionSession): string {
+  return session.source.analysisSessionId;
+}
+
+function isActivePaperExecutionSession(session: PaperExecutionSession): boolean {
+  return ['draft', 'working', 'open'].includes(session.status);
+}
+
+function assertPaperExecutionSourceBound(
+  analysisSessions: readonly GuidedAnalysisSession[],
+  candidate: PaperExecutionSession,
+): void {
+  const analysis = analysisSessions.find(
+    ({ sessionId }) => sessionId === candidate.source.analysisSessionId,
+  );
+  if (!analysis || analysis.status !== 'finalized' || analysis.chart.kind !== 'historical') {
+    throw new PaperExecutionSessionConflictError(
+      candidate.sessionId,
+      'Paper execution requires its exact finalized historical analysis session.',
+    );
+  }
+  if (
+    analysis.finalizedAt !== candidate.source.analysisFinalizedAt ||
+    analysis.chart.datasetId !== candidate.source.datasetId ||
+    analysis.chart.datasetVersion !== candidate.source.datasetVersion ||
+    analysis.chart.canonicalChecksum !== candidate.source.canonicalChecksum ||
+    analysis.chart.scenarioId !== candidate.source.scenarioId ||
+    analysis.chart.scenarioVersion !== candidate.source.scenarioVersion ||
+    analysis.chart.decisionCandleIndex !== candidate.source.decisionCandleIndex ||
+    analysis.chart.candleCount !== candidate.source.candleCount ||
+    analysis.chart.learningCredit !== candidate.source.learningCredit
+  ) {
+    throw new PaperExecutionSessionConflictError(
+      candidate.sessionId,
+      'Paper execution evidence does not match the pinned historical analysis.',
+    );
+  }
+}
+
+function assertSamePaperExecutionIdentity(
+  persisted: PaperExecutionSession,
+  candidate: PaperExecutionSession,
+): void {
+  if (
+    persisted.sessionId !== candidate.sessionId ||
+    persisted.createdAt !== candidate.createdAt ||
+    persisted.orderId !== candidate.orderId ||
+    persisted.positionId !== candidate.positionId ||
+    persisted.debriefId !== candidate.debriefId ||
+    !executionIdentitiesEqual(persisted.source, candidate.source) ||
+    canonicalStringify(persisted.executionPolicy) !==
+      canonicalStringify(candidate.executionPolicy) ||
+    canonicalStringify(persisted.costModel) !== canonicalStringify(candidate.costModel)
+  ) {
+    throw new PaperExecutionSessionConflictError(
+      candidate.sessionId,
+      'Paper execution identity or versioned assumptions changed.',
+    );
+  }
+}
+
+function assertPaperExecutionHistoryPrefix(
+  persisted: PaperExecutionSession,
+  candidate: PaperExecutionSession,
+): void {
+  if (
+    candidate.events.length < persisted.events.length ||
+    candidate.processedCandles.length < persisted.processedCandles.length
+  ) {
+    throw new PaperExecutionSessionConflictError(
+      candidate.sessionId,
+      'Paper execution event and candle histories are append-only.',
+    );
+  }
+  for (const [index, event] of persisted.events.entries()) {
+    if (canonicalStringify(event) !== canonicalStringify(candidate.events[index])) {
+      throw new PaperExecutionSessionConflictError(
+        candidate.sessionId,
+        'Paper execution event history is append-only.',
+      );
+    }
+  }
+  for (const [index, candle] of persisted.processedCandles.entries()) {
+    if (canonicalStringify(candle) !== canonicalStringify(candidate.processedCandles[index])) {
+      throw new PaperExecutionSessionConflictError(
+        candidate.sessionId,
+        'Processed execution candle history is append-only.',
+      );
+    }
+  }
+  if (candidate.lastProcessedCandleIndex < persisted.lastProcessedCandleIndex) {
+    throw new PaperExecutionSessionConflictError(
+      candidate.sessionId,
+      'Paper execution replay cannot move backwards.',
+    );
+  }
 }
 
 function analysisSessionIdentity(session: GuidedAnalysisSession): string {
@@ -203,10 +313,14 @@ export class LearningRepository {
         nextValue: serialized,
         result: cloneSnapshot(migration.snapshot),
         allowAnalysisSessionDeletion:
-          migration.fromSchemaVersion === 4 &&
+          (migration.fromSchemaVersion === 4 || migration.fromSchemaVersion === 5) &&
           migration.migrated &&
           migration.snapshot.quarantinedAnalysisSessions.length > 0,
         allowAnalysisSessionMigration: migration.fromSchemaVersion === 3 && migration.migrated,
+        allowPaperExecutionSessionDeletion:
+          migration.fromSchemaVersion === 5 &&
+          migration.migrated &&
+          migration.snapshot.quarantinedPaperExecutionSessions.length > 0,
       };
     });
   }
@@ -253,6 +367,229 @@ export class LearningRepository {
         result: {
           attempt: normalized,
           inserted: true,
+          snapshot: cloneSnapshot(snapshot),
+        },
+      };
+    });
+  }
+
+  public async createOrResumePaperExecutionSession(
+    candidate: PaperExecutionSession,
+  ): Promise<CreateOrResumePaperExecutionSessionResult> {
+    assertValidPaperExecutionSession(candidate);
+    if (candidate.status !== 'draft' || candidate.revision !== 0) {
+      throw new PaperExecutionSessionConflictError(
+        candidate.sessionId,
+        'A new paper execution session must be a revision-zero draft.',
+      );
+    }
+    await this.initializeAdapter();
+    const migrationAt = this.now();
+    return this.adapter.transact<CreateOrResumePaperExecutionSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, migrationAt).snapshot;
+      assertPaperExecutionSourceBound(current.analysisSessions, candidate);
+      const byId = current.paperExecutionSessions.find(
+        ({ sessionId }) => sessionId === candidate.sessionId,
+      );
+      if (byId) {
+        if (canonicalStringify(byId) !== canonicalStringify(candidate)) {
+          throw new PaperExecutionSessionConflictError(candidate.sessionId);
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePaperExecutionSession(byId),
+            created: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      const logical = current.paperExecutionSessions
+        .filter(
+          (session) =>
+            paperExecutionLogicalIdentity(session) === paperExecutionLogicalIdentity(candidate),
+        )
+        .sort(
+          (left, right) =>
+            Number(isActivePaperExecutionSession(right)) -
+              Number(isActivePaperExecutionSession(left)) ||
+            Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+            compareStrings(left.sessionId, right.sessionId),
+        )[0];
+      if (logical) {
+        if (
+          !executionIdentitiesEqual(logical.source, candidate.source) ||
+          canonicalStringify(logical.executionPolicy) !==
+            canonicalStringify(candidate.executionPolicy) ||
+          canonicalStringify(logical.costModel) !== canonicalStringify(candidate.costModel)
+        ) {
+          throw new PaperExecutionSessionConflictError(
+            candidate.sessionId,
+            'A paper execution for this analysis pins different evidence or assumptions.',
+          );
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePaperExecutionSession(logical),
+            created: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      const session = clonePaperExecutionSession(candidate);
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, session.updatedAt),
+        paperExecutionSessions: [...current.paperExecutionSessions, session],
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: { session, created: true, snapshot: cloneSnapshot(snapshot) },
+      };
+    });
+  }
+
+  public async savePaperExecutionSession(
+    candidate: PaperExecutionSession,
+  ): Promise<SavePaperExecutionSessionResult> {
+    assertValidPaperExecutionSession(candidate);
+    await this.initializeAdapter();
+    const migrationAt = this.now();
+    return this.adapter.transact<SavePaperExecutionSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, migrationAt).snapshot;
+      assertPaperExecutionSourceBound(current.analysisSessions, candidate);
+      const index = current.paperExecutionSessions.findIndex(
+        ({ sessionId }) => sessionId === candidate.sessionId,
+      );
+      const persisted = current.paperExecutionSessions[index];
+      if (!persisted) throw new PaperExecutionSessionNotFoundError(candidate.sessionId);
+      assertSamePaperExecutionIdentity(persisted, candidate);
+      const canonicalPersisted = canonicalStringify(persisted);
+      const canonicalCandidate = canonicalStringify(candidate);
+      if (persisted.revision === candidate.revision) {
+        if (canonicalPersisted !== canonicalCandidate) {
+          throw new PaperExecutionSessionConflictError(
+            candidate.sessionId,
+            'Equal paper execution revisions contain different data.',
+          );
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePaperExecutionSession(persisted),
+            saved: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      if (candidate.revision !== persisted.revision + 1) {
+        throw new PaperExecutionSessionConflictError(
+          candidate.sessionId,
+          'Paper execution saves must apply exactly one deterministic revision.',
+        );
+      }
+      if (Date.parse(candidate.updatedAt) < Date.parse(persisted.updatedAt)) {
+        throw new PaperExecutionSessionConflictError(
+          candidate.sessionId,
+          'Paper execution timestamps cannot move backwards.',
+        );
+      }
+      if (!isActivePaperExecutionSession(persisted)) {
+        throw new PaperExecutionSessionConflictError(
+          candidate.sessionId,
+          'Terminal paper execution sessions are immutable.',
+        );
+      }
+      assertPaperExecutionHistoryPrefix(persisted, candidate);
+      const sessions = [...current.paperExecutionSessions];
+      const session = clonePaperExecutionSession(candidate);
+      sessions[index] = session;
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, session.updatedAt),
+        paperExecutionSessions: sessions,
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: { session, saved: true, snapshot: cloneSnapshot(snapshot) },
+      };
+    });
+  }
+
+  public async getPaperExecutionSession(sessionId: string): Promise<PaperExecutionSession | null> {
+    assertNonEmptyString(sessionId, 'sessionId');
+    const snapshot = await this.load();
+    const session = snapshot.paperExecutionSessions.find(
+      (candidate) => candidate.sessionId === sessionId,
+    );
+    return session ? clonePaperExecutionSession(session) : null;
+  }
+
+  public async listPaperExecutionSessions(): Promise<readonly PaperExecutionSession[]> {
+    const snapshot = await this.load();
+    return [...snapshot.paperExecutionSessions]
+      .sort(
+        (left, right) =>
+          Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+          compareStrings(left.sessionId, right.sessionId),
+      )
+      .map(clonePaperExecutionSession);
+  }
+
+  public async abandonPaperExecutionSession(
+    sessionId: string,
+    confirmationId: string,
+    abandonedAt: string = this.now(),
+  ): Promise<SavePaperExecutionSessionResult> {
+    assertNonEmptyString(sessionId, 'sessionId');
+    assertNonEmptyString(confirmationId, 'confirmationId');
+    assertUtcTimestamp(abandonedAt, 'abandonedAt');
+    await this.initializeAdapter();
+    return this.adapter.transact<SavePaperExecutionSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, abandonedAt).snapshot;
+      const index = current.paperExecutionSessions.findIndex(
+        (session) => session.sessionId === sessionId,
+      );
+      const persisted = current.paperExecutionSessions[index];
+      if (!persisted) throw new PaperExecutionSessionNotFoundError(sessionId);
+      assertPaperExecutionSourceBound(current.analysisSessions, persisted);
+      let abandoned: PaperExecutionSession;
+      try {
+        abandoned = reducePaperExecutionSession(persisted, {
+          type: 'abandon',
+          confirmationId,
+          abandonedAt,
+        });
+      } catch (error) {
+        throw new PaperExecutionSessionConflictError(
+          sessionId,
+          error instanceof Error ? error.message : 'Paper execution cannot be abandoned.',
+        );
+      }
+      if (canonicalStringify(abandoned) === canonicalStringify(persisted)) {
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePaperExecutionSession(persisted),
+            saved: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      assertPaperExecutionHistoryPrefix(persisted, abandoned);
+      const sessions = [...current.paperExecutionSessions];
+      sessions[index] = clonePaperExecutionSession(abandoned);
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, abandoned.updatedAt),
+        paperExecutionSessions: sessions,
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: {
+          session: clonePaperExecutionSession(abandoned),
+          saved: true,
           snapshot: cloneSnapshot(snapshot),
         },
       };
@@ -681,6 +1018,32 @@ export class LearningRepository {
     });
   }
 
+  public async discardQuarantinedPaperExecutionSessions(
+    quarantineIds: readonly string[],
+    recoveredAt: string = this.now(),
+  ): Promise<PersistenceSnapshot> {
+    assertUtcTimestamp(recoveredAt, 'recoveredAt');
+    quarantineIds.forEach((id, index) => assertNonEmptyString(id, `quarantineIds[${index}]`));
+    const ids = new Set(quarantineIds);
+    await this.initializeAdapter();
+    return this.adapter.transact((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, recoveredAt).snapshot;
+      const quarantinedPaperExecutionSessions = current.quarantinedPaperExecutionSessions.filter(
+        ({ quarantineId }) => !ids.has(quarantineId),
+      );
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata:
+          quarantinedPaperExecutionSessions.length ===
+          current.quarantinedPaperExecutionSessions.length
+            ? current.metadata
+            : withSessionUpdatedAt(current, recoveredAt),
+        quarantinedPaperExecutionSessions,
+      };
+      return { nextValue: canonicalStringify(snapshot), result: cloneSnapshot(snapshot) };
+    });
+  }
+
   public async updateSettings(
     patch: LearnerSettingsPatch,
     updatedAt: string = this.now(),
@@ -772,6 +1135,7 @@ export class LearningRepository {
       result: cloneSnapshot(snapshot),
       allowAttemptDeletion: true,
       allowAnalysisSessionDeletion: true,
+      allowPaperExecutionSessionDeletion: true,
     }));
   }
 

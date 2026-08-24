@@ -5,12 +5,13 @@ import type {
   Difficulty,
   GuidedAnalysisSession,
   LessonId,
+  PaperExecutionSession,
   ReviewState,
   SkillId,
   SkillMastery,
 } from '@chartpath/domain';
 
-export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 4;
+export const CURRENT_PERSISTENCE_SCHEMA_VERSION = 5;
 export const CURRENT_PROJECTOR_VERSION = 1;
 export const ATTEMPT_RECORD_SCHEMA_VERSION = 1;
 
@@ -92,6 +93,8 @@ export interface PersistenceSnapshot {
   readonly attempts: readonly PersistedAttempt[];
   readonly analysisSessions: readonly GuidedAnalysisSession[];
   readonly quarantinedAnalysisSessions: readonly QuarantinedAnalysisSession[];
+  readonly paperExecutionSessions: readonly PaperExecutionSession[];
+  readonly quarantinedPaperExecutionSessions: readonly QuarantinedPaperExecutionSession[];
   readonly projections: LearningProjections;
 }
 
@@ -100,6 +103,15 @@ export interface QuarantinedAnalysisSession {
   readonly sessionId?: string;
   readonly reason: string;
   /** Canonical JSON retained so recovery never silently discards a learner draft. */
+  readonly payloadJson: string;
+  readonly quarantinedAt: string;
+}
+
+export interface QuarantinedPaperExecutionSession {
+  readonly quarantineId: string;
+  readonly sessionId?: string;
+  readonly reason: string;
+  /** Canonical JSON retained so recovery never silently discards a paper-trade draft. */
   readonly payloadJson: string;
   readonly quarantinedAt: string;
 }
@@ -132,6 +144,22 @@ export interface PersistenceSnapshotV2 {
 export interface PersistenceSnapshotV3 {
   readonly metadata: {
     readonly schemaVersion: 3;
+    readonly contentVersion: string;
+    readonly projectorVersion: number;
+    readonly createdAt: string;
+    readonly updatedAt: string;
+  };
+  readonly settings: LearnerSettings;
+  readonly attempts: readonly PersistedAttempt[];
+  readonly analysisSessions: readonly unknown[];
+  readonly quarantinedAnalysisSessions: readonly QuarantinedAnalysisSession[];
+  readonly projections: LearningProjections;
+}
+
+/** Fixture shape retained so historical-replay payload schema 4 can migrate forward. */
+export interface PersistenceSnapshotV4 {
+  readonly metadata: {
+    readonly schemaVersion: 4;
     readonly contentVersion: string;
     readonly projectorVersion: number;
     readonly createdAt: string;
@@ -184,6 +212,18 @@ export interface FinalizePracticeAnalysisSessionResult {
   readonly session: GuidedAnalysisSession;
   /** True only when this call performed the active-to-finalized transition. */
   readonly inserted: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface CreateOrResumePaperExecutionSessionResult {
+  readonly session: PaperExecutionSession;
+  readonly created: boolean;
+  readonly snapshot: PersistenceSnapshot;
+}
+
+export interface SavePaperExecutionSessionResult {
+  readonly session: PaperExecutionSession;
+  readonly saved: boolean;
   readonly snapshot: PersistenceSnapshot;
 }
 
