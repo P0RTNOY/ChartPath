@@ -111,3 +111,31 @@ test('glossary search and accessibility preferences work without an account', as
   await expect(page.getByRole('radio', { name: 'גדול מאוד' })).toBeChecked();
   await expect(page.getByRole('switch', { name: 'הפחתת תנועה' })).toBeChecked();
 });
+
+test('learner completes a deterministic Chart Lab trendline analysis', async ({ page }) => {
+  await beginFreshGuest(page);
+  await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+
+  await expect(page.getByTestId('chart-lab-screen')).toBeVisible();
+  await expect(page.getByTestId('workbench-chart')).toBeVisible();
+  await expect(page.getByTestId('workbench-chart-expected-line')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'כלי קו מגמה' }).click();
+  await page.getByRole('button', { name: 'סימון מדויק לפי נר ומחיר' }).click();
+  await page.getByRole('textbox', { name: 'מספר הנר במעבדה' }).fill('21');
+  await page.getByRole('textbox', { name: 'מחיר במעבדה' }).fill('105.938');
+  await page.getByRole('button', { name: 'החלת הנר והמחיר' }).click();
+  await expect(page.getByText('סמנו עוגן שני להשלמת קו המגמה.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'לחלון ההחלטה' }).click();
+  await expect(page.getByText('72/72')).toBeVisible();
+  await page.getByRole('textbox', { name: 'מספר הנר במעבדה' }).fill('56');
+  await page.getByRole('textbox', { name: 'מחיר במעבדה' }).fill('115.0526');
+  await page.getByRole('button', { name: 'החלת הנר והמחיר' }).click();
+
+  await page.getByRole('button', { name: 'הגדלת הגרף' }).click();
+  await page.getByRole('button', { name: 'השוואת הניתוח' }).click();
+  await expect(page.getByTestId('workbench-feedback')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'סימון מדויק' })).toBeVisible();
+  await expect(page.getByTestId('workbench-chart-expected-line')).toHaveCount(1);
+});
