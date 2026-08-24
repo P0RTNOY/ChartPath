@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import { Platform, Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 
 import { isolateLtrRunsInHebrew } from './bidi';
 import { useChartPathTheme } from './theme';
@@ -67,7 +67,10 @@ export function UiText({
         scaledTypography,
         {
           color: theme.colors[color],
-          direction: resolvedDirection,
+          // On native, Yoga applies `direction` to the Text node's layout and iOS then
+          // mirrors the already-physical `textAlign` value. Keep CSS direction on web,
+          // while native uses writingDirection for glyph flow and an explicit alignment.
+          direction: Platform.OS === 'web' ? resolvedDirection : undefined,
           textAlign: alignmentFor(resolvedDirection, align),
           writingDirection: resolvedDirection,
         },

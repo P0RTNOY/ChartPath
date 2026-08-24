@@ -10,6 +10,8 @@ import { ChartPathThemeProvider, useReducedMotion } from '@chartpath/ui';
 import { DISCLAIMER_VERSION, LearningProvider, useLearning } from '@/state/learning';
 
 I18nManager.allowRTL(true);
+I18nManager.forceRTL(true);
+I18nManager.swapLeftAndRightInRTL(false);
 
 function AppTheme({ children }: { readonly children: React.ReactNode }) {
   const { snapshot } = useLearning();
