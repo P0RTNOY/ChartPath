@@ -8,6 +8,7 @@ import { Badge, Button, Card, Heading, LtrText, Screen, UiText, useTheme } from 
 import { ErrorState, LoadingState } from './app-state';
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { TopBar } from './top-bar';
+import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 import { useLearning } from '@/state/learning';
 
 function statusLabel(session: GuidedAnalysisSession): string {
@@ -80,48 +81,91 @@ export function AnalysisHistory() {
       </Card>
 
       {sessions.length ? (
-        sessions.map((session) => (
-          <Card
-            key={session.sessionId}
-            testID={`analysis-history-${session.status}`}
-            variant="outlined"
-          >
-            <View style={{ gap: theme.spacing.sm }}>
-              <View
-                style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
-              >
-                <Badge tone={statusTone(session)}>{statusLabel(session)}</Badge>
-                <UiText style={{ flex: 1 }} variant="label">
-                  מקרה ג׳ — תהליך 11 השלבים
-                </UiText>
-                <LtrText color="textMuted" variant="numeric">{`${submitted(session)}/11`}</LtrText>
-              </View>
-              <UiText color="textMuted" variant="bodySmall">
-                שלב אחרון: {CAPSTONE_STEP_LABELS[session.currentStepId]}
-              </UiText>
-              <LtrText color="textMuted" variant="caption">
-                {displayDate(session.updatedAt)}
-              </LtrText>
-              {session.status !== 'abandoned' ? (
-                <Button
-                  onPress={() =>
-                    router.push(
-                      `/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href,
-                    )
-                  }
-                  variant={session.status === 'finalized' ? 'secondary' : 'primary'}
+        sessions.map((session) => {
+          const historicalResolution =
+            session.chart.kind === 'historical'
+              ? resolveHistoricalAnalysisSession(session)
+              : undefined;
+          const historical =
+            historicalResolution?.status === 'ready' ? historicalResolution : undefined;
+          const historicalFinalized = historical && session.status === 'finalized';
+          return (
+            <Card
+              key={session.sessionId}
+              testID={`analysis-history-${session.status}`}
+              variant="outlined"
+            >
+              <View style={{ gap: theme.spacing.sm }}>
+                <View
+                  style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
                 >
-                  {session.status === 'finalized' ? 'פתיחת התחקיר' : 'המשך הניתוח'}
-                </Button>
-              ) : undefined}
-              {session.status === 'active' ? (
-                <Button onPress={() => setConfirmAbandonId(session.sessionId)} variant="danger">
-                  נטישת הטיוטה
-                </Button>
-              ) : undefined}
-            </View>
-          </Card>
-        ))
+                  <Badge tone={statusTone(session)}>{statusLabel(session)}</Badge>
+                  {session.chart.kind === 'historical' ? (
+                    <Badge tone="neutral">
+                      {session.status === 'finalized'
+                        ? 'Replay היסטורי נחשף'
+                        : 'Replay היסטורי עיוור'}
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral">סינתטי</Badge>
+                  )}
+                  {session.chart.kind === 'historical' &&
+                  session.chart.learningCredit === 'none' ? (
+                    <Badge tone="neutral">ללא XP/שליטה/חזרה</Badge>
+                  ) : undefined}
+                  <UiText style={{ flex: 1 }} variant="label">
+                    {historicalFinalized
+                      ? historical.content.scenario.revealedTitleHebrew
+                      : session.chart.kind === 'historical'
+                        ? 'תרחיש היסטורי שמור — הזהות מוסתרת'
+                        : 'מקרה ג׳ — תהליך 11 השלבים'}
+                  </UiText>
+                  <LtrText
+                    color="textMuted"
+                    variant="numeric"
+                  >{`${submitted(session)}/11`}</LtrText>
+                </View>
+                <UiText color="textMuted" variant="bodySmall">
+                  שלב אחרון: {CAPSTONE_STEP_LABELS[session.currentStepId]}
+                </UiText>
+                <LtrText color="textMuted" variant="caption">
+                  {displayDate(session.updatedAt)}
+                </LtrText>
+                {historicalFinalized ? (
+                  <View style={{ gap: 4 }} testID="historical-history-reveal">
+                    <LtrText color="textMuted" variant="caption">
+                      {`${historical.content.dataset.manifest.displaySymbol} · ${historical.content.dataset.manifest.provenance.providerName}`}
+                    </LtrText>
+                    <LtrText color="textMuted" variant="caption">
+                      {`${historical.content.dataset.manifest.startTimestampUtc} – ${historical.content.dataset.manifest.endTimestampUtc}`}
+                    </LtrText>
+                  </View>
+                ) : session.chart.kind === 'historical' && !historical ? (
+                  <UiText color="warning" variant="caption">
+                    המקור המוצמד חסר או השתנה; פרטי הזהות נשארים מוסתרים.
+                  </UiText>
+                ) : undefined}
+                {session.status !== 'abandoned' ? (
+                  <Button
+                    onPress={() =>
+                      router.push(
+                        `/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href,
+                      )
+                    }
+                    variant={session.status === 'finalized' ? 'secondary' : 'primary'}
+                  >
+                    {session.status === 'finalized' ? 'פתיחת התחקיר' : 'המשך הניתוח'}
+                  </Button>
+                ) : undefined}
+                {session.status === 'active' ? (
+                  <Button onPress={() => setConfirmAbandonId(session.sessionId)} variant="danger">
+                    נטישת הטיוטה
+                  </Button>
+                ) : undefined}
+              </View>
+            </Card>
+          );
+        })
       ) : (
         <Card variant="outlined">
           <Heading level={3}>עדיין אין ניתוחים</Heading>

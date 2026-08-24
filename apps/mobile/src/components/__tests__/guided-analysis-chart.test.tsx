@@ -13,6 +13,7 @@ import {
 import { ChartPathThemeProvider } from '@chartpath/ui';
 
 import { GuidedAnalysisChart } from '../guided-analysis-chart';
+import { resolveHistoricalReplayScenario } from '@/data/historical-replay';
 
 const exercise = exercises.find(({ id }) => id === 'u10-capstone-e03')!;
 const chart = generateChart(exercise.chartSpec!);
@@ -91,6 +92,26 @@ function renderChart({
       />
     </ChartPathThemeProvider>,
   );
+}
+
+function historicalSession(
+  cursorCandleIndex = 23,
+  status: GuidedAnalysisSession['status'] = 'active',
+): GuidedAnalysisSession {
+  const resolved = resolveHistoricalReplayScenario('blind-generated-development-scenario');
+  if (resolved.status !== 'ready') throw new Error('Historical test fixture is unavailable');
+  return {
+    ...session(),
+    chart: resolved.chartIdentity,
+    status,
+    replay: {
+      initialCursorCandleIndex: resolved.content.scenario.initialVisibleRange.endCandleIndex,
+      cursorCandleIndex,
+      maxCursorSeenCandleIndex: cursorCandleIndex,
+      decisionCandleIndex: resolved.content.scenario.decisionCandleIndex,
+      checkpoints: [],
+    },
+  };
 }
 
 describe('GuidedAnalysisChart', () => {
@@ -177,5 +198,71 @@ describe('GuidedAnalysisChart', () => {
     expect(screen.getByText(/מצב תנועה מופחת פעיל/)).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'שמירת נקודת ביקורת' }));
     expect(onCheckpointRequested).toHaveBeenCalledWith(23);
+  });
+
+  it('renders the exact historical knowledge view without pre-final identity or future rows', async () => {
+    const screen = await renderChart({ value: historicalSession() });
+    const beforeData = JSON.stringify(screen.toJSON());
+
+    expect(screen.getByText(/Replay.*היסטורי עיוור/)).toBeTruthy();
+    expect(beforeData).not.toMatch(
+      /DEV-BLIND-001|Generated fixture 001|2025-01-05|github\.com|future fixture annotation/,
+    );
+
+    await fireEvent.press(screen.getByTestId('guided-analysis-chart-notebook-plot'), {
+      nativeEvent: { locationX: 100, locationY: 100 },
+    });
+    expect(screen.getByTestId('guided-analysis-chart-notebook-candle-details')).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/2025-01-05|T07:00:00/);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני הנרות' }));
+    expect(screen.getByLabelText(/נר רציף 24:/)).toBeTruthy();
+    expect(screen.queryByLabelText(/נר רציף 25:/)).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(
+      /DEV-BLIND-001|Generated fixture 001|2025-01-05|github\.com|future fixture annotation/,
+    );
+  });
+
+  it('stamps historical geometry with its authorship cursor and resets to the persisted minimum', async () => {
+    const resolved = resolveHistoricalReplayScenario('blind-generated-development-scenario');
+    if (resolved.status !== 'ready') throw new Error('Historical test fixture is unavailable');
+    const onAnnotationsChange = jest.fn();
+    const onReplayCursorChange = jest.fn();
+    const screen = await renderChart({
+      value: historicalSession(27),
+      onAnnotationsChange,
+      onReplayCursorChange,
+    });
+    const price = resolved.initialKnowledgeView.candles[12]!.close;
+
+    await fireEvent.press(screen.getByRole('button', { name: 'כלי מחברת נקודה' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'סימון מדויק לפי נר ומחיר' }));
+    await fireEvent.changeText(screen.getByLabelText('מספר הנר במחברת'), '12');
+    await fireEvent.changeText(screen.getByLabelText('מחיר במחברת'), String(price));
+    await fireEvent.press(screen.getByRole('button', { name: 'החלת הנר והמחיר במחברת' }));
+
+    expect(onAnnotationsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ authoredAtCursorCandleIndex: 27 }),
+    ]);
+    await fireEvent.press(screen.getByRole('button', { name: 'איפוס' }));
+    expect(onReplayCursorChange).toHaveBeenCalledWith(23);
+  });
+
+  it('fails closed for a modified pinned dataset and reveals identity only after finalization', async () => {
+    const modified = historicalSession();
+    if (modified.chart.kind !== 'historical') throw new Error('Expected historical identity');
+    const recovery = await renderChart({
+      value: {
+        ...modified,
+        chart: { ...modified.chart, datasetVersion: 'modified-version' },
+      },
+    });
+    expect(recovery.getByTestId('guided-analysis-chart-notebook-incompatible')).toBeTruthy();
+    expect(JSON.stringify(recovery.toJSON())).not.toMatch(/Generated fixture 001|2025-01-05/);
+
+    recovery.unmount();
+    const revealed = await renderChart({ value: historicalSession(72, 'finalized') });
+    expect(JSON.stringify(revealed.toJSON())).toMatch(/Generated fixture 001|2025-01-05/);
+    expect(revealed.queryByRole('button', { name: 'החלת הנר והמחיר במחברת' })).toBeNull();
   });
 });

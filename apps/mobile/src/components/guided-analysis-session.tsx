@@ -43,6 +43,7 @@ import { TopBar } from './top-bar';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 import { skillById } from '@/data/catalog';
 import { matchingAlternativeExplanation } from '@/data/feedback-answer-ids';
+import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
@@ -120,9 +121,16 @@ function sessionMatchesExercise(
   exercise: CapstoneExercise,
 ): boolean {
   const chartSpec = exercise.chartSpec;
+  if (session.chart.kind === 'historical') {
+    return (
+      session.exerciseId === exercise.id &&
+      session.contentVersionId === contentVersion.id &&
+      session.exerciseSchemaVersion === exercise.schemaVersion &&
+      resolveHistoricalAnalysisSession(session).status === 'ready'
+    );
+  }
   return Boolean(
     chartSpec &&
-    session.chart.kind === 'synthetic' &&
     session.exerciseId === exercise.id &&
     session.contentVersionId === contentVersion.id &&
     session.exerciseSchemaVersion === exercise.schemaVersion &&
@@ -151,6 +159,25 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
   const [starting, setStarting] = useState(false);
   const result = session.finalResult;
   if (!result) return null;
+  const historicalResolution =
+    session.chart.kind === 'historical' ? resolveHistoricalAnalysisSession(session) : undefined;
+  if (historicalResolution && historicalResolution.status !== 'ready') {
+    return (
+      <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
+        <TopBar back subtitle="תחקיר מוגן" title="המקור ההיסטורי אינו זמין" />
+        <Card testID="historical-debrief-recovery" variant="outlined">
+          <Heading level={3}>לא ניתן לאמת את העותק הקפוא</Heading>
+          <UiText color="textMuted">
+            התחקיר נשמר, אך זהות המקור ונתוניו לא יוצגו מפני שהקובץ המוצמד חסר או השתנה. אין החלפה
+            אוטומטית במקור אחר.
+          </UiText>
+        </Card>
+      </Screen>
+    );
+  }
+  const historical = historicalResolution?.status === 'ready' ? historicalResolution : undefined;
+  const noLearningCredit =
+    session.chart.kind === 'historical' && session.chart.learningCredit === 'none';
   const hints = new Set(analysisSessionHintIdsUsed(session));
   const rubricMisconceptions = misconceptions.filter((item) =>
     result.misconceptionIds.includes(item.id),
@@ -180,7 +207,11 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
   const startNew = async () => {
     setStarting(true);
     try {
-      const created = await learning.createOrResumeAnalysisSession();
+      const created = await learning.createOrResumeAnalysisSession(
+        session.chart.kind === 'historical'
+          ? { kind: 'historical', scenarioId: session.chart.scenarioId }
+          : { kind: 'synthetic' },
+      );
       router.replace(`/analysis?sessionId=${encodeURIComponent(created.sessionId)}` as Href);
     } finally {
       setStarting(false);
@@ -211,6 +242,50 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
           </UiText>
         </View>
       </Card>
+
+      {historical ? (
+        <Card testID="historical-replay-reveal" variant="outlined">
+          <View style={{ gap: theme.spacing.sm }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge tone="neutral">זהות נחשפה לאחר סיום</Badge>
+              <Badge tone={noLearningCredit ? 'warning' : 'success'}>
+                {noLearningCredit ? 'ללא קרדיט למידה' : 'מקור מאושר למסלול'}
+              </Badge>
+            </View>
+            <Heading level={2}>{historical.content.scenario.revealedTitleHebrew}</Heading>
+            <LtrText color="textMuted" variant="caption">
+              {`${historical.content.dataset.manifest.displaySymbol} · ${historical.content.dataset.manifest.exchange}`}
+            </LtrText>
+            <LtrText color="textMuted" variant="caption">
+              {`${historical.content.dataset.manifest.startTimestampUtc} – ${historical.content.dataset.manifest.endTimestampUtc}`}
+            </LtrText>
+            <UiText color="textMuted" variant="bodySmall">
+              ספק/יוצר: {historical.content.dataset.manifest.provenance.providerName} · התאמה:{' '}
+              {historical.content.dataset.manifest.adjustment.mode} · סשנים:{' '}
+              {historical.content.dataset.manifest.sessionPolicy.includedSessions.join(', ')} ·
+              פערים מתועדים: {historical.content.dataset.missingIntervals.length}.
+            </UiText>
+            <LtrText color="textMuted" variant="caption">
+              {historical.content.dataset.manifest.provenance.license.attributionRequirements}
+            </LtrText>
+            <LtrText color="textMuted" variant="caption">
+              {historical.content.dataset.manifest.provenance.sourceUrl}
+            </LtrText>
+            <LtrText color="textMuted" variant="caption">
+              {historical.content.dataset.manifest.provenance.termsUrl}
+            </LtrText>
+            {historical.content.dataset.manifest.provenance.knownLimitations.map((limitation) => (
+              <LtrText key={limitation} color="textMuted" variant="caption">
+                {limitation}
+              </LtrText>
+            ))}
+            <UiText>זהו תרשים היסטורי; הזהות והתוצאה הוסתרו עד לסיום.</UiText>
+            <UiText>הציון מעריך את תהליך הניתוח, לא את תוצאת השוק.</UiText>
+            <UiText>תוצאה היסטורית אינה מבטיחה תוצאה עתידית.</UiText>
+            <UiText>אין כאן המלצה עדכנית לקנייה, מכירה או פעולה.</UiText>
+          </View>
+        </Card>
+      ) : undefined}
 
       {safeDecision ? (
         <Card variant="subtle">
@@ -250,50 +325,60 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
         })}
       </View>
 
-      <Card variant="outlined">
-        <View style={{ gap: theme.spacing.sm }}>
-          <Heading level={3}>מיומנויות ותזכורות</Heading>
-          <UiText variant="label">מיומנויות שהודגמו</UiText>
-          <UiText color="textMuted" variant="bodySmall">
-            {demonstrated.map((id) => skillById.get(id)?.titleHe ?? id).join(' · ') ||
-              'טרם זוהתה מיומנות מעל סף 70%.'}
+      {noLearningCredit ? (
+        <Card testID="historical-no-credit" variant="outlined">
+          <Heading level={3}>הדגמת תהליך ללא השפעה על מסלול הלמידה</Heading>
+          <UiText color="textMuted">
+            לא נוצר ניסיון רגיל, לא הוענק XP, ולא עודכנו שליטה במיומנויות או תזמון חזרה. התחקיר נשמר
+            לקריאה בלבד בתוך היסטוריית הניתוחים.
           </UiText>
-          <UiText variant="label">מיומנויות לחזרה</UiText>
-          <UiText color="textMuted" variant="bodySmall">
-            {review.map((id) => skillById.get(id)?.titleHe ?? id).join(' · ') ||
-              'אין כרגע פריט נוסף שנדרש לחזרה.'}
-          </UiText>
-          {rubricMisconceptions.length ? (
-            <>
-              <UiText variant="label">נושאים שהרובריקה מפנה אליהם</UiText>
-              {rubricMisconceptions.map((item) => (
-                <UiText key={item.id} color="textMuted" variant="bodySmall">
-                  {item.titleHe}: {item.explanationHe}
-                </UiText>
-              ))}
-            </>
-          ) : undefined}
-          <UiText variant="label">רמזים שנפתחו</UiText>
-          <LtrText color="textMuted" variant="numeric">
-            {`${hints.size}/${exercise.hints.length}`}
-          </LtrText>
-          <UiText variant="label">דיוק סיכון וגודל פוזיציה</UiText>
-          <LtrText color="textMuted" variant="numeric">
-            {`${Math.round((((session.steps['position-size'].result?.score ?? 0) + (session.steps.target.result?.score ?? 0)) / 2) * 100)}%`}
-          </LtrText>
-          <UiText variant="label">חזרה מתוזמנת</UiText>
-          <UiText color="textMuted" variant="bodySmall">
-            {scheduledReviews.length
-              ? scheduledReviews
-                  .map(
-                    (state) =>
-                      `${skillById.get(state.skillId)?.titleHe ?? state.skillId}: ${new Intl.DateTimeFormat('he-IL', { dateStyle: 'medium' }).format(new Date(state.nextDueAt))}`,
-                  )
-                  .join(' · ')
-              : 'לא נוצרה כרגע חזרה נוספת.'}
-          </UiText>
-        </View>
-      </Card>
+        </Card>
+      ) : (
+        <Card variant="outlined">
+          <View style={{ gap: theme.spacing.sm }}>
+            <Heading level={3}>מיומנויות ותזכורות</Heading>
+            <UiText variant="label">מיומנויות שהודגמו</UiText>
+            <UiText color="textMuted" variant="bodySmall">
+              {demonstrated.map((id) => skillById.get(id)?.titleHe ?? id).join(' · ') ||
+                'טרם זוהתה מיומנות מעל סף 70%.'}
+            </UiText>
+            <UiText variant="label">מיומנויות לחזרה</UiText>
+            <UiText color="textMuted" variant="bodySmall">
+              {review.map((id) => skillById.get(id)?.titleHe ?? id).join(' · ') ||
+                'אין כרגע פריט נוסף שנדרש לחזרה.'}
+            </UiText>
+            {rubricMisconceptions.length ? (
+              <>
+                <UiText variant="label">נושאים שהרובריקה מפנה אליהם</UiText>
+                {rubricMisconceptions.map((item) => (
+                  <UiText key={item.id} color="textMuted" variant="bodySmall">
+                    {item.titleHe}: {item.explanationHe}
+                  </UiText>
+                ))}
+              </>
+            ) : undefined}
+            <UiText variant="label">רמזים שנפתחו</UiText>
+            <LtrText color="textMuted" variant="numeric">
+              {`${hints.size}/${exercise.hints.length}`}
+            </LtrText>
+            <UiText variant="label">דיוק סיכון וגודל פוזיציה</UiText>
+            <LtrText color="textMuted" variant="numeric">
+              {`${Math.round((((session.steps['position-size'].result?.score ?? 0) + (session.steps.target.result?.score ?? 0)) / 2) * 100)}%`}
+            </LtrText>
+            <UiText variant="label">חזרה מתוזמנת</UiText>
+            <UiText color="textMuted" variant="bodySmall">
+              {scheduledReviews.length
+                ? scheduledReviews
+                    .map(
+                      (state) =>
+                        `${skillById.get(state.skillId)?.titleHe ?? state.skillId}: ${new Intl.DateTimeFormat('he-IL', { dateStyle: 'medium' }).format(new Date(state.nextDueAt))}`,
+                    )
+                    .join(' · ')
+                : 'לא נוצרה כרגע חזרה נוספת.'}
+            </UiText>
+          </View>
+        </Card>
+      )}
 
       <GuidedAnalysisChart
         disabled
@@ -324,7 +409,9 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
 
       <Card variant="subtle">
         <View style={{ gap: 6 }}>
-          <UiText variant="label">מקור התרחיש וכל 11 השלבים</UiText>
+          <UiText variant="label">
+            {historical ? 'מקור פדגוגי נפרד מנתוני השוק' : 'מקור התרחיש וכל 11 השלבים'}
+          </UiText>
           <LtrText color="textMuted" variant="caption">
             {sourceLabel(exercise)}
           </LtrText>
@@ -566,6 +653,12 @@ export function GuidedAnalysisSessionView({
   const usedHints = new Set(analysisSessionHintIdsUsed(session));
   const submitted = submittedCount(session);
   const wide = width >= 980;
+  const historicalResolution =
+    session.chart.kind === 'historical' ? resolveHistoricalAnalysisSession(session) : undefined;
+  const historical = historicalResolution?.status === 'ready' ? historicalResolution : undefined;
+  const historicalChartIdentity = session.chart.kind === 'historical' ? session.chart : undefined;
+  const noLearningCredit =
+    session.chart.kind === 'historical' && session.chart.learningCredit === 'none';
 
   return (
     <Screen
@@ -577,9 +670,42 @@ export function GuidedAnalysisSessionView({
       <TopBar
         back
         onBack={() => void exitAfterSave()}
-        subtitle="תרחיש סינתטי · תהליך מקור־מגובה"
+        subtitle={
+          historical
+            ? historical.content.scenario.publicationStatus === 'development-only'
+              ? 'Replay עיוור · נתונים שנוצרו לפיתוח בלבד'
+              : 'Replay היסטורי עיוור · מקור מוצמד'
+            : 'תרחיש סינתטי · תהליך מקור־מגובה'
+        }
         title="ניתוח מונחה"
       />
+
+      {historical && historicalChartIdentity ? (
+        <Card testID="historical-session-disclosure" variant="outlined">
+          <View style={{ gap: theme.spacing.sm }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge tone="warning">הזהות והתאריכים מוסתרים עד הסיום</Badge>
+              <Badge tone="neutral">
+                {historical.content.scenario.publicationStatus === 'development-only'
+                  ? 'פיתוח פנימי · נתונים שנוצרו'
+                  : 'נתונים היסטוריים מקור־מגובים'}
+              </Badge>
+              {noLearningCredit ? <Badge tone="neutral">ללא XP רגיל</Badge> : undefined}
+            </View>
+            <LtrText color="textMuted" variant="caption">
+              {`${historicalChartIdentity.scenarioId} · ${historicalChartIdentity.datasetId}@${historicalChartIdentity.datasetVersion}`}
+            </LtrText>
+            <LtrText color="textMuted" variant="caption">
+              {`cursor ${session.replay.cursorCandleIndex + 1}/${session.replay.decisionCandleIndex + 1} · checksum ${historicalChartIdentity.canonicalChecksum}`}
+            </LtrText>
+            <UiText color="textMuted" variant="caption">
+              התאמה: {historical.content.dataset.manifest.adjustment.mode} · סשן:{' '}
+              {historical.content.dataset.manifest.sessionPolicy.includedSessions.join(', ')} · אין
+              מילוי מלאכותי של מרווחים חסרים.
+            </UiText>
+          </View>
+        </Card>
+      ) : undefined}
 
       <Card variant="subtle">
         <View style={{ gap: theme.spacing.sm }}>
@@ -719,7 +845,9 @@ export function GuidedAnalysisSessionView({
               <View style={{ gap: theme.spacing.sm }}>
                 <Heading level={3}>כל 11 השלבים הוגשו</Heading>
                 <UiText color="textMuted" variant="bodySmall">
-                  הסיום ייצור ניסיון למידה סמכותי אחד ויקפיא את הניתוח לקריאה בלבד.
+                  {noLearningCredit
+                    ? 'הסיום יקפיא את התהליך לקריאה בלבד, ללא ניסיון רגיל, XP, שליטה או תזמון חזרה.'
+                    : 'הסיום ייצור ניסיון למידה סמכותי אחד ויקפיא את הניתוח לקריאה בלבד.'}
                 </UiText>
                 <Button fullWidth onPress={() => setConfirmFinalize(true)}>
                   סיום מפורש של הניתוח

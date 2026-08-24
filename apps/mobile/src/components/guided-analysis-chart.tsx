@@ -3,6 +3,7 @@ import { Pressable, TextInput, View } from 'react-native';
 
 import { generateChart, learnerAnnotationsVisibleAt } from '@chartpath/chart-engine';
 import { exercises } from '@chartpath/content';
+import { createReplayKnowledgeView, type ReplayKnowledgeView } from '@chartpath/historical-data';
 import {
   createAnalysisDraft,
   reduceAnalysisDraft,
@@ -29,9 +30,9 @@ import {
 
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { OhlcvChart } from './ohlcv-chart';
+import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 
 const GUIDED_ANALYSIS_EXERCISE_ID = 'u10-capstone-e03';
-const INITIAL_VISIBLE_CANDLE_COUNT = 24;
 const FIXED_REPLAY_GROUP_SIZE = 4;
 
 const toolChoices: readonly { readonly tool: ChartTool; readonly label: string }[] = [
@@ -107,6 +108,38 @@ function annotationsKey(annotations: readonly LearnerChartAnnotation[]): string 
   return JSON.stringify(annotations);
 }
 
+function historicalChart(
+  view: ReplayKnowledgeView,
+  session: GuidedAnalysisSession,
+): GeneratedChart {
+  const first = view.candles[0];
+  return {
+    spec: {
+      id: session.chart.id,
+      seed: 0,
+      generatorVersion: 'historical-knowledge-view-v1',
+      candleCount: view.candles.length,
+      timeframe: 'replay',
+      scenario: 'range',
+      basePrice: first?.open ?? 1,
+      baseVolume: first?.volume ?? 1,
+      volatility: 0,
+      noise: 0,
+      decisionCandleIndex: view.cursor,
+    },
+    candles: view.candles.map((candle) => ({
+      index: candle.index,
+      timestamp: candle.timestampUtc ?? '',
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+    })),
+    annotations: [],
+  };
+}
+
 export function GuidedAnalysisChart({
   session,
   onAnnotationsChange,
@@ -118,7 +151,27 @@ export function GuidedAnalysisChart({
 }: GuidedAnalysisChartProps) {
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
-  const chart = useMemo(() => canonicalChart(), []);
+  const syntheticChart = useMemo(() => canonicalChart(), []);
+  const historicalResolution =
+    session.chart.kind === 'historical' ? resolveHistoricalAnalysisSession(session) : undefined;
+  const cursor = Math.min(session.replay.cursorCandleIndex, session.replay.decisionCandleIndex);
+  const historicalView = useMemo(() => {
+    if (!historicalResolution || historicalResolution.status !== 'ready') return undefined;
+    try {
+      return createReplayKnowledgeView(
+        historicalResolution.content.dataset,
+        historicalResolution.content.scenario,
+        cursor,
+        session.status === 'finalized',
+      );
+    } catch {
+      return undefined;
+    }
+  }, [cursor, historicalResolution, session.status]);
+  const chart =
+    session.chart.kind === 'historical' && historicalView
+      ? historicalChart(historicalView, session)
+      : syntheticChart;
   const sourceAnnotationsKey = annotationsKey(session.annotations);
   const [localDraft, setLocalDraft] = useState<LocalDraftState>(() => ({
     sessionId: session.sessionId,
@@ -138,21 +191,20 @@ export function GuidedAnalysisChart({
   const [confirmClear, setConfirmClear] = useState(false);
   const annotationSequence = useRef(0);
 
-  const cursor = Math.min(session.replay.cursorCandleIndex, session.replay.decisionCandleIndex);
   const readOnly = disabled || session.status !== 'active';
   const visibleAnnotations = useMemo(
     () => learnerAnnotationsVisibleAt(draft.annotations, cursor),
     [cursor, draft.annotations],
   );
-  const visibleChart = useMemo<GeneratedChart>(
-    () => ({
+  const visibleChart = useMemo<GeneratedChart>(() => {
+    if (session.chart.kind === 'historical') return chart;
+    return {
       spec: { ...chart.spec, decisionCandleIndex: cursor },
       candles: chart.candles.filter(({ index }) => index <= cursor),
       // chartPresentation="hidden" is preserved: no semantic/reference geometry enters the view.
       annotations: [],
-    }),
-    [chart, cursor],
-  );
+    };
+  }, [chart, cursor, session.chart.kind]);
   const selectedCandle = findCandle(visibleChart, selectedCandleIndex);
   const priceFrame = useMemo(
     () =>
@@ -192,12 +244,20 @@ export function GuidedAnalysisChart({
     setSelectedCandleIndex(anchor.candleIndex);
     setCrosshair(anchor);
     if (draft.activeTool.kind === 'inspect' || draft.activeTool.kind === 'select') return;
-    updateDraft({ type: 'place-anchor', id: nextAnnotationId(), anchor });
+    updateDraft({
+      type: 'place-anchor',
+      id: nextAnnotationId(),
+      anchor,
+      ...(session.chart.kind === 'historical' ? { authoredAtCursorCandleIndex: cursor } : {}),
+    });
   };
 
   const moveReplayTo = (requestedCursor: number) => {
     if (readOnly) return;
-    const bounded = Math.max(0, Math.min(session.replay.decisionCandleIndex, requestedCursor));
+    const bounded = Math.max(
+      session.replay.initialCursorCandleIndex,
+      Math.min(session.replay.decisionCandleIndex, requestedCursor),
+    );
     if (bounded !== cursor) onReplayCursorChange(bounded);
     setSelectedCandleIndex(undefined);
     setCrosshair(undefined);
@@ -205,12 +265,13 @@ export function GuidedAnalysisChart({
 
   const identityMatches =
     session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
-    session.chart.kind === 'synthetic' &&
-    session.chart.id === chart.spec.id &&
-    session.chart.seed === chart.spec.seed &&
-    session.chart.generatorVersion === chart.spec.generatorVersion &&
-    session.chart.candleCount === chart.candles.length &&
-    session.chart.decisionCandleIndex === chart.spec.decisionCandleIndex;
+    (session.chart.kind === 'historical'
+      ? historicalResolution?.status === 'ready' && historicalView !== undefined
+      : session.chart.id === syntheticChart.spec.id &&
+        session.chart.seed === syntheticChart.spec.seed &&
+        session.chart.generatorVersion === syntheticChart.spec.generatorVersion &&
+        session.chart.candleCount === syntheticChart.candles.length &&
+        session.chart.decisionCandleIndex === syntheticChart.spec.decisionCandleIndex);
 
   if (!identityMatches) {
     return (
@@ -223,6 +284,11 @@ export function GuidedAnalysisChart({
     );
   }
 
+  const historical = session.chart.kind === 'historical';
+  const blindHistorical = historical && session.status !== 'finalized';
+  const chartTicker =
+    historicalView?.identity?.displaySymbol ?? (historical ? 'Historical' : 'CPTH');
+
   return (
     <View style={{ gap: theme.spacing.md, width: '100%' }} testID={testID}>
       <Card variant="subtle">
@@ -232,6 +298,7 @@ export function GuidedAnalysisChart({
             <Badge tone={readOnly ? 'neutral' : 'teal'}>
               {readOnly ? 'קריאה בלבד' : CAPSTONE_STEP_LABELS[session.currentStepId]}
             </Badge>
+            {blindHistorical ? <Badge tone="warning">Replay היסטורי עיוור</Badge> : undefined}
           </View>
           <UiText color="textMuted" variant="bodySmall">
             זהו משטח הקשר וטיוטה בלבד. הסימונים כאן אינם ראיות לתשובה, אינם חושפים תשובת ייחוס ואינם
@@ -280,19 +347,24 @@ export function GuidedAnalysisChart({
 
       <View style={{ direction: 'ltr', width: '100%' }} testID={`${testID}-ltr-surface`}>
         <OhlcvChart
-          accessibilityLabel="גרף מחברת הניתוח, כרונולוגיה משמאל לימין, ללא סימוני ייחוס"
+          accessibilityLabel={
+            historicalView?.accessibilityLabel ??
+            'גרף מחברת הניתוח, כרונולוגיה משמאל לימין, ללא סימוני ייחוס'
+          }
           chart={visibleChart}
           crosshairAnchor={crosshair}
+          cutoffCandleIndex={cursor}
           interactionHint={toolStatus(draft)}
           interactive={!readOnly && draft.activeTool.kind !== 'select'}
           learnerAnnotations={visibleAnnotations}
           onChartPress={placeAnchor}
+          presentationPolicy={blindHistorical ? 'blind' : 'standard'}
           selectedAnnotationId={draft.selectedAnnotationId}
           selectedCandleIndex={selectedCandleIndex}
           selectedPoints={draft.pendingDrawing ? [draft.pendingDrawing.start] : []}
           showAnnotations={false}
           testID={`${testID}-plot`}
-          ticker="CPTH"
+          ticker={chartTicker}
         />
       </View>
 
@@ -301,7 +373,9 @@ export function GuidedAnalysisChart({
           <View style={{ gap: 5 }}>
             <UiText variant="label">נתוני הנר שנבחר</UiText>
             <LtrText color="textMuted" variant="numeric">
-              {`#${selectedCandle.index} | ${selectedCandle.timestamp} | O ${selectedCandle.open.toFixed(2)} H ${selectedCandle.high.toFixed(2)} L ${selectedCandle.low.toFixed(2)} C ${selectedCandle.close.toFixed(2)} V ${Math.round(selectedCandle.volume)}`}
+              {blindHistorical
+                ? `#${selectedCandle.index + 1} | O ${selectedCandle.open.toFixed(2)} H ${selectedCandle.high.toFixed(2)} L ${selectedCandle.low.toFixed(2)} C ${selectedCandle.close.toFixed(2)} V ${Math.round(selectedCandle.volume)}`
+                : `#${selectedCandle.index} | ${selectedCandle.timestamp} | O ${selectedCandle.open.toFixed(2)} H ${selectedCandle.high.toFixed(2)} L ${selectedCandle.low.toFixed(2)} C ${selectedCandle.close.toFixed(2)} V ${Math.round(selectedCandle.volume)}`}
             </LtrText>
           </View>
         </Card>
@@ -415,16 +489,8 @@ export function GuidedAnalysisChart({
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <Button
-              disabled={
-                readOnly ||
-                cursor ===
-                  Math.min(INITIAL_VISIBLE_CANDLE_COUNT - 1, session.replay.decisionCandleIndex)
-              }
-              onPress={() =>
-                moveReplayTo(
-                  Math.min(INITIAL_VISIBLE_CANDLE_COUNT - 1, session.replay.decisionCandleIndex),
-                )
-              }
+              disabled={readOnly || cursor === session.replay.initialCursorCandleIndex}
+              onPress={() => moveReplayTo(session.replay.initialCursorCandleIndex)}
               size="compact"
               variant="ghost"
             >

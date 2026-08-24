@@ -18,7 +18,13 @@ import {
 import { ErrorState, LoadingState } from './app-state';
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { TopBar } from './top-bar';
+import {
+  resolveHistoricalAnalysisSession,
+  resolveHistoricalReplayScenario,
+} from '@/data/historical-replay';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
+
+const HISTORICAL_SCENARIO_ID = 'blind-generated-development-scenario';
 
 function progress(session: GuidedAnalysisSession): number {
   return ANALYSIS_WORKFLOW_STEP_IDS.filter((id) => session.steps[id].status === 'submitted').length;
@@ -34,7 +40,7 @@ export function AnalysisLabHub() {
   const theme = useTheme();
   const learning = useLearning();
   const [working, setWorking] = useState(false);
-  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [confirmRestartId, setConfirmRestartId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (learning.status === 'loading') return <LoadingState />;
   if (learning.status === 'error' || !learning.snapshot) {
@@ -46,12 +52,26 @@ export function AnalysisLabHub() {
     );
   }
 
-  const active = [...learning.snapshot.analysisSessions]
+  const activeSynthetic = [...learning.snapshot.analysisSessions]
     .filter(
       (session) =>
-        session.status === 'active' && session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID,
+        session.status === 'active' &&
+        session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
+        session.chart.kind === 'synthetic',
     )
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
+  const activeHistorical = [...learning.snapshot.analysisSessions]
+    .filter(
+      (session) =>
+        session.status === 'active' &&
+        session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
+        session.chart.kind === 'historical',
+    )
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
+  const historicalEntry = resolveHistoricalReplayScenario(HISTORICAL_SCENARIO_ID);
+  const activeHistoricalResolution = activeHistorical
+    ? resolveHistoricalAnalysisSession(activeHistorical)
+    : undefined;
   const finalizedCount = learning.snapshot.analysisSessions.filter(
     (session) => session.status === 'finalized',
   ).length;
@@ -60,11 +80,15 @@ export function AnalysisLabHub() {
     router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href);
   };
 
-  const start = async () => {
+  const start = async (kind: 'synthetic' | 'historical') => {
     setWorking(true);
     setError(null);
     try {
-      const session = await learning.createOrResumeAnalysisSession();
+      const session = await learning.createOrResumeAnalysisSession(
+        kind === 'historical'
+          ? { kind: 'historical', scenarioId: HISTORICAL_SCENARIO_ID }
+          : { kind: 'synthetic' },
+      );
       openSession(session);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'לא הצלחנו לפתוח ניתוח.');
@@ -74,12 +98,12 @@ export function AnalysisLabHub() {
   };
 
   const restart = async () => {
-    if (!active) return;
+    if (!confirmRestartId) return;
     setWorking(true);
     setError(null);
     try {
-      const session = await learning.restartAnalysisSession(active.sessionId);
-      setConfirmRestart(false);
+      const session = await learning.restartAnalysisSession(confirmRestartId);
+      setConfirmRestartId(null);
       openSession(session);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'לא הצלחנו להתחיל מחדש.');
@@ -122,31 +146,39 @@ export function AnalysisLabHub() {
           <UiText color="textMuted" variant="caption">
             התרחיש סינתטי ומיועד ללמידה בלבד. אין בו אות, תחזית או המלצה אישית.
           </UiText>
-          {!active ? (
-            <Button disabled={working} fullWidth onPress={() => void start()} size="large">
+          {!activeSynthetic ? (
+            <Button
+              disabled={working}
+              fullWidth
+              onPress={() => void start('synthetic')}
+              size="large"
+            >
               {working ? 'פותח ניתוח…' : 'התחלת ניתוח חדש'}
             </Button>
           ) : undefined}
         </View>
       </Card>
 
-      {active ? (
+      {activeSynthetic ? (
         <Card testID="analysis-resume-card" variant="outlined">
           <View style={{ gap: theme.spacing.sm }}>
             <View style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <Badge tone="warning">ניתוח בתהליך</Badge>
               <UiText style={{ flex: 1 }} variant="label">
-                {CAPSTONE_STEP_LABELS[active.currentStepId]}
+                {CAPSTONE_STEP_LABELS[activeSynthetic.currentStepId]}
               </UiText>
-              <LtrText color="textMuted" variant="numeric">{`${progress(active)}/11`}</LtrText>
+              <LtrText
+                color="textMuted"
+                variant="numeric"
+              >{`${progress(activeSynthetic)}/11`}</LtrText>
             </View>
             <ProgressBar
               accessibilityLabel="התקדמות בטיוטת הניתוח"
               showValue
-              value={(progress(active) / 11) * 100}
+              value={(progress(activeSynthetic) / 11) * 100}
             />
             <LtrText color="textMuted" variant="caption">
-              {sessionDate(active.updatedAt)}
+              {sessionDate(activeSynthetic.updatedAt)}
             </LtrText>
             <UiText color="textMuted" variant="caption">
               התשובות, הסימונים, הרמזים ומיקום ה-replay נשמרו במכשיר.
@@ -154,12 +186,16 @@ export function AnalysisLabHub() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <Button
                 disabled={working}
-                onPress={() => openSession(active)}
+                onPress={() => openSession(activeSynthetic)}
                 style={{ flexGrow: 1 }}
               >
                 המשך הניתוח
               </Button>
-              <Button disabled={working} onPress={() => setConfirmRestart(true)} variant="danger">
+              <Button
+                disabled={working}
+                onPress={() => setConfirmRestartId(activeSynthetic.sessionId)}
+                variant="danger"
+              >
                 התחלה מחדש
               </Button>
             </View>
@@ -167,7 +203,82 @@ export function AnalysisLabHub() {
         </Card>
       ) : undefined}
 
-      {confirmRestart && active ? (
+      <Card testID="historical-replay-entry" variant="outlined">
+        <View style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Badge tone="warning">Beta פנימי</Badge>
+            <Badge tone="neutral">Frozen Historical Replay</Badge>
+            <Badge tone="neutral">ללא XP רגיל</Badge>
+          </View>
+          <Heading level={2}>Replay היסטורי עיוור</Heading>
+          <UiText>
+            הזהות, התאריכים והתוצאה מוסתרים בזמן העבודה. נחשפים נרות קפואים בלבד, אחד־אחד, עד נקודת
+            ההחלטה — ללא מסחר חי, פקודות או בקרי קנייה ומכירה.
+          </UiText>
+          {historicalEntry.status === 'ready' ? (
+            <>
+              <UiText color="textMuted" variant="bodySmall">
+                {historicalEntry.content.scenario.hebrewDisclosure}
+              </UiText>
+              <LtrText color="textMuted" variant="caption">
+                {`${historicalEntry.content.dataset.manifest.datasetId}@${historicalEntry.content.dataset.manifest.datasetVersion}`}
+              </LtrText>
+              <UiText color="textMuted" variant="caption">
+                סטטוס: {historicalEntry.content.scenario.publicationStatus} · התאמה:{' '}
+                {historicalEntry.content.dataset.manifest.adjustment.mode} · סשן:{' '}
+                {historicalEntry.content.dataset.manifest.sessionPolicy.includedSessions.join(', ')}{' '}
+                · חוסרים נשמרים ואינם מומצאים.
+              </UiText>
+              {!activeHistorical ? (
+                <Button
+                  disabled={working}
+                  fullWidth
+                  onPress={() => void start('historical')}
+                  variant="secondary"
+                >
+                  {working ? 'פותח Replay…' : 'פתיחת Replay היסטורי פנימי'}
+                </Button>
+              ) : undefined}
+            </>
+          ) : (
+            <UiText color="warning">תרחיש ה־Replay הפנימי אינו זמין כעת.</UiText>
+          )}
+        </View>
+      </Card>
+
+      {activeHistorical ? (
+        <Card testID="historical-analysis-resume-card" variant="outlined">
+          <View style={{ gap: theme.spacing.sm }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge tone="warning">Replay עיוור בתהליך</Badge>
+              <Badge tone="neutral">ללא קרדיט למידה רגיל</Badge>
+            </View>
+            <UiText variant="label">תרחיש היסטורי שמור — הזהות עדיין מוסתרת</UiText>
+            <LtrText color="textMuted" variant="numeric">
+              {`${progress(activeHistorical)}/11 · cursor ${activeHistorical.replay.cursorCandleIndex + 1}`}
+            </LtrText>
+            <UiText color="textMuted" variant="caption">
+              {activeHistoricalResolution?.status === 'ready'
+                ? 'הנתונים הקפואים והזהות המוצמדת אומתו מול העותק המותקן.'
+                : 'העותק המוצמד חסר או השתנה; הטיוטה תיפתח במצב שחזור בטוח.'}
+            </UiText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Button onPress={() => openSession(activeHistorical)} style={{ flexGrow: 1 }}>
+                המשך Replay עיוור
+              </Button>
+              <Button
+                disabled={working}
+                onPress={() => setConfirmRestartId(activeHistorical.sessionId)}
+                variant="danger"
+              >
+                התחלה מחדש מאותו מקור
+              </Button>
+            </View>
+          </View>
+        </Card>
+      ) : undefined}
+
+      {confirmRestartId ? (
         <Card accessibilityLabel="אישור התחלת ניתוח מחדש" variant="outlined">
           <View style={{ gap: theme.spacing.sm }}>
             <Heading level={3}>להתחיל מחדש?</Heading>
@@ -175,7 +286,7 @@ export function AnalysisLabHub() {
               הטיוטה הנוכחית תסומן כנטושה ותישאר בהיסטוריה. ניסיונות שהושלמו ו־XP לא יימחקו.
             </UiText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              <Button onPress={() => setConfirmRestart(false)} variant="ghost">
+              <Button onPress={() => setConfirmRestartId(null)} variant="ghost">
                 שמירת הטיוטה
               </Button>
               <Button disabled={working} onPress={() => void restart()} variant="danger">

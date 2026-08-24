@@ -39,6 +39,7 @@ jest.mock('../guided-analysis-chart', () => {
 });
 
 import { GuidedAnalysisSessionView } from '../guided-analysis-session';
+import { resolveHistoricalReplayScenario } from '@/data/historical-replay';
 
 const exercise = exercises.find(({ id }) => id === 'u10-capstone-e03')!;
 
@@ -146,8 +147,8 @@ function correctAnswer(rubric: AtomicAnswerRubric): AtomicExerciseAnswer {
   }
 }
 
-function finalizedSession(): GuidedAnalysisSession {
-  let current = session();
+function finalizedSession(initial: GuidedAnalysisSession = session()): GuidedAnalysisSession {
+  let current = initial;
   exercise.capstoneSteps!.forEach((step, index) => {
     const timestamp = `2026-08-24T10:${String(index + 1).padStart(2, '0')}:00.000Z`;
     const answer = correctAnswer(step.rubric);
@@ -170,6 +171,26 @@ function finalizedSession(): GuidedAnalysisSession {
     idempotencyKey: current.finalizationIdempotencyKey,
     finalResult: result(),
     finalizedAt: '2026-08-24T11:00:00.000Z',
+  });
+}
+
+function historicalSession(): GuidedAnalysisSession {
+  const resolved = resolveHistoricalReplayScenario('blind-generated-development-scenario');
+  if (resolved.status !== 'ready') throw new Error('Historical fixture unavailable');
+  return createGuidedAnalysisSession({
+    sessionId: 'historical-ui-session',
+    attemptId: 'historical-ui-attempt',
+    finalizationIdempotencyKey: 'historical-ui-finalize',
+    exerciseId: exercise.id,
+    contentVersionId: exercise.contentVersionId,
+    exerciseSchemaVersion: exercise.schemaVersion,
+    chart: resolved.chartIdentity,
+    createdAt: '2026-08-24T10:00:00.000Z',
+    initialReplayCursorCandleIndex: 23,
+    workflowStepIds: ANALYSIS_WORKFLOW_STEP_IDS,
+    stepRubrics: Object.fromEntries(
+      exercise.capstoneSteps!.map((step) => [step.id, step.rubric]),
+    ) as Readonly<Record<AnalysisWorkflowStepId, AtomicAnswerRubric>>,
   });
 }
 
@@ -265,5 +286,50 @@ describe('GuidedAnalysisSessionView', () => {
     expect(screen.getAllByText('מדויק')).toHaveLength(11);
     expect(screen.getByLabelText('מחברת finalized')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'הגשת השלב' })).toBeNull();
+  });
+
+  it('shows a verified blind historical shell without pre-final identity or terms', async () => {
+    const screen = await renderSession(historicalSession());
+    const serialized = JSON.stringify(screen.toJSON());
+
+    expect(screen.getByTestId('historical-session-disclosure')).toBeTruthy();
+    expect(screen.getByText(/הזהות והתאריכים מוסתרים עד הסיום/)).toBeTruthy();
+    expect(screen.getByText(/ללא.*XP.*רגיל/)).toBeTruthy();
+    expect(serialized).not.toMatch(/DEV-BLIND-001|Generated fixture 001|2025-01-05|github\.com/);
+  });
+
+  it('blocks editing when the pinned historical dataset identity changed', async () => {
+    const current = historicalSession();
+    if (current.chart.kind !== 'historical') throw new Error('Expected historical identity');
+    const screen = await renderSession({
+      ...current,
+      chart: { ...current.chart, datasetVersion: 'modified-version' },
+    });
+
+    expect(screen.getByText('גרסת הטיוטה אינה תואמת')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'הגשת השלב' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'סיום מפורש של הניתוח' })).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/Generated fixture 001|2025-01-05/);
+  });
+
+  it('reveals finalized provenance, explains no-credit behavior, and restarts the same source', async () => {
+    const current = finalizedSession(historicalSession());
+    const screen = await renderSession(current);
+
+    expect(screen.getByTestId('historical-replay-reveal')).toBeTruthy();
+    expect(screen.getByText(/Generated fixture 001/)).toBeTruthy();
+    expect(screen.getByText(/2025-01-05/)).toBeTruthy();
+    expect(screen.getByText('זהו תרשים היסטורי; הזהות והתוצאה הוסתרו עד לסיום.')).toBeTruthy();
+    expect(screen.getByText('הציון מעריך את תהליך הניתוח, לא את תוצאת השוק.')).toBeTruthy();
+    expect(screen.getByText('תוצאה היסטורית אינה מבטיחה תוצאה עתידית.')).toBeTruthy();
+    expect(screen.getByText('אין כאן המלצה עדכנית לקנייה, מכירה או פעולה.')).toBeTruthy();
+    expect(screen.getByTestId('historical-no-credit')).toBeTruthy();
+    expect(screen.queryByText('מיומנויות שהודגמו')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'ניתוח חדש' }));
+    expect(mockLearning.createOrResumeAnalysisSession).toHaveBeenCalledWith({
+      kind: 'historical',
+      scenarioId: 'blind-generated-development-scenario',
+    });
   });
 });
