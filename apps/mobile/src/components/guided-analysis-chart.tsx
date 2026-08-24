@@ -205,6 +205,7 @@ export function GuidedAnalysisChart({
 
   const identityMatches =
     session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
+    session.chart.kind === 'synthetic' &&
     session.chart.id === chart.spec.id &&
     session.chart.seed === chart.spec.seed &&
     session.chart.generatorVersion === chart.spec.generatorVersion &&

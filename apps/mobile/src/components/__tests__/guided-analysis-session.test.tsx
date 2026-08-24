@@ -15,7 +15,7 @@ import {
 import { ChartPathThemeProvider } from '@chartpath/ui';
 
 import type { LearningContextValue } from '@/state/learning';
-import type { PersistenceSnapshot } from '@/lib/persistence';
+import { CURRENT_PERSISTENCE_SCHEMA_VERSION, type PersistenceSnapshot } from '@/lib/persistence';
 
 let mockLearning: LearningContextValue;
 
@@ -62,10 +62,11 @@ function session(): GuidedAnalysisSession {
     contentVersionId: exercise.contentVersionId,
     exerciseSchemaVersion: exercise.schemaVersion,
     chart: {
+      kind: 'synthetic',
       id: exercise.chartSpec!.id,
       seed: exercise.chartSpec!.seed,
       generatorVersion: exercise.chartSpec!.generatorVersion,
-      candleCount: exercise.chartSpec!.decisionCandleIndex! + 1,
+      candleCount: exercise.chartSpec!.candleCount,
       decisionCandleIndex: exercise.chartSpec!.decisionCandleIndex!,
     },
     createdAt: '2026-08-24T10:00:00.000Z',
@@ -80,7 +81,7 @@ function session(): GuidedAnalysisSession {
 function snapshot(analysisSessions: readonly GuidedAnalysisSession[]): PersistenceSnapshot {
   return {
     metadata: {
-      schemaVersion: 3,
+      schemaVersion: CURRENT_PERSISTENCE_SCHEMA_VERSION,
       contentVersion: exercise.contentVersionId,
       projectorVersion: 1,
       createdAt: '2026-08-24T10:00:00.000Z',
@@ -201,6 +202,15 @@ function renderSession(current: GuidedAnalysisSession) {
 }
 
 describe('GuidedAnalysisSessionView', () => {
+  it('accepts the persisted full source count even when the decision cutoff is earlier', async () => {
+    const current = session();
+    expect(current.chart.candleCount).toBe(exercise.chartSpec!.candleCount);
+    expect(current.chart.candleCount).toBeGreaterThan(current.chart.decisionCandleIndex + 1);
+
+    const screen = await renderSession(current);
+    expect(screen.getByTestId('guided-analysis-session')).toBeTruthy();
+  });
+
   it('flushes the current revision through the serialized save queue when backgrounded', async () => {
     let onAppStateChange: ((state: AppStateStatus) => void) | undefined;
     const subscription = { remove: jest.fn() };

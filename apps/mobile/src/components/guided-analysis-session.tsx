@@ -120,19 +120,16 @@ function sessionMatchesExercise(
   exercise: CapstoneExercise,
 ): boolean {
   const chartSpec = exercise.chartSpec;
-  const permittedCandleCount =
-    chartSpec?.decisionCandleIndex === undefined
-      ? chartSpec?.candleCount
-      : Math.min(chartSpec.candleCount, chartSpec.decisionCandleIndex + 1);
   return Boolean(
     chartSpec &&
+    session.chart.kind === 'synthetic' &&
     session.exerciseId === exercise.id &&
     session.contentVersionId === contentVersion.id &&
     session.exerciseSchemaVersion === exercise.schemaVersion &&
     session.chart.id === chartSpec.id &&
     session.chart.seed === chartSpec.seed &&
     session.chart.generatorVersion === chartSpec.generatorVersion &&
-    session.chart.candleCount === permittedCandleCount &&
+    session.chart.candleCount === chartSpec.candleCount &&
     session.chart.decisionCandleIndex === chartSpec.decisionCandleIndex,
   );
 }
@@ -529,7 +526,6 @@ export function GuidedAnalysisSessionView({
         checkpoint: {
           id: `${current.sessionId}:${stepId}:${next.revision}`,
           stepId,
-          cursorCandleIndex: current.replay.cursorCandleIndex,
           capturedAt: submittedAt,
         },
       });
@@ -637,14 +633,13 @@ export function GuidedAnalysisSessionView({
                 updatedAt: monotonicNow(current),
               });
             }}
-            onCheckpointRequested={(cursorCandleIndex) => {
+            onCheckpointRequested={() => {
               const current = sessionRef.current;
               transition({
                 type: 'add-replay-checkpoint',
                 checkpoint: {
                   id: `${current.sessionId}:manual:${current.revision + 1}`,
                   stepId: current.currentStepId,
-                  cursorCandleIndex,
                   capturedAt: monotonicNow(current),
                 },
               });

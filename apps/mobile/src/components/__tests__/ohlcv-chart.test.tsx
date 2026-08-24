@@ -135,4 +135,150 @@ describe('OhlcvChart accessibility', () => {
     ).toBeTruthy();
     expect(screen.getByLabelText(/הסימון שלך כולל נקודה אחת/)).toBeTruthy();
   });
+
+  it('applies one cutoff to candles, overlays, scale inputs, and accessible rows', async () => {
+    const cutoffChart: GeneratedChart = {
+      ...chart,
+      annotations: [
+        {
+          id: 'future-semantic',
+          kind: 'point',
+          role: 'future',
+          candleIndex: 2,
+          price: 107,
+          visibleFromCandleIndex: 2,
+        },
+      ],
+    };
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart
+          chart={cutoffChart}
+          crosshairAnchor={{ candleIndex: 2, price: 107 }}
+          cutoffCandleIndex={1}
+          expectedLine={{
+            start: { candleIndex: 0, price: 100 },
+            end: { candleIndex: 2, price: 107 },
+          }}
+          expectedPoints={[{ candleIndex: 2, price: 107 }]}
+          expectedZone={{
+            startCandleIndex: 2,
+            endCandleIndex: 2,
+            priceLow: 106,
+            priceHigh: 108,
+          }}
+          highlightedCandleIndices={[1, 2]}
+          learnerAnnotations={[
+            {
+              id: 'future-anchor',
+              kind: 'point',
+              anchor: { candleIndex: 2, price: 107 },
+            },
+            {
+              id: 'later-authored',
+              kind: 'point',
+              anchor: { candleIndex: 0, price: 100 },
+              authoredAtCursorCandleIndex: 2,
+            },
+          ]}
+          selectedCandleIndex={2}
+          selectedLine={{
+            start: { candleIndex: 0, price: 100 },
+            end: { candleIndex: 2, price: 107 },
+          }}
+          selectedPoints={[{ candleIndex: 2, price: 107 }]}
+          selectedZone={{
+            startCandleIndex: 2,
+            endCandleIndex: 2,
+            priceLow: 106,
+            priceHigh: 108,
+          }}
+          showAnnotations
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.queryByTestId('ohlcv-chart-semantic-future-semantic')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-learner-future-anchor')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-learner-later-authored')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-highlight-2')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-selected-candle')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-crosshair')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-expected-line')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-expected-point-0')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-expected-zone')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-selected-line')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-selected-point-0')).toBeNull();
+    expect(screen.queryByTestId('ohlcv-chart-selected-zone')).toBeNull();
+    expect(
+      screen.getByTestId('ohlcv-chart-highlight-1', { includeHiddenElements: true }),
+    ).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני הנרות' }));
+    expect(screen.getByLabelText(/נר 1: פתיחה 102.00/)).toBeTruthy();
+    expect(screen.queryByLabelText(/נר 2:/)).toBeNull();
+  });
+
+  it('produces identical cutoff output for identical prefixes with different tails', async () => {
+    const extremeTailChart: GeneratedChart = {
+      ...chart,
+      candles: [
+        chart.candles[0]!,
+        chart.candles[1]!,
+        {
+          ...chart.candles[2]!,
+          open: 9_500,
+          high: 10_000,
+          low: 9_000,
+          close: 9_600,
+          volume: 99_000_000,
+        },
+      ],
+    };
+    const ordinary = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart chart={chart} cutoffCandleIndex={1} />
+      </ChartPathThemeProvider>,
+    );
+    const extreme = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart chart={extremeTailChart} cutoffCandleIndex={1} />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(JSON.stringify(extreme.toJSON())).toBe(JSON.stringify(ordinary.toJSON()));
+  });
+
+  it('redacts identity and dates in blind presentation, including accessibility text', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart
+          accessibilityLabel="SECRET ticker on 2026-01-03"
+          chart={chart}
+          interactionHint="SECRET on 2026-01-03"
+          interactive
+          onChartPress={jest.fn()}
+          presentationPolicy="blind"
+          ticker="SECRET"
+          viewport={{
+            startIndex: 1,
+            endIndex: 2,
+            minPrice: -999,
+            maxPrice: 999,
+          }}
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByLabelText(/תרשים נרות היסטורי מוסתר זהות/)).toBeTruthy();
+    expect(screen.queryByText('SECRET')).toBeNull();
+    expect(screen.queryByText('1D')).toBeNull();
+    expect(screen.queryByLabelText(/SECRET|2026-01-03/)).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/SECRET|2026-01-03|01\/01|03\/01|1D/);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני הנרות' }));
+    expect(screen.getByLabelText(/נר רציף 2: פתיחה 102.00/)).toBeTruthy();
+    expect(screen.getByText(/#2 \| O 102.00/)).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/SECRET|2026-01-03|01\/01|03\/01|1D/);
+  });
 });

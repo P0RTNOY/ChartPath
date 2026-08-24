@@ -9,7 +9,9 @@ import {
   createChartViewport,
   createReplayState,
   generateFullChart,
+  learnerAnnotationsVisibleAt,
   panChartViewport,
+  projectVisibleCandles,
   reduceReplayState,
   replayChartSlice,
   screenToChart,
@@ -27,6 +29,37 @@ const bounds: ChartBounds = {
 };
 
 describe('bounded chart viewport', () => {
+  it('derives identical visible bounds and statistics from identical prefixes with different tails', () => {
+    const prefix = replayFixture().candles.slice(0, 6);
+    const lowTail = replayFixture()
+      .candles.slice(6)
+      .map((candle) => ({
+        ...candle,
+        high: 10,
+        low: 8,
+        open: 9,
+        close: 9,
+        volume: 99_000_000,
+      }));
+    const highTail = replayFixture()
+      .candles.slice(6)
+      .map((candle) => ({
+        ...candle,
+        high: 10_000,
+        low: 9_000,
+        open: 9_500,
+        close: 9_500,
+        volume: 1,
+      }));
+
+    const left = projectVisibleCandles([...prefix, ...lowTail], { cutoffCandleIndex: 5 });
+    const right = projectVisibleCandles([...prefix, ...highTail], { cutoffCandleIndex: 5 });
+
+    expect(left).toEqual(right);
+    expect(left.candles).toEqual(prefix);
+    expect(left.bounds?.maxIndex).toBe(5);
+  });
+
   it('keeps zoom and pan inside the permitted candle range', () => {
     const initial = createChartViewport(bounds, { startIndex: 20, endIndex: 59 });
     const zoomed = zoomChartViewport(initial, 2, 40, bounds);
@@ -166,6 +199,18 @@ describe('deterministic replay', () => {
       visibleCandleIndex: 2,
       annotations: [drawings[0]],
     });
+  });
+
+  it('hides an early-anchor drawing that was authored after the visible cursor', () => {
+    const annotation = {
+      id: 'hindsight-note',
+      kind: 'point' as const,
+      anchor: { candleIndex: 1, price: 100 },
+      authoredAtCursorCandleIndex: 8,
+    };
+
+    expect(learnerAnnotationsVisibleAt([annotation], 2)).toEqual([]);
+    expect(learnerAnnotationsVisibleAt([annotation], 8)).toEqual([annotation]);
   });
 });
 

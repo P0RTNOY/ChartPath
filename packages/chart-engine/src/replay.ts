@@ -1,5 +1,5 @@
 import type { GeneratedChart, LearnerChartAnnotation } from '@chartpath/domain';
-import { learnerAnnotationLastCandleIndex } from '@chartpath/domain';
+import { learnerAnnotationsVisibleAtCursor } from '@chartpath/domain';
 
 import { sliceChartAt, type DecisionChartSlice } from './decision.js';
 
@@ -115,12 +115,7 @@ export function learnerAnnotationsVisibleAt(
   annotations: readonly LearnerChartAnnotation[],
   visibleCandleIndex: number,
 ): readonly LearnerChartAnnotation[] {
-  if (!Number.isInteger(visibleCandleIndex) || visibleCandleIndex < 0) {
-    throw new RangeError('Visible candle index must be a non-negative integer');
-  }
-  return annotations.filter(
-    (annotation) => learnerAnnotationLastCandleIndex(annotation) <= visibleCandleIndex,
-  );
+  return learnerAnnotationsVisibleAtCursor(annotations, visibleCandleIndex);
 }
 
 function moveReplayTo(state: ReplayState, requestedIndex: number): ReplayState {

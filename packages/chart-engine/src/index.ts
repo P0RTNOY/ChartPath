@@ -6,6 +6,7 @@ export * from './price-model.js';
 export * from './prng.js';
 export * from './replay.js';
 export * from './viewport.js';
+export * from './visible.js';
 
 export type {
   ChartAnchor,

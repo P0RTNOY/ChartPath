@@ -95,6 +95,13 @@ describe('ChartWorkbench', () => {
       screen.getByTestId('workbench-chart-expected-line', { includeHiddenElements: true }),
     ).toBeTruthy();
     expect(screen.getByText('סימון מדויק')).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'איפוס' }));
+    expect(screen.queryByTestId('workbench-feedback')).toBeNull();
+    expect(screen.queryByTestId('workbench-chart-expected-line')).toBeNull();
+    expect(screen.queryByRole('button', { name: /בחירת קו מגמה/ })).toBeNull();
+    expect(screen.getByText('0')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'השוואת הניתוח' })).toBeDisabled();
   });
 
   it('creates and specifically deletes scratch geometry without exposing reference geometry', async () => {

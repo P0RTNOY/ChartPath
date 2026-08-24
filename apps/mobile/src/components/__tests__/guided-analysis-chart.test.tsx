@@ -34,6 +34,7 @@ function session(
     contentVersionId: exercise.contentVersionId,
     exerciseSchemaVersion: exercise.schemaVersion,
     chart: {
+      kind: 'synthetic',
       id: chart.spec.id,
       seed: chart.spec.seed,
       generatorVersion: chart.spec.generatorVersion,
@@ -58,7 +59,9 @@ function session(
     ) as unknown as GuidedAnalysisSession['steps'],
     annotations,
     replay: {
+      initialCursorCandleIndex: 23,
       cursorCandleIndex,
+      maxCursorSeenCandleIndex: cursorCandleIndex,
       decisionCandleIndex: chart.spec.decisionCandleIndex!,
       checkpoints: [],
     },

@@ -6,11 +6,12 @@ import {
   createChartViewport,
   createReplayState,
   generateChart,
+  learnerAnnotationsVisibleAt,
   panChartViewport,
+  projectVisibleCandles,
   reduceReplayState,
   replayChartSlice,
   zoomChartViewport,
-  type ChartBounds,
   type ChartViewport,
   type ReplayAction,
 } from '@chartpath/chart-engine';
@@ -58,24 +59,6 @@ const toolChoices: readonly { readonly tool: ChartTool; readonly label: string }
   { tool: { kind: 'zone' }, label: 'אזור' },
   { tool: { kind: 'select' }, label: 'בחירה ומחיקה' },
 ];
-
-function chartBounds(chart: GeneratedChart): ChartBounds {
-  const frame = chart.candles.reduce(
-    (current, candle) => ({
-      minPrice: Math.min(current.minPrice, candle.low),
-      maxPrice: Math.max(current.maxPrice, candle.high),
-    }),
-    { minPrice: Number.POSITIVE_INFINITY, maxPrice: Number.NEGATIVE_INFINITY },
-  );
-  const padding = Math.max(0.01, (frame.maxPrice - frame.minPrice) * 0.08);
-  return {
-    minIndex: chart.candles[0]?.index ?? 0,
-    maxIndex: chart.candles.at(-1)?.index ?? 0,
-    minPrice: frame.minPrice - padding,
-    maxPrice: frame.maxPrice + padding,
-    minVisibleCandles: MIN_VISIBLE_CANDLES,
-  };
-}
 
 function toolLabel(tool: ChartTool): string {
   return toolChoices.find((choice) => choice.tool.kind === tool.kind)?.label ?? tool.kind;
@@ -141,8 +124,17 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
   const exercise = useMemo(() => authoredExercise(), []);
   const rubric = exercise.rubric;
   const chart = useMemo(() => generateChart(exercise.chartSpec), [exercise.chartSpec]);
-  const fullBounds = useMemo(() => chartBounds(chart), [chart]);
   const decisionCandleIndex = rubric.decisionCandleIndex ?? chart.candles.length - 1;
+  const initialEndIndex = Math.min(INITIAL_VISIBLE_CANDLES - 1, decisionCandleIndex);
+  const initialBounds = useMemo(
+    () =>
+      projectVisibleCandles(chart.candles, {
+        cutoffCandleIndex: initialEndIndex,
+        minVisibleCandles: MIN_VISIBLE_CANDLES,
+      }).bounds,
+    [chart.candles, initialEndIndex],
+  );
+  if (!initialBounds) throw new Error('The Chart Lab exercise has no visible candles');
   const [draft, setDraft] = useState<AnalysisDraft>(() => createAnalysisDraft({ kind: 'inspect' }));
   const [replay, setReplay] = useState(() =>
     createReplayState(chart, {
@@ -153,14 +145,11 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
   );
   const initialViewport = useMemo(
     () =>
-      createChartViewport(
-        { ...fullBounds, maxIndex: Math.min(INITIAL_VISIBLE_CANDLES - 1, decisionCandleIndex) },
-        {
-          startIndex: fullBounds.minIndex,
-          endIndex: Math.min(INITIAL_VISIBLE_CANDLES - 1, decisionCandleIndex),
-        },
-      ),
-    [decisionCandleIndex, fullBounds],
+      createChartViewport(initialBounds, {
+        startIndex: initialBounds.minIndex,
+        endIndex: initialEndIndex,
+      }),
+    [initialBounds, initialEndIndex],
   );
   const [viewport, setViewport] = useState<ChartViewport>(initialViewport);
   const [selectedCandleIndex, setSelectedCandleIndex] = useState<number>();
@@ -181,32 +170,51 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
     () => replayChartSlice(chart, replayWithDrawings),
     [chart, replayWithDrawings],
   );
-  const visibleChart = useMemo<GeneratedChart>(
-    () => ({
-      spec: { ...chart.spec, decisionCandleIndex: replay.visibleCandleIndex },
-      candles: safeSlice.candles,
-      annotations: safeSlice.annotations,
-    }),
-    [chart.spec, replay.visibleCandleIndex, safeSlice.annotations, safeSlice.candles],
+  const currentBounds = projectVisibleCandles(chart.candles, {
+    cutoffCandleIndex: replay.visibleCandleIndex,
+    minVisibleCandles: MIN_VISIBLE_CANDLES,
+  }).bounds;
+  if (!currentBounds) throw new Error('Replay has no visible candles');
+  const viewportBounds = projectVisibleCandles(chart.candles, {
+    cutoffCandleIndex: replay.visibleCandleIndex,
+    startCandleIndex: viewport.startIndex,
+    endCandleIndex: viewport.endIndex,
+    minVisibleCandles: MIN_VISIBLE_CANDLES,
+  }).bounds;
+  const displayViewport: ChartViewport = viewportBounds
+    ? {
+        ...viewport,
+        minPrice: viewportBounds.minPrice,
+        maxPrice: viewportBounds.maxPrice,
+      }
+    : viewport;
+  const visibleAnnotations = learnerAnnotationsVisibleAt(
+    draft.annotations,
+    replay.visibleCandleIndex,
   );
-  const currentBounds: ChartBounds = {
-    ...fullBounds,
-    maxIndex: replay.visibleCandleIndex,
-  };
-  const selected = selectedCandle(visibleChart, selectedCandleIndex);
-  const gradedTrendline = latestTrendline(draft.annotations);
+  const visibleAnnotationIds = new Set(visibleAnnotations.map(({ id }) => id));
+  const visiblePendingDrawing =
+    draft.pendingDrawing && draft.pendingDrawing.start.candleIndex <= replay.visibleCandleIndex
+      ? draft.pendingDrawing
+      : undefined;
+  const visibleSelectedAnnotationId =
+    draft.selectedAnnotationId && visibleAnnotationIds.has(draft.selectedAnnotationId)
+      ? draft.selectedAnnotationId
+      : undefined;
+  const selected = selectedCandle({ ...chart, candles: safeSlice.candles }, selectedCandleIndex);
+  const gradedTrendline = latestTrendline(visibleAnnotations);
   const atDecision = replay.visibleCandleIndex === replay.decisionCandleIndex;
-  const drawingReady = gradedTrendline !== undefined && draft.pendingDrawing === undefined;
+  const drawingReady = gradedTrendline !== undefined && visiblePendingDrawing === undefined;
   const preciseCandle = Number(candleInput);
   const precisePrice = Number(priceInput.trim().replace(',', '.'));
   const preciseCandleValid =
     Number.isInteger(preciseCandle) &&
-    preciseCandle >= viewport.startIndex &&
-    preciseCandle <= viewport.endIndex;
+    preciseCandle >= displayViewport.startIndex &&
+    preciseCandle <= displayViewport.endIndex;
   const precisePriceValid =
     Number.isFinite(precisePrice) &&
-    precisePrice >= viewport.minPrice &&
-    precisePrice <= viewport.maxPrice;
+    precisePrice >= displayViewport.minPrice &&
+    precisePrice <= displayViewport.maxPrice;
   const wide = (availableWidth ?? windowWidth) >= 900;
 
   const updateDraft = (action: AnalysisDraftAction) => {
@@ -224,15 +232,54 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
     setSelectedCandleIndex(anchor.candleIndex);
     setCrosshair(anchor);
     if (draft.activeTool.kind === 'inspect' || draft.activeTool.kind === 'select') return;
-    updateDraft({ type: 'place-anchor', id: nextAnnotationId(), anchor });
+    const requestedId = nextAnnotationId();
+    setDraft((current) => {
+      const committedId = current.pendingDrawing?.id ?? requestedId;
+      const next = reduceAnalysisDraft(current, {
+        type: 'place-anchor',
+        id: requestedId,
+        anchor,
+      });
+      return {
+        ...next,
+        annotations: next.annotations.map((annotation) =>
+          annotation.id === committedId && annotation.authoredAtCursorCandleIndex === undefined
+            ? { ...annotation, authoredAtCursorCandleIndex: replay.visibleCandleIndex }
+            : annotation,
+        ),
+      };
+    });
+    setResult(undefined);
+    setConfirmClear(false);
   };
 
   const changeReplay = (action: ReplayAction) => {
     const next = reduceReplayState(replayWithDrawings, action);
     setReplay(next);
+    setResult(undefined);
+    setConfirmClear(false);
     setSelectedCandleIndex(undefined);
     setCrosshair(undefined);
-    const nextBounds = { ...fullBounds, maxIndex: next.visibleCandleIndex };
+    setDraft((current) => {
+      const withoutPending =
+        current.pendingDrawing && current.pendingDrawing.start.candleIndex > next.visibleCandleIndex
+          ? reduceAnalysisDraft(current, { type: 'cancel-drawing' })
+          : current;
+      const selectedStillVisible = learnerAnnotationsVisibleAt(
+        withoutPending.annotations,
+        next.visibleCandleIndex,
+      ).some(({ id }) => id === withoutPending.selectedAnnotationId);
+      const projectedDraft =
+        !selectedStillVisible && withoutPending.selectedAnnotationId
+          ? reduceAnalysisDraft(withoutPending, { type: 'select-annotation', id: undefined })
+          : withoutPending;
+      return { ...projectedDraft, undoStack: [], redoStack: [] };
+    });
+    const nextBounds = projectVisibleCandles(chart.candles, {
+      cutoffCandleIndex: next.visibleCandleIndex,
+      minVisibleCandles: MIN_VISIBLE_CANDLES,
+    }).bounds;
+    if (!nextBounds) return;
     if (action.type === 'reset') {
       setViewport(initialViewport);
       return;
@@ -340,20 +387,21 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
         <View>
           <OhlcvChart
             accessibilityLabel="גרף מעבדת הניתוח, כרונולוגיה משמאל לימין"
-            chart={visibleChart}
+            chart={chart}
             crosshairAnchor={crosshair}
-            expectedLine={result ? rubric.target : undefined}
+            cutoffCandleIndex={replay.visibleCandleIndex}
+            expectedLine={atDecision && result ? rubric.target : undefined}
             interactionHint={toolStatus(draft)}
             interactive={draft.activeTool.kind !== 'select'}
-            learnerAnnotations={safeSlice.learnerAnnotations}
+            learnerAnnotations={visibleAnnotations}
             onChartPress={placeAnchor}
-            selectedAnnotationId={draft.selectedAnnotationId}
+            selectedAnnotationId={visibleSelectedAnnotationId}
             selectedCandleIndex={selectedCandleIndex}
-            selectedPoints={draft.pendingDrawing ? [draft.pendingDrawing.start] : []}
+            selectedPoints={visiblePendingDrawing ? [visiblePendingDrawing.start] : []}
             showAnnotations={false}
             testID="workbench-chart"
             ticker="CPTH"
-            viewport={viewport}
+            viewport={displayViewport}
           />
         </View>
       </GestureDetector>
@@ -410,7 +458,7 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
               הקטנה −
             </Button>
             <LtrText color="textMuted" variant="caption">
-              {`${viewport.startIndex}–${viewport.endIndex}`}
+              {`${displayViewport.startIndex}–${displayViewport.endIndex}`}
             </LtrText>
           </View>
           <Button
@@ -425,7 +473,7 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
               <UiText color="textMuted" variant="caption">
                 טווח החלון הגלוי:{' '}
                 <LtrText color="textMuted" variant="caption">
-                  {`#${viewport.startIndex}–#${viewport.endIndex} | ${viewport.minPrice.toFixed(2)}–${viewport.maxPrice.toFixed(2)}`}
+                  {`#${displayViewport.startIndex}–#${displayViewport.endIndex} | ${displayViewport.minPrice.toFixed(2)}–${displayViewport.maxPrice.toFixed(2)}`}
                 </LtrText>
               </UiText>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -507,7 +555,7 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
           ביצוע חוזר
         </Button>
         <Button
-          disabled={draft.annotations.length === 0 && !draft.pendingDrawing}
+          disabled={visibleAnnotations.length === 0 && !visiblePendingDrawing}
           onPress={() => setConfirmClear(true)}
           size="compact"
           variant="danger"
@@ -535,11 +583,11 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
         </Card>
       ) : undefined}
 
-      {draft.annotations.length ? (
+      {visibleAnnotations.length ? (
         <Card padding="sm" variant="outlined">
           <View style={{ gap: 8 }}>
             <UiText variant="label">סימוני הלומד</UiText>
-            {draft.annotations.map((annotation) => (
+            {visibleAnnotations.map((annotation) => (
               <View
                 key={annotation.id}
                 style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}
@@ -547,15 +595,15 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
                 <Pressable
                   accessibilityLabel={`בחירת ${annotationLabel(annotation)}`}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: draft.selectedAnnotationId === annotation.id }}
+                  accessibilityState={{ selected: visibleSelectedAnnotationId === annotation.id }}
                   onPress={() => updateDraft({ type: 'select-annotation', id: annotation.id })}
                   style={{
                     backgroundColor:
-                      draft.selectedAnnotationId === annotation.id
+                      visibleSelectedAnnotationId === annotation.id
                         ? theme.colors.primarySoft
                         : theme.colors.surface,
                     borderColor:
-                      draft.selectedAnnotationId === annotation.id
+                      visibleSelectedAnnotationId === annotation.id
                         ? theme.colors.primary
                         : theme.colors.border,
                     borderRadius: theme.radii.md,
@@ -650,7 +698,7 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
           <UiText color="textMuted" variant="bodySmall">
             כלי נבחר: {toolLabel(draft.activeTool)} · סימונים שהושלמו:{' '}
             <LtrText color="textMuted" variant="numeric">
-              {draft.annotations.length}
+              {visibleAnnotations.length}
             </LtrText>
           </UiText>
           <UiText color={drawingReady ? 'primary' : 'warning'} variant="bodySmall">
@@ -688,7 +736,7 @@ export function ChartWorkbench({ availableWidth }: { readonly availableWidth?: n
         </View>
       </Card>
 
-      {result ? (
+      {atDecision && result ? (
         <Card testID="workbench-feedback" variant={result.correct ? 'accent' : 'outlined'}>
           <View style={{ gap: theme.spacing.sm }}>
             <Badge tone={result.correct ? 'teal' : 'warning'}>
