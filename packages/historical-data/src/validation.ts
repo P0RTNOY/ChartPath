@@ -5,6 +5,11 @@ import {
   isValidIanaTimezone,
   isValidUtcTimestamp,
 } from './time.js';
+import {
+  PAPER_EXECUTION_COST_MODEL_VERSION,
+  PAPER_EXECUTION_POLICY_VERSION,
+  PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION,
+} from './types.js';
 import type {
   CorporateAction,
   HistoricalCandle,
@@ -22,6 +27,16 @@ const VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 const HEBREW = /[\u0590-\u05ff]/;
 const CLOCK = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const PAPER_EXECUTION_DIRECTIONS = new Set(['long', 'short']);
+const PAPER_EXECUTION_ORDER_TYPES = new Set(['market', 'limit', 'stop']);
+const PAPER_EXECUTION_ANALYSIS_CONCLUSIONS = new Set([
+  'long',
+  'short',
+  'wait',
+  'no-trade',
+  'insufficient-evidence',
+]);
+const PUBLICATION_STATUSES = new Set(['development-only', 'internal', 'publishable', 'published']);
 
 function add(
   issues: HistoricalValidationIssue[],
@@ -78,6 +93,109 @@ function validateTimestamp(
     return false;
   }
   return true;
+}
+
+function isUniquePermittedStringArray(value: unknown, permitted: ReadonlySet<string>): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    new Set(value).size === value.length &&
+    value.every((item) => typeof item === 'string' && permitted.has(item))
+  );
+}
+
+function validatePaperExecutionConfiguration(
+  scenario: HistoricalReplayScenario,
+  datasetLastCandleIndex: number,
+  issues: HistoricalValidationIssue[],
+): void {
+  const configuration = scenario.paperExecution;
+  if (configuration === undefined) return;
+
+  if (configuration.enabled !== true)
+    add(
+      issues,
+      'invalid-paper-execution-enabled',
+      'scenario.paperExecution.enabled',
+      'A present paper-execution configuration must be explicitly enabled.',
+    );
+  if (configuration.schemaVersion !== PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION)
+    add(
+      issues,
+      'unsupported-paper-execution-schema',
+      'scenario.paperExecution.schemaVersion',
+      `Only paper-execution scenario schema ${PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION} is supported.`,
+    );
+  if (configuration.executionPolicyVersion !== PAPER_EXECUTION_POLICY_VERSION)
+    add(
+      issues,
+      'unsupported-paper-execution-policy',
+      'scenario.paperExecution.executionPolicyVersion',
+      `Paper execution must pin ${PAPER_EXECUTION_POLICY_VERSION}.`,
+    );
+  if (configuration.costModelVersion !== PAPER_EXECUTION_COST_MODEL_VERSION)
+    add(
+      issues,
+      'unsupported-paper-cost-model',
+      'scenario.paperExecution.costModelVersion',
+      `Paper execution must pin ${PAPER_EXECUTION_COST_MODEL_VERSION}.`,
+    );
+  if (!isUniquePermittedStringArray(configuration.permittedDirections, PAPER_EXECUTION_DIRECTIONS))
+    add(
+      issues,
+      'invalid-paper-execution-directions',
+      'scenario.paperExecution.permittedDirections',
+      'Paper execution requires a non-empty, unique list containing only long or short.',
+    );
+  if (
+    !isUniquePermittedStringArray(
+      configuration.permittedEntryOrderTypes,
+      PAPER_EXECUTION_ORDER_TYPES,
+    )
+  )
+    add(
+      issues,
+      'invalid-paper-execution-order-types',
+      'scenario.paperExecution.permittedEntryOrderTypes',
+      'Paper execution requires a non-empty, unique list containing only market, limit, or stop.',
+    );
+
+  const boundary = configuration.executionBoundary;
+  if (
+    !boundary ||
+    !Number.isInteger(boundary.afterDecisionCandleIndex) ||
+    boundary.afterDecisionCandleIndex !== scenario.decisionCandleIndex ||
+    !Number.isInteger(boundary.lastCandleIndex) ||
+    boundary.lastCandleIndex <= boundary.afterDecisionCandleIndex ||
+    boundary.lastCandleIndex > datasetLastCandleIndex
+  )
+    add(
+      issues,
+      'invalid-paper-execution-boundary',
+      'scenario.paperExecution.executionBoundary',
+      'Paper execution must begin after the pinned decision candle and end at a later dataset candle.',
+    );
+  if (!PAPER_EXECUTION_ANALYSIS_CONCLUSIONS.has(configuration.analysisAlignmentConclusion))
+    add(
+      issues,
+      'invalid-paper-execution-analysis-conclusion',
+      'scenario.paperExecution.analysisAlignmentConclusion',
+      'Paper execution requires a recognized, deterministic analysis conclusion.',
+    );
+  if (!HEBREW.test(configuration.learnerDisclosureHebrew))
+    add(
+      issues,
+      'missing-paper-execution-hebrew-disclosure',
+      'scenario.paperExecution.learnerDisclosureHebrew',
+      'Paper execution requires a Hebrew learner disclosure describing the simulation assumptions.',
+    );
+  if (!PUBLICATION_STATUSES.has(configuration.publicationStatus))
+    add(
+      issues,
+      'invalid-paper-execution-publication-status',
+      'scenario.paperExecution.publicationStatus',
+      'Paper-execution publication status is not recognized.',
+    );
 }
 
 function validateManifest(
@@ -976,6 +1094,7 @@ export function validateHistoricalScenario(
       'scenario.futureLeakValidation.validatedAt',
       'Future-leak validation timestamp must be UTC.',
     );
+  validatePaperExecutionConfiguration(scenario, last, issues);
   const annotationIds = new Set<string>();
   for (const [index, annotation] of scenario.annotations.entries()) {
     if (!annotation.id || annotationIds.has(annotation.id))
@@ -1131,6 +1250,24 @@ export function evaluatePublicationGate(
       'scenario.futureLeakValidation.validatedAt',
       'Future-leak validation timestamp is required.',
     );
+  if (scenario.paperExecution !== undefined) {
+    const configurationIssues: HistoricalValidationIssue[] = [];
+    validatePaperExecutionConfiguration(scenario, dataset.candles.length - 1, configurationIssues);
+    if (configurationIssues.some((item) => item.severity === 'error'))
+      add(
+        issues,
+        'publication-paper-execution-configuration-required',
+        'scenario.paperExecution',
+        'Publication requires a complete and supported paper-execution configuration.',
+      );
+    if (scenario.paperExecution.publicationStatus !== 'published')
+      add(
+        issues,
+        'paper-execution-not-published',
+        'scenario.paperExecution.publicationStatus',
+        'Paper execution must be independently published before the scenario can grant course credit.',
+      );
+  }
   return issues;
 }
 

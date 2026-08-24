@@ -1,5 +1,8 @@
 export const HISTORICAL_DATA_SCHEMA_VERSION = 1 as const;
 export const HISTORICAL_SCENARIO_SCHEMA_VERSION = 1 as const;
+export const PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION = 1 as const;
+export const PAPER_EXECUTION_POLICY_VERSION = 'paper-execution-policy-v1' as const;
+export const PAPER_EXECUTION_COST_MODEL_VERSION = 'paper-cost-model-v1' as const;
 
 export type Sha256Checksum = `sha256:${string}`;
 
@@ -174,6 +177,32 @@ export interface ScenarioAnnotation {
   readonly payload: Readonly<Record<string, string | number | boolean>>;
 }
 
+export type PaperExecutionDirection = 'long' | 'short';
+export type PaperExecutionOrderType = 'market' | 'limit' | 'stop';
+export type PaperExecutionAnalysisConclusion =
+  PaperExecutionDirection | 'wait' | 'no-trade' | 'insufficient-evidence';
+
+/**
+ * Versioned authoring metadata that opts a historical scenario into paper execution.
+ * The boundary records the completed decision candle and the final candle that the
+ * engine may process; execution begins only after `afterDecisionCandleIndex`.
+ */
+export interface PaperExecutionScenarioConfiguration {
+  readonly enabled: true;
+  readonly schemaVersion: typeof PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION;
+  readonly executionPolicyVersion: typeof PAPER_EXECUTION_POLICY_VERSION;
+  readonly costModelVersion: typeof PAPER_EXECUTION_COST_MODEL_VERSION;
+  readonly permittedDirections: readonly PaperExecutionDirection[];
+  readonly permittedEntryOrderTypes: readonly PaperExecutionOrderType[];
+  readonly executionBoundary: {
+    readonly afterDecisionCandleIndex: number;
+    readonly lastCandleIndex: number;
+  };
+  readonly analysisAlignmentConclusion: PaperExecutionAnalysisConclusion;
+  readonly learnerDisclosureHebrew: string;
+  readonly publicationStatus: DatasetPublicationStatus;
+}
+
 export interface HistoricalReplayScenario {
   readonly scenarioId: string;
   readonly schemaVersion: typeof HISTORICAL_SCENARIO_SCHEMA_VERSION;
@@ -220,6 +249,8 @@ export interface HistoricalReplayScenario {
     readonly validatedAt?: string;
     readonly validatorVersion: string;
   };
+  /** Omission means this historical scenario does not offer paper execution. */
+  readonly paperExecution?: PaperExecutionScenarioConfiguration;
 }
 
 export interface HistoricalValidationIssue {

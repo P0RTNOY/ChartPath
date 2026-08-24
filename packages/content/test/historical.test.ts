@@ -59,6 +59,7 @@ function publishablePair(): readonly [
     humanReviewer: 'independent-review-record-001',
     reviewedAt: '2026-08-24T00:00:00.000Z',
   };
+  scenario.paperExecution!.publicationStatus = 'published';
   return [dataset, scenario];
 }
 
@@ -83,6 +84,7 @@ describe('historical content registry', () => {
         'dataset-not-published',
         'redistribution-not-verified',
         'human-editorial-review-required',
+        'paper-execution-not-published',
       ]),
     );
 
@@ -94,6 +96,15 @@ describe('historical content registry', () => {
         educationalExercise: { id: 'u10-capstone-e03' },
         learningCredit: 'none',
       },
+    });
+    expect(DEVELOPMENT_HISTORICAL_SCENARIO.paperExecution).toMatchObject({
+      executionPolicyVersion: 'paper-execution-policy-v1',
+      costModelVersion: 'paper-cost-model-v1',
+      permittedDirections: ['short'],
+      permittedEntryOrderTypes: ['market', 'limit', 'stop'],
+      executionBoundary: { afterDecisionCandleIndex: 72, lastCandleIndex: 95 },
+      analysisAlignmentConclusion: 'no-trade',
+      publicationStatus: 'development-only',
     });
   });
 
@@ -173,6 +184,16 @@ describe('historical content registry', () => {
     const rubric = cloneScenario();
     rubric.deterministicRubric.graderId = 'author-selected-grader';
     expect(scenarioCodes(rubric)).toContain('historical-rubric-mismatch');
+
+    const analysisConclusion = cloneScenario();
+    analysisConclusion.paperExecution!.analysisAlignmentConclusion = 'short';
+    expect(scenarioCodes(analysisConclusion)).toContain(
+      'historical-paper-execution-analysis-mismatch',
+    );
+
+    const direction = cloneScenario();
+    direction.paperExecution!.permittedDirections = ['long'];
+    expect(scenarioCodes(direction)).toContain('historical-paper-execution-direction-mismatch');
   });
 
   it('checks adjustment, session, replay, and future-leak policy at the content boundary', () => {

@@ -47,6 +47,7 @@ function publishablePair(): readonly [
     humanReviewer: 'editorial-review-record-001',
     reviewedAt: '2026-08-24T00:00:00.000Z',
   };
+  scenario.paperExecution!.publicationStatus = 'published';
   return [dataset, scenario];
 }
 
@@ -64,6 +65,9 @@ describe('historical manifest and dataset validation', () => {
       counts: { candles: 96, corporateActions: 0, missingIntervals: 1 },
       issues: [],
     });
+    expect(DEVELOPMENT_HISTORICAL_DATASET.manifest.canonicalChecksum).toBe(
+      'sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e',
+    );
   });
 
   it('detects missing provenance and missing license status without throwing', () => {
@@ -332,8 +336,20 @@ describe('scenario schema and publication gate', () => {
         'dataset-not-published',
         'redistribution-not-verified',
         'human-editorial-review-required',
+        'paper-execution-not-published',
       ]),
     );
+    expect(DEVELOPMENT_HISTORICAL_SCENARIO.paperExecution).toMatchObject({
+      enabled: true,
+      schemaVersion: 1,
+      executionPolicyVersion: 'paper-execution-policy-v1',
+      costModelVersion: 'paper-cost-model-v1',
+      permittedDirections: ['short'],
+      permittedEntryOrderTypes: ['market', 'limit', 'stop'],
+      executionBoundary: { afterDecisionCandleIndex: 72, lastCandleIndex: 95 },
+      analysisAlignmentConclusion: 'no-trade',
+      publicationStatus: 'development-only',
+    });
   });
 
   it.each([
@@ -421,6 +437,74 @@ describe('scenario schema and publication gate', () => {
       },
       'invalid-future-leak-state',
     ],
+    [
+      'paper execution schema',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.schemaVersion = 2 as 1;
+      },
+      'unsupported-paper-execution-schema',
+    ],
+    [
+      'paper execution policy',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.executionPolicyVersion =
+          'unsafe-policy' as 'paper-execution-policy-v1';
+      },
+      'unsupported-paper-execution-policy',
+    ],
+    [
+      'paper cost model',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.costModelVersion = 'unsafe-costs' as 'paper-cost-model-v1';
+      },
+      'unsupported-paper-cost-model',
+    ],
+    [
+      'paper execution directions',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.permittedDirections = ['sideways'] as unknown as (
+          'long' | 'short'
+        )[];
+      },
+      'invalid-paper-execution-directions',
+    ],
+    [
+      'paper execution order types',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.permittedEntryOrderTypes = ['stop-limit'] as unknown as (
+          'market' | 'limit' | 'stop'
+        )[];
+      },
+      'invalid-paper-execution-order-types',
+    ],
+    [
+      'paper execution boundary',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.executionBoundary.afterDecisionCandleIndex = 71;
+      },
+      'invalid-paper-execution-boundary',
+    ],
+    [
+      'paper execution analysis conclusion',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.analysisAlignmentConclusion = 'reject' as 'no-trade';
+      },
+      'invalid-paper-execution-analysis-conclusion',
+    ],
+    [
+      'paper execution disclosure',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.learnerDisclosureHebrew = 'simulation only';
+      },
+      'missing-paper-execution-hebrew-disclosure',
+    ],
+    [
+      'paper execution publication state',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.publicationStatus = 'unknown' as 'development-only';
+      },
+      'invalid-paper-execution-publication-status',
+    ],
   ] as const)('rejects scenario %s mismatch', (_label, mutate, expected) => {
     const scenario = cloneScenario();
     mutate(scenario);
@@ -429,6 +513,31 @@ describe('scenario schema and publication gate', () => {
         ({ code }) => code,
       ),
     ).toContain(expected);
+  });
+
+  it('fails closed when an enabled paper-execution envelope is incomplete', () => {
+    const scenario = cloneScenario();
+    scenario.paperExecution = { enabled: true } as unknown as Mutable<
+      NonNullable<HistoricalReplayScenario['paperExecution']>
+    >;
+    const report = validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET);
+    expect(report.valid).toBe(false);
+    expect(report.issues.map(({ code }) => code)).toEqual(
+      expect.arrayContaining([
+        'unsupported-paper-execution-schema',
+        'unsupported-paper-execution-policy',
+        'unsupported-paper-cost-model',
+        'invalid-paper-execution-directions',
+        'invalid-paper-execution-order-types',
+        'invalid-paper-execution-boundary',
+        'invalid-paper-execution-analysis-conclusion',
+        'missing-paper-execution-hebrew-disclosure',
+        'invalid-paper-execution-publication-status',
+      ]),
+    );
+    expect(
+      evaluatePublicationGate(DEVELOPMENT_HISTORICAL_DATASET, scenario).map(({ code }) => code),
+    ).toContain('publication-paper-execution-configuration-required');
   });
 
   it('permits publication only with verified redistribution and human-reviewed published state', () => {
@@ -517,6 +626,14 @@ describe('scenario schema and publication gate', () => {
         scenario.futureLeakValidation.status = 'not-run';
       },
       'future-leak-validation-required',
+    ],
+    [
+      'paper execution publication',
+      unchanged,
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.paperExecution!.publicationStatus = 'internal';
+      },
+      'paper-execution-not-published',
     ],
   ] as const)(
     'blocks publication when %s is incomplete',

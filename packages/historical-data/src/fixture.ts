@@ -187,4 +187,20 @@ export const DEVELOPMENT_HISTORICAL_SCENARIO: HistoricalReplayScenario = {
     validatedAt: '2026-08-24T00:00:00.000Z',
     validatorVersion: 'historical-knowledge-view-v1',
   },
+  paperExecution: {
+    enabled: true,
+    schemaVersion: 1,
+    executionPolicyVersion: 'paper-execution-policy-v1',
+    costModelVersion: 'paper-cost-model-v1',
+    permittedDirections: ['short'],
+    permittedEntryOrderTypes: ['market', 'limit', 'stop'],
+    executionBoundary: {
+      afterDecisionCandleIndex: 72,
+      lastCandleIndex: 95,
+    },
+    analysisAlignmentConclusion: 'no-trade',
+    learnerDisclosureHebrew:
+      'ביצוע הנייר הוא הדמיה לימודית דטרמיניסטית בלבד. הוא משתמש בהנחות גרסה לגבי מרווח, החלקה ועלויות, אינו מדמה ברוקר אמיתי ואינו המלצה למסחר.',
+    publicationStatus: 'development-only',
+  },
 };

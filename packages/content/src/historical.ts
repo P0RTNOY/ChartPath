@@ -20,6 +20,7 @@ export { DEVELOPMENT_HISTORICAL_DATASET, DEVELOPMENT_HISTORICAL_SCENARIO };
 
 export const HISTORICAL_EDUCATIONAL_CONTENT_ID = 'u10-capstone-e03' as const;
 export const HISTORICAL_GRADER_ID = 'deterministic-capstone-v1' as const;
+export const HISTORICAL_PAPER_EXECUTION_ANALYSIS_CONCLUSION = 'no-trade' as const;
 
 export type HistoricalLearningCredit = 'course' | 'none';
 
@@ -200,6 +201,36 @@ function validateCanonicalContentBinding(
         'Historical deterministic-rubric identity must exactly match the canonical capstone.',
       ),
     );
+
+  if (scenario.paperExecution !== undefined) {
+    const acceptedAnalysisConclusions =
+      exercise.capstoneSteps?.flatMap((step) =>
+        step.rubric.kind === 'decision' ? step.rubric.acceptedDecisions : [],
+      ) ?? [];
+    if (
+      scenario.paperExecution.analysisAlignmentConclusion !==
+        HISTORICAL_PAPER_EXECUTION_ANALYSIS_CONCLUSION ||
+      !acceptedAnalysisConclusions.includes(HISTORICAL_PAPER_EXECUTION_ANALYSIS_CONCLUSION)
+    )
+      issues.push(
+        issue(
+          'historical-paper-execution-analysis-mismatch',
+          'scenario.paperExecution.analysisAlignmentConclusion',
+          'Paper-execution alignment must preserve the canonical no-trade capstone conclusion.',
+        ),
+      );
+    if (
+      canonicalSerialize(scenario.paperExecution.permittedDirections) !==
+      canonicalSerialize(['short'])
+    )
+      issues.push(
+        issue(
+          'historical-paper-execution-direction-mismatch',
+          'scenario.paperExecution.permittedDirections',
+          'This countertrend-short scenario may expose only the short paper direction.',
+        ),
+      );
+  }
 
   return { exercise, issues };
 }
