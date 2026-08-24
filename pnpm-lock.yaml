@@ -47,6 +47,9 @@ importers:
       '@chartpath/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@chartpath/historical-data':
+        specifier: workspace:*
+        version: link:../../packages/historical-data
       '@chartpath/ui':
         specifier: workspace:*
         version: link:../../packages/ui

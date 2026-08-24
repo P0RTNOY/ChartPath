@@ -10,7 +10,13 @@ import {
 } from 'react';
 
 import { generateChart } from '@chartpath/chart-engine';
-import { contentVersion, exercises, lessons } from '@chartpath/content';
+import {
+  contentVersion,
+  exercises,
+  historicalContentRegistry,
+  lessons,
+  type HistoricalContentRegistry,
+} from '@chartpath/content';
 import {
   ANALYSIS_WORKFLOW_STEP_IDS,
   analysisSessionHintIdsUsed,
@@ -18,6 +24,7 @@ import {
   gradeAnswer,
   reduceGuidedAnalysisSession,
   type AnalysisWorkflowStepId,
+  type AnalysisChartIdentity,
   type AtomicAnswerRubric,
   type AttemptResult,
   type CapstoneAnswer,
@@ -25,6 +32,7 @@ import {
   type ExerciseAnswer,
   type GeneratedChart,
   type GuidedAnalysisSession,
+  type OhlcvCandle,
 } from '@chartpath/domain';
 
 import {
@@ -40,6 +48,11 @@ import {
   type PersistenceSnapshot,
 } from '@/lib/persistence';
 import { boundedAttemptTiming } from '@/data/attempt-timing';
+import {
+  resolveHistoricalAnalysisSession,
+  resolveHistoricalReplayScenario,
+  type HistoricalReplayReady,
+} from '@/data/historical-replay';
 
 export const DISCLAIMER_VERSION = 'chartpath-education-he-2026-08';
 export const GUIDED_ANALYSIS_EXERCISE_ID = 'u10-capstone-e03';
@@ -58,6 +71,9 @@ export interface AttemptSubmission {
   readonly completesLesson?: boolean;
 }
 
+export type AnalysisSessionRequest =
+  { readonly kind: 'synthetic' } | { readonly kind: 'historical'; readonly scenarioId: string };
+
 export interface LearningContextValue {
   readonly status: 'loading' | 'ready' | 'error';
   readonly error: string | null;
@@ -65,7 +81,9 @@ export interface LearningContextValue {
   readonly updateSettings: (patch: LearnerSettingsPatch) => Promise<void>;
   readonly acceptDisclaimer: (dailyGoalMinutes: number) => Promise<void>;
   readonly submitAttempt: (input: AttemptSubmission) => Promise<AttemptResult>;
-  readonly createOrResumeAnalysisSession: () => Promise<GuidedAnalysisSession>;
+  readonly createOrResumeAnalysisSession: (
+    request?: AnalysisSessionRequest,
+  ) => Promise<GuidedAnalysisSession>;
   readonly saveAnalysisSession: (session: GuidedAnalysisSession) => Promise<GuidedAnalysisSession>;
   readonly abandonAnalysisSession: (sessionId: string) => Promise<GuidedAnalysisSession>;
   readonly restartAnalysisSession: (sessionId: string) => Promise<GuidedAnalysisSession>;
@@ -116,6 +134,7 @@ interface AttemptRecordInput {
   readonly isReview: boolean;
   readonly completesLesson: boolean;
   readonly dailyGoalMinutes: number;
+  readonly analysisChartIdentity?: AnalysisChartIdentity;
 }
 
 /** Shared immutable event construction for ordinary and guided submissions. */
@@ -141,6 +160,9 @@ export function createAttemptRecord(input: AttemptRecordInput): NewAttemptRecord
     difficulty: input.exercise.difficulty,
     exerciseVersion: input.exercise.schemaVersion,
     generatorVersion: input.exercise.chartSpec?.generatorVersion,
+    ...(input.analysisChartIdentity === undefined
+      ? {}
+      : { analysisChartIdentity: input.analysisChartIdentity }),
     isReview: input.isReview,
     xpAwarded: xpForResult(input.result),
     activityDate: localDate(input.submittedAt),
@@ -150,7 +172,7 @@ export function createAttemptRecord(input: AttemptRecordInput): NewAttemptRecord
   };
 }
 
-function guidedAnalysisContent() {
+function syntheticGuidedAnalysisContent() {
   const exercise = exercises.find(({ id }) => id === GUIDED_ANALYSIS_EXERCISE_ID);
   const lesson = lessons.find(({ id }) => id === GUIDED_ANALYSIS_LESSON_ID);
   if (
@@ -170,9 +192,31 @@ function guidedAnalysisContent() {
   return { exercise, lesson, chart, decisionCandleIndex };
 }
 
-function allocateGuidedAnalysisSession(createdAt: string): GuidedAnalysisSession {
-  const { exercise, chart, decisionCandleIndex } = guidedAnalysisContent();
-  const token = `${Date.parse(createdAt).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+function allocationToken(createdAt: string): string {
+  return `${Date.parse(createdAt).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function stepRubrics(
+  exercise: Exercise & {
+    readonly capstoneSteps?: readonly {
+      readonly id: AnalysisWorkflowStepId;
+      readonly rubric: AtomicAnswerRubric;
+    }[];
+  },
+): Readonly<Record<AnalysisWorkflowStepId, AtomicAnswerRubric>> {
+  if (
+    exercise.rubric.kind !== 'capstone' ||
+    exercise.capstoneSteps?.length !== ANALYSIS_WORKFLOW_STEP_IDS.length
+  )
+    throw new Error('תוכן הניתוח המונחה שנבדק אינו זמין בגרסה זו.');
+  return Object.fromEntries(
+    exercise.capstoneSteps.map((step) => [step.id, step.rubric]),
+  ) as Readonly<Record<AnalysisWorkflowStepId, AtomicAnswerRubric>>;
+}
+
+function allocateSyntheticGuidedAnalysisSession(createdAt: string): GuidedAnalysisSession {
+  const { exercise, chart, decisionCandleIndex } = syntheticGuidedAnalysisContent();
+  const token = allocationToken(createdAt);
   return createGuidedAnalysisSession({
     sessionId: `analysis-session-${token}`,
     attemptId: `analysis-attempt-${token}`,
@@ -181,6 +225,7 @@ function allocateGuidedAnalysisSession(createdAt: string): GuidedAnalysisSession
     contentVersionId: contentVersion.id,
     exerciseSchemaVersion: exercise.schemaVersion,
     chart: {
+      kind: 'synthetic',
       id: chart.spec.id,
       seed: chart.spec.seed,
       generatorVersion: chart.spec.generatorVersion,
@@ -193,10 +238,54 @@ function allocateGuidedAnalysisSession(createdAt: string): GuidedAnalysisSession
       decisionCandleIndex,
     ),
     workflowStepIds: ANALYSIS_WORKFLOW_STEP_IDS,
-    stepRubrics: Object.fromEntries(
-      exercise.capstoneSteps!.map((step) => [step.id, step.rubric]),
-    ) as Readonly<Record<AnalysisWorkflowStepId, AtomicAnswerRubric>>,
+    stepRubrics: stepRubrics(exercise),
   });
+}
+
+function allocateHistoricalGuidedAnalysisSession(
+  createdAt: string,
+  resolved: HistoricalReplayReady,
+): GuidedAnalysisSession {
+  const { educationalExercise } = resolved.content;
+  const token = allocationToken(createdAt);
+  return createGuidedAnalysisSession({
+    sessionId: `analysis-session-${token}`,
+    attemptId: `analysis-attempt-${token}`,
+    finalizationIdempotencyKey: `analysis-finalization-${token}`,
+    exerciseId: educationalExercise.id,
+    contentVersionId: contentVersion.id,
+    exerciseSchemaVersion: educationalExercise.schemaVersion,
+    chart: resolved.chartIdentity,
+    createdAt,
+    initialReplayCursorCandleIndex: resolved.content.scenario.initialVisibleRange.endCandleIndex,
+    workflowStepIds: ANALYSIS_WORKFLOW_STEP_IDS,
+    stepRubrics: stepRubrics(educationalExercise),
+  });
+}
+
+function canonicalOrdinarySubmission(input: AttemptSubmission): {
+  readonly exercise: (typeof exercises)[number];
+  readonly lesson: (typeof lessons)[number];
+  readonly chart?: GeneratedChart;
+} {
+  const exercise = exercises.find(({ id }) => id === input.exercise.id);
+  const lesson = lessons.find(({ id }) => id === input.lessonId);
+  if (
+    !exercise ||
+    exercise.editorialStatus === 'draft' ||
+    !lesson ||
+    lesson.editorialStatus === 'draft' ||
+    !lesson.exerciseIds.includes(exercise.id) ||
+    JSON.stringify(input.exercise) !== JSON.stringify(exercise)
+  )
+    throw new Error('אפשר להגיש רק תרגיל בדוק מתוך גרסת התוכן הפעילה.');
+  if (!input.chart) return { exercise, lesson };
+  if (!exercise.chartSpec)
+    throw new Error('התרגיל הבדוק אינו כולל גרף ולכן לא ניתן לצרף ראיות גרפיות.');
+  const chart = generateChart(exercise.chartSpec);
+  if (JSON.stringify(input.chart) !== JSON.stringify(chart))
+    throw new Error('ראיות הגרף אינן תואמות לתרגיל הבדוק בגרסת התוכן הפעילה.');
+  return { exercise, lesson, chart };
 }
 
 function capstoneAnswerForSession(session: GuidedAnalysisSession): CapstoneAnswer {
@@ -224,14 +313,32 @@ function localizedGuidedAnalysisError(reason: unknown): Error {
   return new Error(errorMessage(reason), { cause: reason });
 }
 
+function unavailableHistoricalDataError(
+  resolution: Exclude<
+    ReturnType<typeof resolveHistoricalReplayScenario>,
+    { readonly status: 'ready' }
+  >,
+): Error {
+  return new Error(
+    `נתוני התרחיש ההיסטורי אינם זמינים או אינם תואמים (${resolution.status}). הטיוטה נשמרה ללא שינוי ואפשר לנטוש אותה במפורש.`,
+  );
+}
+
 export interface LearningProviderProps {
   readonly children: ReactNode;
   /** Test/offline composition seam; production always uses the platform adapter. */
   readonly repositoryOverride?: LearningRepository;
+  /** Test-only immutable registry seam; production uses the bundled canonical registry. */
+  readonly historicalRegistryOverride?: HistoricalContentRegistry;
 }
 
-export function LearningProvider({ children, repositoryOverride }: LearningProviderProps) {
+export function LearningProvider({
+  children,
+  repositoryOverride,
+  historicalRegistryOverride,
+}: LearningProviderProps) {
   const repositoryRef = useRef<LearningRepository | null>(repositoryOverride ?? null);
+  const historicalRegistry = historicalRegistryOverride ?? historicalContentRegistry;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<PersistenceSnapshot | null>(null);
@@ -303,23 +410,24 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
   const submitAttempt = useCallback(
     async (input: AttemptSubmission): Promise<AttemptResult> => {
       if (!snapshot) throw new Error('הנתונים עדיין נטענים.');
+      const canonical = canonicalOrdinarySubmission(input);
       const submittedAt = new Date().toISOString();
       const result = gradeAnswer(
-        input.exercise.rubric,
+        canonical.exercise.rubric,
         input.answer,
-        input.chart
+        canonical.chart
           ? {
-              candles: input.chart.candles,
-              decisionCandleIndex: input.chart.spec.decisionCandleIndex,
+              candles: canonical.chart.candles,
+              decisionCandleIndex: canonical.chart.spec.decisionCandleIndex,
             }
           : undefined,
       );
-      const attemptId = `${input.exercise.id}:${submittedAt}:${Math.random().toString(36).slice(2, 8)}`;
+      const attemptId = `${canonical.exercise.id}:${submittedAt}:${Math.random().toString(36).slice(2, 8)}`;
       const append = await repository().appendAttempt(
         createAttemptRecord({
           attemptId,
-          exercise: input.exercise,
-          lessonId: input.lessonId,
+          exercise: canonical.exercise,
+          lessonId: canonical.lesson.id,
           answer: input.answer,
           result,
           hintIdsUsed: input.hintIdsUsed,
@@ -336,22 +444,37 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
     [repository, snapshot],
   );
 
-  const createOrResumeAnalysisSession = useCallback(async (): Promise<GuidedAnalysisSession> => {
-    try {
-      const createdAt = new Date().toISOString();
-      const created = await repository().createOrResumeAnalysisSession(
-        allocateGuidedAnalysisSession(createdAt),
-      );
-      setSnapshot(created.snapshot);
-      return created.session;
-    } catch (reason) {
-      throw localizedGuidedAnalysisError(reason);
-    }
-  }, [repository]);
+  const createOrResumeAnalysisSession = useCallback(
+    async (
+      request: AnalysisSessionRequest = { kind: 'synthetic' },
+    ): Promise<GuidedAnalysisSession> => {
+      try {
+        const createdAt = new Date().toISOString();
+        let candidate: GuidedAnalysisSession;
+        if (request.kind === 'synthetic') {
+          candidate = allocateSyntheticGuidedAnalysisSession(createdAt);
+        } else {
+          const resolved = resolveHistoricalReplayScenario(request.scenarioId, historicalRegistry);
+          if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
+          candidate = allocateHistoricalGuidedAnalysisSession(createdAt, resolved);
+        }
+        const created = await repository().createOrResumeAnalysisSession(candidate);
+        setSnapshot(created.snapshot);
+        return created.session;
+      } catch (reason) {
+        throw localizedGuidedAnalysisError(reason);
+      }
+    },
+    [historicalRegistry, repository],
+  );
 
   const saveAnalysisSession = useCallback(
     async (session: GuidedAnalysisSession): Promise<GuidedAnalysisSession> => {
       try {
+        if (session.chart.kind === 'historical') {
+          const resolved = resolveHistoricalAnalysisSession(session, historicalRegistry);
+          if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
+        }
         const saved = await repository().saveAnalysisSession(session);
         setSnapshot(saved.snapshot);
         return saved.session;
@@ -359,7 +482,7 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
         throw localizedGuidedAnalysisError(reason);
       }
     },
-    [repository],
+    [historicalRegistry, repository],
   );
 
   const abandonAnalysisSession = useCallback(
@@ -380,9 +503,22 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
     async (sessionId: string): Promise<GuidedAnalysisSession> => {
       try {
         const restartedAt = new Date().toISOString();
+        const current = await repository().load();
+        const persisted = current.analysisSessions.find(
+          ({ sessionId: candidateId }) => candidateId === sessionId,
+        );
+        if (!persisted) throw new AnalysisSessionNotFoundError(sessionId);
+        let replacement: GuidedAnalysisSession;
+        if (persisted.chart.kind === 'historical') {
+          const resolved = resolveHistoricalAnalysisSession(persisted, historicalRegistry);
+          if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
+          replacement = allocateHistoricalGuidedAnalysisSession(restartedAt, resolved);
+        } else {
+          replacement = allocateSyntheticGuidedAnalysisSession(restartedAt);
+        }
         const restarted = await repository().restartAnalysisSession(
           sessionId,
-          allocateGuidedAnalysisSession(restartedAt),
+          replacement,
           restartedAt,
         );
         setSnapshot(restarted.snapshot);
@@ -391,14 +527,13 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
         throw localizedGuidedAnalysisError(reason);
       }
     },
-    [repository],
+    [historicalRegistry, repository],
   );
 
   const finalizeAnalysisSession = useCallback(
     async (session: GuidedAnalysisSession): Promise<AttemptResult> => {
       if (!snapshot) throw new Error('הנתונים עדיין נטענים.');
       try {
-        const { exercise, lesson, chart, decisionCandleIndex } = guidedAnalysisContent();
         if (session.status === 'abandoned') {
           throw new Error('ניתוח שננטש נשמר בהיסטוריה ואי אפשר להשלים אותו. פתחו ניתוח חדש.');
         }
@@ -408,29 +543,66 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
         ) {
           throw new Error('יש להגיש את כל 11 שלבי הניתוח לפני השלמה סופית.');
         }
+
+        let exercise: (typeof exercises)[number];
+        let lesson: (typeof lessons)[number];
+        let chartEvidence: {
+          readonly candles: readonly OhlcvCandle[];
+          readonly decisionCandleIndex: number;
+        };
+        if (session.chart.kind === 'historical') {
+          const resolved = resolveHistoricalAnalysisSession(session, historicalRegistry);
+          if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
+          exercise = resolved.content.educationalExercise;
+          const matchingLesson = lessons.find((candidate) =>
+            candidate.exerciseIds.includes(exercise.id),
+          );
+          if (!matchingLesson || matchingLesson.editorialStatus === 'draft')
+            throw new Error('שיעור המקור הבדוק של התרחיש ההיסטורי אינו זמין.');
+          lesson = matchingLesson;
+          chartEvidence = resolved.chartEvidence;
+        } else {
+          const synthetic = syntheticGuidedAnalysisContent();
+          exercise = synthetic.exercise;
+          lesson = synthetic.lesson;
+          chartEvidence = {
+            candles: synthetic.chart.candles,
+            decisionCandleIndex: synthetic.decisionCandleIndex,
+          };
+          if (
+            session.exerciseId !== exercise.id ||
+            session.contentVersionId !== contentVersion.id ||
+            session.exerciseSchemaVersion !== exercise.schemaVersion ||
+            session.chart.id !== synthetic.chart.spec.id ||
+            session.chart.seed !== synthetic.chart.spec.seed ||
+            session.chart.generatorVersion !== synthetic.chart.spec.generatorVersion ||
+            session.chart.candleCount !== synthetic.chart.candles.length ||
+            session.chart.decisionCandleIndex !== synthetic.decisionCandleIndex
+          ) {
+            throw new Error(
+              'טיוטת הניתוח אינה תואמת לתוכן ולגרף שנבדקו בגרסה זו. פתחו ניתוח חדש ושמרו את הטיוטה הישנה בהיסטוריה.',
+            );
+          }
+        }
         if (
           session.exerciseId !== exercise.id ||
           session.contentVersionId !== contentVersion.id ||
-          session.exerciseSchemaVersion !== exercise.schemaVersion ||
-          session.chart.id !== chart.spec.id ||
-          session.chart.seed !== chart.spec.seed ||
-          session.chart.generatorVersion !== chart.spec.generatorVersion ||
-          session.chart.candleCount !== chart.candles.length ||
-          session.chart.decisionCandleIndex !== decisionCandleIndex
-        ) {
-          throw new Error(
-            'טיוטת הניתוח אינה תואמת לתוכן ולגרף שנבדקו בגרסה זו. פתחו ניתוח חדש ושמרו את הטיוטה הישנה בהיסטוריה.',
-          );
-        }
+          session.exerciseSchemaVersion !== exercise.schemaVersion
+        )
+          throw new Error('טיוטת הניתוח אינה תואמת לתוכן הבדוק בגרסה זו.');
 
         const answer = capstoneAnswerForSession(session);
-        const chartEvidence = {
-          candles: chart.candles,
-          decisionCandleIndex,
-        };
         // The aggregate capstone grader deterministically grades the authored rubric for all 11
         // steps. The persisted per-step results remain useful for the debrief, but do not replace it.
         const finalResult = gradeAnswer(exercise.rubric, answer, chartEvidence);
+
+        const practiceHistorical =
+          session.chart.kind === 'historical' && session.chart.learningCredit === 'none';
+        if (session.status === 'finalized' && practiceHistorical) {
+          const retried = await repository().finalizePracticeAnalysisSession(session);
+          setSnapshot(retried.snapshot);
+          return retried.session.finalResult ?? finalResult;
+        }
 
         const existingAttempt = snapshot.attempts.find(
           ({ attempt }) => attempt.id === session.attemptId,
@@ -452,6 +624,11 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
           finalResult,
           finalizedAt,
         });
+        if (practiceHistorical) {
+          const stored = await repository().finalizePracticeAnalysisSession(finalized);
+          setSnapshot(stored.snapshot);
+          return stored.session.finalResult ?? finalResult;
+        }
         const finalizedAttempt = createAttemptRecord({
           attemptId: session.attemptId,
           exercise,
@@ -464,6 +641,7 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
           isReview: false,
           completesLesson: guidedAnalysisCompletesLesson(snapshot, lesson.exerciseIds),
           dailyGoalMinutes: snapshot.settings.dailyGoalMinutes,
+          ...(session.chart.kind === 'historical' ? { analysisChartIdentity: session.chart } : {}),
         });
         const stored = await repository().finalizeAnalysisSession({
           session: finalized,
@@ -491,7 +669,9 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
             persistedSession?.status === 'finalized' &&
             persistedSession.attemptId === session.attemptId &&
             persistedSession.finalizationIdempotencyKey === session.finalizationIdempotencyKey &&
-            persistedAttempt
+            ((persistedSession.chart.kind === 'historical' &&
+              persistedSession.chart.learningCredit === 'none') ||
+              persistedAttempt)
           ) {
             return persistedSession.finalResult!;
           }
@@ -499,7 +679,7 @@ export function LearningProvider({ children, repositoryOverride }: LearningProvi
         throw localizedGuidedAnalysisError(reason);
       }
     },
-    [repository, snapshot],
+    [historicalRegistry, repository, snapshot],
   );
 
   const discardQuarantinedAnalysisSessions = useCallback(

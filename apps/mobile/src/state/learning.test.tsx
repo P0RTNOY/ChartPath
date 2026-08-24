@@ -1,6 +1,15 @@
 import { act, render, waitFor } from '@testing-library/react-native';
 
-import { contentVersion, exercises, lessons } from '@chartpath/content';
+import {
+  DEVELOPMENT_HISTORICAL_DATASET,
+  DEVELOPMENT_HISTORICAL_SCENARIO,
+  contentVersion,
+  exercises,
+  historicalContentRegistry,
+  lessons,
+  type HistoricalContentRegistry,
+} from '@chartpath/content';
+import { computeCanonicalDatasetChecksum } from '@chartpath/historical-data';
 import {
   ANALYSIS_WORKFLOW_STEP_IDS,
   gradeAnswer,
@@ -19,6 +28,64 @@ import {
   useLearning,
   type LearningContextValue,
 } from './learning';
+
+type Mutable<T> = T extends readonly (infer Item)[]
+  ? Mutable<Item>[]
+  : T extends object
+    ? { -readonly [Key in keyof T]: Mutable<T[Key]> }
+    : T;
+
+async function renderLearning(
+  repository: LearningRepository,
+  registry?: HistoricalContentRegistry,
+): Promise<{
+  readonly current: () => LearningContextValue;
+  readonly view: Awaited<ReturnType<typeof render>>;
+}> {
+  let learning: LearningContextValue | undefined;
+  function Probe() {
+    learning = useLearning();
+    return null;
+  }
+  let view!: Awaited<ReturnType<typeof render>>;
+  await act(async () => {
+    view = await render(
+      <LearningProvider repositoryOverride={repository} historicalRegistryOverride={registry}>
+        <Probe />
+      </LearningProvider>,
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await waitFor(() => expect(learning?.status).toBe('ready'));
+  return {
+    current: () => {
+      if (!learning) throw new Error('Learning provider did not initialize');
+      return learning;
+    },
+    view,
+  };
+}
+
+function publishableHistoricalRegistry(): HistoricalContentRegistry {
+  const dataset = structuredClone(DEVELOPMENT_HISTORICAL_DATASET) as Mutable<
+    typeof DEVELOPMENT_HISTORICAL_DATASET
+  >;
+  dataset.manifest.publicationStatus = 'published';
+  dataset.manifest.provenance.license.redistributionStatus = 'verified';
+  dataset.manifest.canonicalChecksum = computeCanonicalDatasetChecksum(dataset);
+  const scenario = structuredClone(DEVELOPMENT_HISTORICAL_SCENARIO) as Mutable<
+    typeof DEVELOPMENT_HISTORICAL_SCENARIO
+  >;
+  scenario.dataset.canonicalChecksum = dataset.manifest.canonicalChecksum;
+  scenario.publicationStatus = 'published';
+  scenario.editorial = {
+    status: 'published',
+    humanReviewer: 'test-independent-review-record',
+    reviewedAt: '2026-08-24T00:00:00.000Z',
+  };
+  return { datasets: [dataset], scenarios: [scenario] };
+}
 
 function correctAnswer(rubric: AtomicAnswerRubric): AtomicExerciseAnswer {
   switch (rubric.kind) {
@@ -150,6 +217,7 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       session = await learning!.createOrResumeAnalysisSession();
     });
+    expect(session.chart.kind).toBe('synthetic');
     await act(async () => {
       const resumed = await learning!.createOrResumeAnalysisSession();
       expect(resumed.sessionId).toBe(session.sessionId);
@@ -189,5 +257,241 @@ describe('guided analysis learning integration', () => {
       learning!.snapshot!.attempts.filter(({ attempt }) => attempt.id === session.attemptId),
     ).toHaveLength(1);
     expect(learning!.snapshot!.projections.totalXp).toBe(firstXp);
+  });
+
+  it('creates, autosaves, resumes, and restarts the exact historical allocation', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    let session!: GuidedAnalysisSession;
+    await act(async () => {
+      session = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+    });
+    expect(session.chart).toMatchObject({
+      kind: 'historical',
+      scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      scenarioVersion: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioVersion,
+      datasetId: DEVELOPMENT_HISTORICAL_SCENARIO.dataset.datasetId,
+      datasetVersion: DEVELOPMENT_HISTORICAL_SCENARIO.dataset.datasetVersion,
+      canonicalChecksum: DEVELOPMENT_HISTORICAL_SCENARIO.dataset.canonicalChecksum,
+      candleCount: 96,
+      decisionCandleIndex: 72,
+      learningCredit: 'none',
+    });
+    expect(session.replay).toMatchObject({
+      initialCursorCandleIndex: 23,
+      cursorCandleIndex: 23,
+      maxCursorSeenCandleIndex: 23,
+      decisionCandleIndex: 72,
+    });
+
+    const advanced = reduceGuidedAnalysisSession(session, {
+      type: 'set-replay-cursor',
+      cursorCandleIndex: 40,
+      updatedAt: session.updatedAt,
+    });
+    let saved!: GuidedAnalysisSession;
+    await act(async () => {
+      saved = await harness.current().saveAnalysisSession(advanced);
+    });
+    expect(saved).toEqual(advanced);
+    await act(async () => {
+      const resumed = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+      expect(resumed).toEqual(saved);
+    });
+
+    let restarted!: GuidedAnalysisSession;
+    await act(async () => {
+      restarted = await harness.current().restartAnalysisSession(session.sessionId);
+    });
+    expect(restarted.sessionId).not.toBe(session.sessionId);
+    expect(restarted.chart).toEqual(session.chart);
+    expect(harness.current().snapshot?.analysisSessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sessionId: session.sessionId, status: 'abandoned' }),
+        expect.objectContaining({
+          sessionId: restarted.sessionId,
+          status: 'active',
+          chart: session.chart,
+        }),
+      ]),
+    );
+    await harness.view.unmount();
+  });
+
+  it('finalizes development historical practice idempotently without attempts or projections', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    let session!: GuidedAnalysisSession;
+    await act(async () => {
+      session = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+    });
+    const completed = submitEveryStep(session);
+    await act(async () => {
+      await harness.current().saveAnalysisSession(completed);
+    });
+    const before = await repository.load();
+    const beforeLearning = JSON.stringify({
+      attempts: before.attempts,
+      projections: before.projections,
+    });
+
+    await act(async () => {
+      await harness.current().finalizeAnalysisSession(completed);
+    });
+    const finalized = harness
+      .current()
+      .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === session.sessionId)!;
+    expect(finalized.status).toBe('finalized');
+    expect(harness.current().snapshot!.attempts).toEqual([]);
+    expect(
+      JSON.stringify({
+        attempts: harness.current().snapshot!.attempts,
+        projections: harness.current().snapshot!.projections,
+      }),
+    ).toBe(beforeLearning);
+
+    // Retry both the stale active object and the immutable finalized object.
+    await act(async () => {
+      await harness.current().finalizeAnalysisSession(completed);
+      await harness.current().finalizeAnalysisSession(finalized);
+    });
+    expect(harness.current().snapshot!.attempts).toEqual([]);
+    expect(
+      JSON.stringify({
+        attempts: harness.current().snapshot!.attempts,
+        projections: harness.current().snapshot!.projections,
+      }),
+    ).toBe(beforeLearning);
+    await harness.view.unmount();
+  });
+
+  it('pins exact chart identity into a future eligible historical course attempt', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const registry = publishableHistoricalRegistry();
+    const harness = await renderLearning(repository, registry);
+    let session!: GuidedAnalysisSession;
+    await act(async () => {
+      session = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+    });
+    expect(session.chart).toMatchObject({ kind: 'historical', learningCredit: 'course' });
+    const completed = submitEveryStep(session);
+    await act(async () => {
+      await harness.current().saveAnalysisSession(completed);
+      await harness.current().finalizeAnalysisSession(completed);
+    });
+    expect(harness.current().snapshot!.attempts).toHaveLength(1);
+    expect(harness.current().snapshot!.attempts[0]?.analysisChartIdentity).toEqual(session.chart);
+    await harness.view.unmount();
+  });
+
+  it('refuses historical save/finalize on altered data but still allows explicit abandon', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const mutableRegistry = structuredClone(
+      historicalContentRegistry,
+    ) as Mutable<HistoricalContentRegistry>;
+    const harness = await renderLearning(repository, mutableRegistry);
+    let session!: GuidedAnalysisSession;
+    await act(async () => {
+      session = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+      });
+    });
+    const completed = submitEveryStep(session);
+    const before = JSON.stringify(await repository.load());
+    mutableRegistry.datasets[0]!.candles[0]!.close += 0.01;
+
+    await expect(harness.current().saveAnalysisSession(completed)).rejects.toThrow(
+      /dataset-modified/,
+    );
+    await expect(harness.current().finalizeAnalysisSession(completed)).rejects.toThrow(
+      /dataset-modified/,
+    );
+    expect(JSON.stringify(await repository.load())).toBe(before);
+
+    let abandoned!: GuidedAnalysisSession;
+    await act(async () => {
+      abandoned = await harness.current().abandonAnalysisSession(session.sessionId);
+    });
+    expect(abandoned.status).toBe('abandoned');
+    expect((await repository.load()).attempts).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it('rejects spoofed or mismatched ordinary submissions before appending an attempt', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    const exercise = exercises.find(({ rubric }) => rubric.kind === 'multiple-choice')!;
+    if (exercise.rubric.kind !== 'multiple-choice') throw new Error('Expected choice exercise');
+    const answer = correctAnswer(exercise.rubric);
+    const spoofed = { ...exercise, editorialStatus: 'draft' as const };
+
+    await expect(
+      harness.current().submitAttempt({
+        exercise: spoofed,
+        lessonId: lessons.find(({ exerciseIds }) => exerciseIds.includes(exercise.id))!.id,
+        answer,
+        hintIdsUsed: [],
+        startedAt: '2026-08-24T08:00:00.000Z',
+      }),
+    ).rejects.toThrow(/תרגיל בדוק/);
+    await expect(
+      harness.current().submitAttempt({
+        exercise,
+        lessonId: 'lesson-u10-capstone',
+        answer,
+        hintIdsUsed: [],
+        startedAt: '2026-08-24T08:00:00.000Z',
+      }),
+    ).rejects.toThrow(/תרגיל בדוק/);
+    expect((await repository.load()).attempts).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it('keeps canonical reviewed ordinary submission behavior unchanged', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    const exercise = exercises.find(({ rubric }) => rubric.kind === 'multiple-choice')!;
+    if (exercise.rubric.kind !== 'multiple-choice') throw new Error('Expected choice exercise');
+    const lesson = lessons.find(({ exerciseIds }) => exerciseIds.includes(exercise.id))!;
+    await act(async () => {
+      await harness.current().submitAttempt({
+        exercise,
+        lessonId: lesson.id,
+        answer: correctAnswer(exercise.rubric),
+        hintIdsUsed: [],
+        startedAt: '2026-08-24T08:00:00.000Z',
+      });
+    });
+    expect(harness.current().snapshot!.attempts).toHaveLength(1);
+    expect(harness.current().snapshot!.attempts[0]).toMatchObject({
+      lessonId: lesson.id,
+      attempt: { exerciseId: exercise.id },
+    });
+    await harness.view.unmount();
   });
 });
