@@ -1,5 +1,5 @@
-import { ChartWorkbench } from '@/components/chart-workbench';
+import { AnalysisLabHub } from '@/components/analysis-lab-hub';
 
 export default function ChartLabScreen() {
-  return <ChartWorkbench />;
+  return <AnalysisLabHub />;
 }

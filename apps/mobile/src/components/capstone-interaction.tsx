@@ -57,6 +57,10 @@ export type CapstonePresentationCatalog = Partial<
 
 export type CapstoneAnswerMap = Partial<Readonly<Record<WorkflowStepId, AtomicExerciseAnswer>>>;
 
+export type CapstoneStepStatus = 'draft' | 'submitted' | 'invalidated' | 'finalized';
+
+export type CapstoneStepStatusMap = Partial<Readonly<Record<WorkflowStepId, CapstoneStepStatus>>>;
+
 export interface CapstoneStepResult {
   readonly stepId: WorkflowStepId;
   readonly answer: AtomicExerciseAnswer | null;
@@ -92,10 +96,26 @@ export type CapstoneExercise = ContentExercise & {
 export interface CapstoneInteractionProps {
   readonly exercise: CapstoneExercise;
   readonly answer: CapstoneAnswer | null;
+  /** Optional controlled draft state used by resumable guided-analysis sessions. */
+  readonly partialAnswers?: CapstoneAnswerMap;
+  /** Receives every controlled or uncontrolled partial-answer edit. */
+  readonly onPartialAnswersChange?: (
+    answers: CapstoneAnswerMap,
+    aggregate: CapstoneAggregateResult,
+  ) => void;
+  readonly activeStepId?: WorkflowStepId;
+  readonly onActiveStepChange?: (stepId: WorkflowStepId) => void;
+  readonly stepStatuses?: CapstoneStepStatusMap;
   readonly presentation?: CapstonePresentationCatalog;
   readonly disabled?: boolean;
   /** Emits null until all stages are complete, plus the useful partial aggregate on every edit. */
   readonly onChange: (answer: CapstoneAnswer | null, aggregate: CapstoneAggregateResult) => void;
+  /** Explicitly submits only the visible, structurally complete stage. */
+  readonly onSubmitStep?: (
+    stepId: WorkflowStepId,
+    answer: AtomicExerciseAnswer,
+    result: AttemptResult,
+  ) => void;
   readonly renderCustomStep?: (props: CapstoneCustomStepRenderProps) => ReactNode;
   readonly testID?: string;
 }
@@ -126,7 +146,10 @@ function finite(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value);
 }
 
-function answerIsComplete(step: CapstoneStep, answer: AtomicExerciseAnswer | undefined): boolean {
+export function isCapstoneStepAnswerComplete(
+  step: CapstoneStep,
+  answer: AtomicExerciseAnswer | undefined,
+): boolean {
   if (!answer || answer.kind !== step.rubric.kind) return false;
   switch (step.rubric.kind) {
     case 'multiple-choice':
@@ -163,6 +186,41 @@ function answerIsComplete(step: CapstoneStep, answer: AtomicExerciseAnswer | und
   }
 }
 
+const stepStatusLabels: Readonly<Record<CapstoneStepStatus, string>> = {
+  draft: 'טיוטה',
+  submitted: 'הוגש',
+  invalidated: 'דורש בדיקה מחדש',
+  finalized: 'סופי',
+};
+
+function stepStatusTone(status: CapstoneStepStatus): 'neutral' | 'teal' | 'warning' | 'success' {
+  switch (status) {
+    case 'draft':
+      return 'neutral';
+    case 'submitted':
+      return 'teal';
+    case 'invalidated':
+      return 'warning';
+    case 'finalized':
+      return 'success';
+  }
+}
+
+function stepStatusColor(
+  status: CapstoneStepStatus,
+): 'textMuted' | 'primary' | 'warning' | 'success' {
+  switch (status) {
+    case 'draft':
+      return 'textMuted';
+    case 'submitted':
+      return 'primary';
+    case 'invalidated':
+      return 'warning';
+    case 'finalized':
+      return 'success';
+  }
+}
+
 function hasCanonicalWorkflow(stages: readonly CapstoneStep[]): boolean {
   return (
     stages.length === WORKFLOW_STEP_IDS.length &&
@@ -177,7 +235,7 @@ export function gradeCapstoneAnswers(
   const stages = exercise.capstoneSteps ?? [];
   const steps = stages.map<CapstoneStepResult>((step) => {
     const answer = answers[step.id];
-    const complete = answerIsComplete(step, answer);
+    const complete = isCapstoneStepAnswerComplete(step, answer);
     return {
       stepId: step.id,
       answer: answer ?? null,
@@ -683,9 +741,15 @@ function StepEditor({
 function CapstoneSession({
   exercise,
   answer,
+  partialAnswers,
+  onPartialAnswersChange,
+  activeStepId: controlledActiveStepId,
+  onActiveStepChange,
+  stepStatuses,
   presentation,
   disabled = false,
   onChange,
+  onSubmitStep,
   renderCustomStep,
   testID = 'capstone-interaction',
 }: CapstoneInteractionProps) {
@@ -694,22 +758,50 @@ function CapstoneSession({
   const [internalAnswers, setInternalAnswers] = useState<CapstoneAnswerMap>(() =>
     answersFromDomain(answer),
   );
-  const [activeStepId, setActiveStepId] = useState<WorkflowStepId>(stages[0]?.id ?? 'context');
-  const answers = internalAnswers;
+  const [internalActiveStepId, setInternalActiveStepId] = useState<WorkflowStepId>(
+    stages[0]?.id ?? 'context',
+  );
+  const answers = partialAnswers ?? internalAnswers;
+  const activeStepId = controlledActiveStepId ?? internalActiveStepId;
   const aggregate = gradeCapstoneAnswers(exercise, answers);
   const activeIndex = Math.max(
     0,
     stages.findIndex((step) => step.id === activeStepId),
   );
   const activeStep = stages[activeIndex];
+  const activeAnswer = activeStep ? answers[activeStep.id] : undefined;
+  const activeStatus = activeStep ? stepStatuses?.[activeStep.id] : undefined;
+  const activeStepDisabled = disabled || activeStatus === 'finalized';
+  const activeStepComplete = activeStep
+    ? isCapstoneStepAnswerComplete(activeStep, activeAnswer)
+    : false;
+
+  const navigateTo = (stepId: WorkflowStepId) => {
+    if (controlledActiveStepId === undefined) setInternalActiveStepId(stepId);
+    onActiveStepChange?.(stepId);
+  };
 
   const commit = (stepId: WorkflowStepId, stepAnswer: AtomicExerciseAnswer | null) => {
     const next = { ...answers };
     if (stepAnswer) next[stepId] = stepAnswer;
     else delete next[stepId];
-    setInternalAnswers(next);
+    if (partialAnswers === undefined) setInternalAnswers(next);
     const nextAggregate = gradeCapstoneAnswers(exercise, next);
+    onPartialAnswersChange?.(next, nextAggregate);
     onChange(nextAggregate.answer, nextAggregate);
+  };
+
+  const submitActiveStep = () => {
+    if (
+      !onSubmitStep ||
+      !activeStep ||
+      !activeAnswer ||
+      !activeStepComplete ||
+      activeStepDisabled
+    ) {
+      return;
+    }
+    onSubmitStep(activeStep.id, activeAnswer, gradeAnswer(activeStep.rubric, activeAnswer));
   };
 
   if (!hasCanonicalWorkflow(stages) || !activeStep) {
@@ -750,8 +842,9 @@ function CapstoneSession({
           value={(aggregate.answeredSteps / 11) * 100}
         />
         <UiText color="textMuted" variant="bodySmall">
-          כל שלב נשמר בזיכרון כל עוד התרגיל פתוח. לאחר מענה על כל 11 השלבים, ההגשה המלאה נשמרת
-          במכשיר.
+          {partialAnswers
+            ? 'כל שינוי נשמר כטיוטה במכשיר. הגשת שלב וסיום הניתוח הן פעולות נפרדות ומפורשות.'
+            : 'כל שלב נשמר בזיכרון כל עוד התרגיל פתוח. לאחר מענה על כל 11 השלבים, ההגשה המלאה נשמרת במכשיר.'}
         </UiText>
       </View>
 
@@ -760,16 +853,24 @@ function CapstoneSession({
         style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
       >
         {stages.map((step, index) => {
-          const answered = answerIsComplete(step, answers[step.id]);
+          const answered = isCapstoneStepAnswerComplete(step, answers[step.id]);
           const selected = step.id === activeStep.id;
-          const status = answered ? 'נענה' : 'טרם נענה';
+          const visualStatus = stepStatuses?.[step.id];
+          const status = visualStatus
+            ? stepStatusLabels[visualStatus]
+            : answered
+              ? 'נענה'
+              : 'טרם נענה';
+          const showCheck = visualStatus
+            ? visualStatus === 'submitted' || visualStatus === 'finalized'
+            : answered;
           return (
             <Pressable
               accessibilityLabel={`שלב ${index + 1}: ${CAPSTONE_STEP_LABELS[step.id]}, ${status}`}
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={step.id}
-              onPress={() => setActiveStepId(step.id)}
+              onPress={() => navigateTo(step.id)}
               style={{
                 alignItems: 'center',
                 backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
@@ -789,14 +890,14 @@ function CapstoneSession({
               <View
                 style={{
                   alignItems: 'center',
-                  backgroundColor: answered ? theme.colors.primary : theme.colors.surfaceMuted,
+                  backgroundColor: showCheck ? theme.colors.primary : theme.colors.surfaceMuted,
                   borderRadius: 12,
                   height: 24,
                   justifyContent: 'center',
                   width: 24,
                 }}
               >
-                {answered ? (
+                {showCheck ? (
                   <Glyph color={theme.colors.onPrimary} name="check" size={14} />
                 ) : (
                   <LtrText align="center" color="textMuted" style={{ fontSize: 11 }}>
@@ -804,9 +905,16 @@ function CapstoneSession({
                   </LtrText>
                 )}
               </View>
-              <UiText color={selected ? 'primary' : 'text'} style={{ flex: 1 }} variant="caption">
-                {CAPSTONE_STEP_LABELS[step.id]}
-              </UiText>
+              <View style={{ flex: 1, gap: 2 }}>
+                <UiText color={selected ? 'primary' : 'text'} variant="caption">
+                  {CAPSTONE_STEP_LABELS[step.id]}
+                </UiText>
+                {visualStatus ? (
+                  <UiText color={stepStatusColor(visualStatus)} style={{ fontSize: 11 }}>
+                    {stepStatusLabels[visualStatus]}
+                  </UiText>
+                ) : undefined}
+              </View>
             </Pressable>
           );
         })}
@@ -817,6 +925,9 @@ function CapstoneSession({
           <View style={{ gap: 6 }}>
             <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
               <Badge tone="teal">{`שלב ${activeIndex + 1} מתוך 11`}</Badge>
+              {activeStatus ? (
+                <Badge tone={stepStatusTone(activeStatus)}>{stepStatusLabels[activeStatus]}</Badge>
+              ) : undefined}
               <Heading level={3}>{CAPSTONE_STEP_LABELS[activeStep.id]}</Heading>
             </View>
             <UiText>{activeStep.promptHe}</UiText>
@@ -828,23 +939,48 @@ function CapstoneSession({
           </View>
           <StepEditor
             answer={answers[activeStep.id]}
-            disabled={disabled}
+            disabled={activeStepDisabled}
             onAnswer={(answer) => commit(activeStep.id, answer)}
             presentation={mergePresentation(activeStep, presentation)}
             renderCustomStep={renderCustomStep}
             step={activeStep}
           />
+          {onSubmitStep ? (
+            <View style={{ gap: 6 }}>
+              <Button
+                disabled={!activeStepComplete || activeStepDisabled || activeStatus === 'submitted'}
+                fullWidth
+                onPress={submitActiveStep}
+              >
+                {activeStatus === 'invalidated'
+                  ? 'הגשת השלב מחדש'
+                  : activeStatus === 'submitted'
+                    ? 'השלב הוגש'
+                    : activeStatus === 'finalized'
+                      ? 'השלב סופי'
+                      : 'הגשת השלב'}
+              </Button>
+              {!activeStepComplete ? (
+                <UiText align="center" color="textMuted" variant="caption">
+                  יש להשלים את התשובה לפני הגשת השלב.
+                </UiText>
+              ) : undefined}
+            </View>
+          ) : undefined}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button
               disabled={activeIndex === 0}
-              onPress={() => setActiveStepId(stages[activeIndex - 1]!.id)}
+              onPress={() => navigateTo(stages[activeIndex - 1]!.id)}
               variant="ghost"
             >
               השלב הקודם
             </Button>
             <Button
-              disabled={activeIndex === stages.length - 1}
-              onPress={() => setActiveStepId(stages[activeIndex + 1]!.id)}
+              disabled={
+                activeIndex === stages.length - 1 ||
+                (onSubmitStep !== undefined && activeStatus !== 'submitted')
+              }
+              onPress={() => navigateTo(stages[activeIndex + 1]!.id)}
               style={{ flex: 1 }}
               variant="secondary"
             >

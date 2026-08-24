@@ -18,7 +18,7 @@ import { Glyph, IconBubble } from '@/components/glyph';
 import { MainScreen } from '@/components/main-screen';
 import { MetricPill, TopBar } from '@/components/top-bar';
 import { isUnitUnlocked, lessons, unitLessons, units } from '@/data/catalog';
-import { useLearning } from '@/state/learning';
+import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 
 function todayKey(): string {
   const date = new Date();
@@ -61,6 +61,9 @@ export default function HomeScreen() {
   const activeMinutes = today?.activeMinutes ?? 0;
   const goalMinutes = snapshot.settings.dailyGoalMinutes;
   const coursePercent = lessons.length === 0 ? 0 : (completedIds.length / lessons.length) * 100;
+  const activeAnalysis = snapshot.analysisSessions.find(
+    (session) => session.status === 'active' && session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID,
+  );
 
   return (
     <MainScreen
@@ -146,10 +149,14 @@ export default function HomeScreen() {
             <Glyph name="chart" />
           </IconBubble>
           <View style={{ flex: 1, gap: 3 }}>
-            <Badge tone="warning">מעבדת גרפים</Badge>
-            <Heading level={3}>תרגול על משטח ניתוח מלא</Heading>
+            <Badge tone="warning">{activeAnalysis ? 'ניתוח מונחה בתהליך' : 'מעבדת גרפים'}</Badge>
+            <Heading level={3}>
+              {activeAnalysis ? 'המשך מאותה טיוטה שמורה' : 'התחלת תהליך ניתוח מלא'}
+            </Heading>
             <UiText color="textMuted" variant="bodySmall">
-              בדקו נרות, התקדמו בזמן ושרטטו ראיות בתרחיש סינתטי מבוקר.
+              {activeAnalysis
+                ? 'התשובות, הסימונים ומיקום ה־replay נשמרו במכשיר ומחכים להמשך.'
+                : 'עברו דרך 11 השלבים, שמרו סימונים וסיימו בתחקיר תהליך מקור־מגובה.'}
             </UiText>
           </View>
           <Glyph name="back" />

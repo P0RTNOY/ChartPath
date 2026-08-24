@@ -110,6 +110,117 @@ describe('CapstoneInteraction', () => {
     expect(screen.queryByText('נכון')).toBeNull();
   });
 
+  it('applies controlled partial answers that arrive after an async resume', async () => {
+    const exercise = findCapstone();
+    const controlledAnswers: CapstoneAnswerMap = {
+      context: correctAnswer(exercise.capstoneSteps[0]!.rubric),
+    };
+    const onChange = jest.fn();
+    const screen = await renderCapstone(exercise, { partialAnswers: {}, onChange });
+
+    expect(screen.getByText('0/11')).toBeTruthy();
+    await screen.rerender(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <CapstoneInteraction
+          answer={null}
+          exercise={exercise}
+          onChange={onChange}
+          partialAnswers={controlledAnswers}
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByText('1/11')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'המגמה השבועית עולה' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'הרעיון הוא מכירה בחסר נגד המגמה' })).toBeChecked();
+  });
+
+  it('reports controlled draft edits without mutating the supplied answer map', async () => {
+    const exercise = findCapstone();
+    const partialAnswers: CapstoneAnswerMap = {};
+    const onPartialAnswersChange = jest.fn();
+    const screen = await renderCapstone(exercise, {
+      partialAnswers,
+      onPartialAnswersChange,
+    });
+
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'המגמה השבועית עולה' }));
+
+    expect(partialAnswers).toEqual({});
+    expect(onPartialAnswersChange).toHaveBeenCalledWith(
+      {
+        context: { kind: 'selection', selectedIds: ['weekly-uptrend'] },
+      },
+      expect.objectContaining({ answeredSteps: 1 }),
+    );
+  });
+
+  it('submits only the active structurally complete step with its deterministic result', async () => {
+    const exercise = findCapstone();
+    const onSubmitStep = jest.fn();
+    const screen = await renderCapstone(exercise, { onSubmitStep });
+    const submit = screen.getByRole('button', { name: 'הגשת השלב' });
+
+    expect(submit).toBeDisabled();
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'המגמה השבועית עולה' }));
+    await fireEvent.press(
+      screen.getByRole('checkbox', { name: 'הרעיון הוא מכירה בחסר נגד המגמה' }),
+    );
+    await fireEvent.press(submit);
+
+    expect(onSubmitStep).toHaveBeenCalledTimes(1);
+    expect(onSubmitStep).toHaveBeenCalledWith(
+      'context',
+      {
+        kind: 'selection',
+        selectedIds: ['weekly-uptrend', 'countertrend-short'],
+      },
+      expect.objectContaining({ correct: true, feedbackCode: 'correct', score: 1 }),
+    );
+  });
+
+  it('controls navigation, presents session statuses, and locks a finalized step', async () => {
+    const exercise = findCapstone();
+    const answers = correctCapstoneAnswers(exercise);
+    const onActiveStepChange = jest.fn();
+    const onSubmitStep = jest.fn();
+    const screen = await renderCapstone(exercise, {
+      activeStepId: 'context',
+      onActiveStepChange,
+      onSubmitStep,
+      partialAnswers: answers,
+      stepStatuses: {
+        context: 'submitted',
+        structure: 'invalidated',
+        review: 'finalized',
+      },
+    });
+
+    expect(screen.getAllByText('הוגש')).toHaveLength(2);
+    await fireEvent.press(screen.getByRole('button', { name: /שלב 2: מבנה, דורש בדיקה מחדש/ }));
+    expect(onActiveStepChange).toHaveBeenCalledWith('structure');
+    expect(screen.getByText(exercise.capstoneSteps[0]!.promptHe)).toBeTruthy();
+
+    await screen.rerender(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <CapstoneInteraction
+          activeStepId="review"
+          answer={null}
+          exercise={exercise}
+          onActiveStepChange={onActiveStepChange}
+          onChange={jest.fn()}
+          onSubmitStep={onSubmitStep}
+          partialAnswers={answers}
+          stepStatuses={{ review: 'finalized' }}
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getAllByText('סופי')).toHaveLength(2);
+    expect(screen.getByRole('checkbox', { name: 'ההקשר נבדק לפני התבנית' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'השלב סופי' })).toBeDisabled();
+  });
+
   it('retains an independently graded selection when the learner leaves and edits a stage', async () => {
     const onChange = jest.fn();
     const screen = await renderCapstone(findCapstone(), { onChange });

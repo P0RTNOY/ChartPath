@@ -11,12 +11,14 @@ export function TopBar({
   subtitle,
   subtitleDirection = 'rtl',
   back = false,
+  onBack,
   trailing,
 }: {
   readonly title: string;
   readonly subtitle?: string;
   readonly subtitleDirection?: 'rtl' | 'ltr';
   readonly back?: boolean;
+  readonly onBack?: () => void;
   readonly trailing?: React.ReactNode;
 }) {
   const theme = useTheme();
@@ -35,7 +37,7 @@ export function TopBar({
           accessibilityLabel="חזרה למסך הקודם"
           accessibilityRole="button"
           hitSlop={8}
-          onPress={() => router.back()}
+          onPress={onBack ?? (() => router.back())}
           style={{
             alignItems: 'center',
             borderColor: theme.colors.border,
@@ -51,7 +53,7 @@ export function TopBar({
       ) : (
         <BrandMark size={42} />
       )}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Heading level={2}>{title}</Heading>
         {subtitle && subtitleDirection === 'ltr' ? (
           <LtrText color="textMuted" variant="caption">
