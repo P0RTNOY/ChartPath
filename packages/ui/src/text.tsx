@@ -25,11 +25,19 @@ function alignmentFor(
     return 'center';
   }
 
-  if (alignment === 'start') {
-    return direction === 'rtl' ? 'right' : 'left';
-  }
+  const logicalAlignment =
+    alignment === 'start'
+      ? direction === 'rtl'
+        ? 'right'
+        : 'left'
+      : direction === 'rtl'
+        ? 'left'
+        : 'right';
 
-  return direction === 'rtl' ? 'left' : 'right';
+  // Fabric mirrors physical text alignment inside an RTL root on native. Supplying
+  // the opposite physical edge yields the requested logical start/end alignment.
+  if (Platform.OS !== 'web') return logicalAlignment === 'right' ? 'left' : 'right';
+  return logicalAlignment;
 }
 
 function isolateMixedChildren(children: ReactNode): ReactNode {

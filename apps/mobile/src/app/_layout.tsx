@@ -3,15 +3,17 @@ import '@/global.css';
 import { router, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 
 import { ChartPathThemeProvider, useReducedMotion } from '@chartpath/ui';
 
 import { DISCLAIMER_VERSION, LearningProvider, useLearning } from '@/state/learning';
 
-I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
-I18nManager.swapLeftAndRightInRTL(false);
+if (Platform.OS !== 'web') {
+  I18nManager.allowRTL(true);
+  I18nManager.forceRTL(true);
+  I18nManager.swapLeftAndRightInRTL(false);
+}
 
 function AppTheme({ children }: { readonly children: React.ReactNode }) {
   const { snapshot } = useLearning();

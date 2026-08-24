@@ -39,7 +39,10 @@ claim app-store, production, or human-learning validation.
   mistake diagnosis, and sequential reveal interactions.
 - Decision alternatives use explicit authored option-to-domain mappings, presentation order is
   deterministic without consulting rubrics, and sequential-reveal submission stays gated until the
-  learner records staged updates through the decision window.
+  staged chart reaches the decision window.
+- All 60 exercises carry an audited chart-presentation role. Seven direct chart interactions expose
+  answer-bearing graphs; the other 53 hide unrelated synthetic charts in both question and feedback
+  phases and explicitly tell learners to answer from the written case.
 - Seeded synthetic OHLCV generation is separated from semantic annotations, rendering, and grading.
   Property tests cover deterministic generation, OHLC invariants, supported scenarios, and arbitrary
   decision-candle cutoffs.
@@ -60,7 +63,7 @@ All commands were run from the repository root on macOS with Node `v22.23.2` and
 | Frozen install                          | `pnpm install --frozen-lockfile`                                                                | PASS; lockfile unchanged                                                            |
 | Formatting, lint, types, tests, content | `pnpm check`                                                                                    | PASS                                                                                |
 | Package builds                          | `pnpm build`                                                                                    | PASS for domain, chart engine, content, and UI                                      |
-| Unit/integration inventory              | included in `pnpm check`                                                                        | 184 tests: domain 48, chart 48, content 20, UI 14, mobile/persistence/UI 54         |
+| Unit/integration inventory              | included in `pnpm check`                                                                        | 186 tests: domain 48, chart 48, content 22, UI 14, mobile/persistence/UI 54         |
 | Catalog validation                      | `pnpm content:validate`                                                                         | PASS; exact inventory printed and quotas satisfied                                  |
 | Web export                              | `pnpm --filter @chartpath/mobile export:web`                                                    | PASS; 49 static routes, including every dynamic unit/lesson path                    |
 | Browser journeys                        | `pnpm test:e2e:web`                                                                             | PASS; 4/4 on phone and tablet Chromium projects, no retries                         |
@@ -72,8 +75,8 @@ All commands were run from the repository root on macOS with Node `v22.23.2` and
 | Production dependency audit             | `pnpm audit --prod --audit-level high`                                                          | PASS gate: 0 high, 0 critical; one moderate build-tool advisory documented below    |
 | Diff integrity                          | `git diff --check`                                                                              | PASS                                                                                |
 
-The 184-test inventory excludes the four browser journeys. Together the automated candidate evidence
-contains 188 passing tests/journeys. The native simulator journey is recorded separately because it
+The 186-test inventory excludes the four browser journeys. Together the automated candidate evidence
+contains 190 passing tests/journeys. The native simulator journey is recorded separately because it
 was driven through native controls rather than the browser suite.
 
 ## Journey evidence
@@ -157,6 +160,11 @@ contrast, and bottom-navigation obstruction:
 - `docs/screenshots/native-ios-lesson-intro.png`
 - `docs/screenshots/native-ios-summary.png`
 - `docs/screenshots/native-ios-restart-home.png`
+- `docs/screenshots/native-ios-rtl-onboarding.png`
+- `docs/screenshots/native-ios-rtl-clarification.png`
+- `docs/screenshots/native-ios-rtl-chart.png`
+- `docs/screenshots/native-ios-question-basis.png`
+- `docs/screenshots/native-ios-chart-answer-evidence.png`
 
 The inspection verified logical RTL navigation order, a right-edge back action, Hebrew sequence and
 icon order, right-origin progress, and a rightmost home tab. Quantitative chart chronology remains
@@ -172,6 +180,16 @@ accessible path does not reveal the numeric answer key. Hollow/filled candle bod
 non-color direction cue. Touch targets use a 44-point minimum; palette tests enforce WCAG AA
 normal-text contrast; system font scaling remains enabled up to `2x`, and the in-app preference adds
 bounded `1.15x`/`1.3x` scaling.
+
+A native follow-up caught a Fabric-specific text-alignment mirror that was not present in the web
+screenshots. The shared text primitive now maps logical alignment separately on native and web, and
+the native root is explicitly configured as RTL. A cold Expo Go relaunch also restored the bundled
+`RNSVGSvgView` registration; the current native images verify the logo and OHLCV chart without the
+red unimplemented-component placeholder.
+
+The two chart-relevance images additionally verify the learner-facing distinction between a written
+case with no displayed graph and a direct chart task whose graph is explicitly named as answer
+evidence.
 
 Remaining accessibility work before native distribution is listed below; screenshots and automated
 roles do not replace a manual VoiceOver/TalkBack pass.

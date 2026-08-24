@@ -939,8 +939,6 @@ function SequentialReveal(props: ExerciseInteractionProps) {
   const [revealed, setRevealed] = useState(
     props.answer ? decisionWindow : Math.min(12, decisionWindow),
   );
-  const [draftAnswer, setDraftAnswer] = useState<ExerciseAnswer | null>(props.answer);
-  const [recordedUpdates, setRecordedUpdates] = useState(0);
   const atDecisionWindow = revealed >= decisionWindow;
   if (!props.chart || decisionWindow === 0) {
     return <EmptyInteraction message="לא ניתן לטעון את רצף הנרות; לא נרשמה תשובה." />;
@@ -955,16 +953,11 @@ function SequentialReveal(props: ExerciseInteractionProps) {
           </Card>
         ) : (
           <Button
-            disabled={!draftAnswer}
-            onPress={() => {
-              setRecordedUpdates((value) => value + 1);
-              setDraftAnswer(null);
-              props.onChange(null);
-              setRevealed((value) => Math.min(decisionWindow, value + 8));
-            }}
+            disabled={props.disabled}
+            onPress={() => setRevealed((value) => Math.min(decisionWindow, value + 8))}
             variant="secondary"
           >
-            {draftAnswer ? 'תעדו את הניתוח וחשפו 8 נרות' : 'בחרו ניתוח לפני החשיפה'}
+            חשיפת 8 נרות נוספים
           </Button>
         )}
         <LtrText color="textMuted" variant="numeric">
@@ -973,17 +966,10 @@ function SequentialReveal(props: ExerciseInteractionProps) {
       </View>
       <UiText color="textMuted" variant="bodySmall">
         {atDecisionWindow
-          ? `הגעתם לחלון ההחלטה לאחר ${recordedUpdates} עדכונים. הבחירה הבאה תהיה התשובה הסופית.`
-          : 'בחרו ניתוח לפי הנרות הגלויים, ורק אז ייחשפו הנרות הבאים. אי אפשר להגיש את הבחירה הזמנית.'}
+          ? 'הגעתם לחלון ההחלטה. כעת בחרו תשובה לפי הרצף שנחשף.'
+          : 'בדקו בכל חלון מה ידעתם באותו רגע. אפשר לבחור תשובה רק לאחר חשיפת חלון ההחלטה.'}
       </UiText>
-      <RubricInteraction
-        {...props}
-        answer={draftAnswer}
-        onChange={(next) => {
-          setDraftAnswer(next);
-          props.onChange(atDecisionWindow ? next : null);
-        }}
-      />
+      {atDecisionWindow ? <RubricInteraction {...props} /> : undefined}
     </View>
   );
 }

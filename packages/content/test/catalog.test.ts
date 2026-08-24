@@ -47,6 +47,36 @@ describe('reviewed curriculum catalog', () => {
     expect(catalog.lessons.every((lesson) => lesson.exerciseIds.length === 5)).toBe(true);
   });
 
+  it('shows charts only for audited exercises where the graph is answer evidence', () => {
+    expect(
+      catalog.exercises
+        .filter((exercise) => exercise.chartPresentation === 'answer-evidence')
+        .map((exercise) => exercise.id),
+    ).toEqual([
+      'u01-chart-data-e01',
+      'u02-structure-e01',
+      'u02-structure-e04',
+      'u03-levels-e01',
+      'u03-levels-e04',
+      'u05-reversal-e04',
+      'u06-breakouts-e04',
+    ]);
+    expect(catalog.exercises.find((exercise) => exercise.id === 'u00-scenarios-e04')).toMatchObject(
+      { chartPresentation: 'hidden' },
+    );
+  });
+
+  it('rejects hiding a chart required by an interactive chart exercise', () => {
+    const copy = cloneCatalog();
+    const index = copy.exercises.findIndex((exercise) => exercise.rubric.kind === 'point');
+    const exercise = copy.exercises[index]!;
+    (copy.exercises as ContentCatalog['exercises'][number][])[index] = {
+      ...exercise,
+      chartPresentation: 'hidden',
+    };
+    expect(issueCodes(copy)).toContain('hidden-required-chart');
+  });
+
   it('keeps the capstone as one independently graded eleven-stage workflow', () => {
     const capstones = catalog.exercises.filter((exercise) => exercise.capstoneSteps);
     expect(capstones).toHaveLength(1);

@@ -1,5 +1,6 @@
 import type {
   AtomicAnswerRubric,
+  ChartPresentation,
   Exercise,
   ExerciseOption,
   Lesson,
@@ -51,6 +52,7 @@ export interface CapstoneStep {
 
 export interface ContentExercise extends Exercise {
   readonly contentVersionId: string;
+  readonly chartPresentation: ChartPresentation;
   readonly workflowStepIds: readonly WorkflowStepId[];
   readonly termIds: readonly string[];
   readonly role: ExerciseRole;

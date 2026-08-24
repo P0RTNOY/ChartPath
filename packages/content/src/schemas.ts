@@ -263,6 +263,7 @@ export const exerciseSchema = z.strictObject({
     .optional(),
   decisionOptionMap: z.record(id, tradeDecisionSchema).optional(),
   chartSpec: chartSpecSchema,
+  chartPresentation: z.enum(['hidden', 'answer-evidence']),
   rubric: answerRubricSchema,
   explanationHe: nonEmpty,
   explanationEn: nonEmpty.optional(),
