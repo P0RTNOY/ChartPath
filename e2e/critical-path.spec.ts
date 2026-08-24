@@ -78,6 +78,7 @@ test('fresh Hebrew guest completes the first lesson and keeps progress after rel
   await expect(page.getByText('שיעור הושלם', { exact: true })).toBeVisible();
   await expect(page.getByText('5/5', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'חזרה למסלול' }).click();
+  await page.waitForURL('**/home');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'המסלול שלי' })).toBeVisible();
 
