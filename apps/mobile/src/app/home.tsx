@@ -136,6 +136,26 @@ export default function HomeScreen() {
         </View>
       </Card>
 
+      <Card
+        accessibilityLabel="פתיחת מעבדת הגרפים"
+        onPress={() => router.push('/lab')}
+        variant="outlined"
+      >
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
+          <IconBubble tone="gold">
+            <Glyph name="chart" />
+          </IconBubble>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Badge tone="warning">מעבדת גרפים</Badge>
+            <Heading level={3}>תרגול על משטח ניתוח מלא</Heading>
+            <UiText color="textMuted" variant="bodySmall">
+              בדקו נרות, התקדמו בזמן ושרטטו ראיות בתרחיש סינתטי מבוקר.
+            </UiText>
+          </View>
+          <Glyph name="back" />
+        </View>
+      </Card>
+
       <View style={{ gap: theme.spacing.md }}>
         <View
           style={{

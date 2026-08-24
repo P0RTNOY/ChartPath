@@ -4,6 +4,7 @@ import { router, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { I18nManager, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ChartPathThemeProvider, useReducedMotion } from '@chartpath/ui';
 
@@ -57,12 +58,14 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <LearningProvider>
-      <AppTheme>
-        <NavigationGuard>
-          <RootNavigator />
-        </NavigationGuard>
-      </AppTheme>
-    </LearningProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <LearningProvider>
+        <AppTheme>
+          <NavigationGuard>
+            <RootNavigator />
+          </NavigationGuard>
+        </AppTheme>
+      </LearningProvider>
+    </GestureHandlerRootView>
   );
 }

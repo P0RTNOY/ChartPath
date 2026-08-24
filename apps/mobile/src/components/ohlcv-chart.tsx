@@ -13,8 +13,10 @@ import type {
   ChartAnnotation,
   ChartZone,
   GeneratedChart,
+  LearnerChartAnnotation,
   OhlcvCandle,
 } from '@chartpath/domain';
+import type { ChartViewport } from '@chartpath/chart-engine';
 import { Button, Card, isolateLtrRunsInHebrew, LtrText, UiText, useTheme } from '@chartpath/ui';
 
 const CHART_HEIGHT = 320;
@@ -36,6 +38,11 @@ export interface OhlcvChartProps {
   readonly expectedZone?: ChartZone;
   readonly expectedLine?: { readonly start: ChartAnchor; readonly end: ChartAnchor };
   readonly revealCount?: number;
+  readonly viewport?: ChartViewport;
+  readonly learnerAnnotations?: readonly LearnerChartAnnotation[];
+  readonly selectedAnnotationId?: string;
+  readonly selectedCandleIndex?: number;
+  readonly crosshairAnchor?: ChartAnchor;
   readonly showAnnotations?: boolean;
   readonly allowAccessibleDataTable?: boolean;
   readonly onChartPress?: (anchor: ChartAnchor) => void;
@@ -111,6 +118,11 @@ export function OhlcvChart({
   expectedZone,
   expectedLine,
   revealCount,
+  viewport,
+  learnerAnnotations = [],
+  selectedAnnotationId,
+  selectedCandleIndex,
+  crosshairAnchor,
   showAnnotations = false,
   allowAccessibleDataTable = true,
   onChartPress,
@@ -122,16 +134,19 @@ export function OhlcvChart({
   const [width, setWidth] = useState(680);
   const [showAccessibleData, setShowAccessibleData] = useState(false);
   const [interactionStatus, setInteractionStatus] = useState<string | undefined>();
-  const candles = useMemo(
-    () => chart.candles.slice(0, revealCount ?? chart.candles.length),
-    [chart.candles, revealCount],
-  );
+  const candles = useMemo(() => {
+    const revealed = chart.candles.slice(0, revealCount ?? chart.candles.length);
+    if (!viewport) return revealed;
+    return revealed.filter(
+      (candle) => candle.index >= viewport.startIndex && candle.index <= viewport.endIndex,
+    );
+  }, [chart.candles, revealCount, viewport]);
   const frame = useMemo(() => chartFrame(candles), [candles]);
   const plotWidth = Math.max(1, width - AXIS_LEFT - AXIS_RIGHT);
   const candleSpan = Math.max(1, frame.last - frame.first + 1);
   const pricePadding = Math.max(0.01, (frame.high - frame.low) * 0.08);
-  const priceLow = frame.low - pricePadding;
-  const priceHigh = frame.high + pricePadding;
+  const priceLow = viewport?.minPrice ?? frame.low - pricePadding;
+  const priceHigh = viewport?.maxPrice ?? frame.high + pricePadding;
   const xForIndex = (index: number): number =>
     AXIS_LEFT + ((index - frame.first + 0.5) / candleSpan) * plotWidth;
   const yForPrice = (price: number): number =>
@@ -220,6 +235,81 @@ export function OhlcvChart({
         width={Math.max(candleWidth, xForIndex(end) - xForIndex(start))}
         x={xForIndex(start)}
         y={PLOT_TOP}
+      />
+    );
+  };
+
+  const renderLearnerAnnotation = (annotation: LearnerChartAnnotation) => {
+    const selected = annotation.id === selectedAnnotationId;
+    const stroke = selected ? theme.colors.warning : theme.colors.primary;
+    const strokeWidth = selected ? 4 : 2.5;
+    if (annotation.kind === 'point') {
+      return (
+        <Circle
+          cx={xForIndex(annotation.anchor.candleIndex)}
+          cy={yForPrice(annotation.anchor.price)}
+          fill={theme.colors.surface}
+          key={annotation.id}
+          r={selected ? 8 : 6}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          testID={`${testID}-learner-${annotation.id}`}
+        />
+      );
+    }
+    if (annotation.kind === 'horizontal-level') {
+      return (
+        <Line
+          key={annotation.id}
+          stroke={stroke}
+          strokeDasharray={selected ? '3 2' : undefined}
+          strokeWidth={strokeWidth}
+          testID={`${testID}-learner-${annotation.id}`}
+          x1={AXIS_LEFT}
+          x2={width - AXIS_RIGHT}
+          y1={yForPrice(annotation.price)}
+          y2={yForPrice(annotation.price)}
+        />
+      );
+    }
+    if (annotation.kind === 'trendline') {
+      return (
+        <Line
+          key={annotation.id}
+          stroke={stroke}
+          strokeDasharray={selected ? '3 2' : undefined}
+          strokeWidth={strokeWidth}
+          testID={`${testID}-learner-${annotation.id}`}
+          x1={xForIndex(annotation.start.candleIndex)}
+          x2={xForIndex(annotation.end.candleIndex)}
+          y1={yForPrice(annotation.start.price)}
+          y2={yForPrice(annotation.end.price)}
+        />
+      );
+    }
+    const left = Math.min(
+      xForIndex(annotation.start.candleIndex),
+      xForIndex(annotation.end.candleIndex),
+    );
+    const right = Math.max(
+      xForIndex(annotation.start.candleIndex),
+      xForIndex(annotation.end.candleIndex),
+    );
+    const top = yForPrice(Math.max(annotation.start.price, annotation.end.price));
+    const bottom = yForPrice(Math.min(annotation.start.price, annotation.end.price));
+    return (
+      <Rect
+        fill={theme.colors.primary}
+        fillOpacity={0.12}
+        height={Math.abs(bottom - top)}
+        key={annotation.id}
+        stroke={stroke}
+        strokeDasharray={selected ? '3 2' : '5 3'}
+        strokeWidth={strokeWidth}
+        testID={`${testID}-learner-${annotation.id}`}
+        width={Math.max(candleWidth, right - left)}
+        x={left}
+        y={top}
       />
     );
   };
@@ -344,7 +434,43 @@ export function OhlcvChart({
           y={PLOT_TOP}
         />
       ))}
+      {selectedCandleIndex !== undefined ? (
+        <Rect
+          fill={theme.colors.info}
+          fillOpacity={0.09}
+          height={PLOT_BOTTOM - PLOT_TOP}
+          stroke={theme.colors.info}
+          strokeWidth={2}
+          testID={`${testID}-selected-candle`}
+          width={Math.max(18, candleWidth + 10)}
+          x={xForIndex(selectedCandleIndex) - Math.max(18, candleWidth + 10) / 2}
+          y={PLOT_TOP}
+        />
+      ) : undefined}
+      {crosshairAnchor ? (
+        <G testID={`${testID}-crosshair`}>
+          <Line
+            stroke={theme.colors.info}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            x1={xForIndex(crosshairAnchor.candleIndex)}
+            x2={xForIndex(crosshairAnchor.candleIndex)}
+            y1={PLOT_TOP}
+            y2={PLOT_BOTTOM}
+          />
+          <Line
+            stroke={theme.colors.info}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            x1={AXIS_LEFT}
+            x2={width - AXIS_RIGHT}
+            y1={yForPrice(crosshairAnchor.price)}
+            y2={yForPrice(crosshairAnchor.price)}
+          />
+        </G>
+      ) : undefined}
       {showAnnotations ? chart.annotations.map(renderAnnotation) : undefined}
+      {learnerAnnotations.map(renderLearnerAnnotation)}
       {expectedZone ? (
         <Rect
           fill={theme.colors.warning}
@@ -496,7 +622,7 @@ export function OhlcvChart({
         accessibilityRole={interactive ? 'button' : 'image'}
         onLayout={onLayout}
         onPress={onPress}
-        style={[styles.chart, { borderColor: theme.colors.border }]}
+        style={[styles.chart, { borderColor: theme.colors.border, direction: 'ltr' }]}
         testID={testID}
       >
         {body}
