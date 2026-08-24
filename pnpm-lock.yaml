@@ -148,6 +148,9 @@ importers:
       '@chartpath/domain':
         specifier: workspace:*
         version: link:../domain
+      '@chartpath/historical-data':
+        specifier: workspace:*
+        version: link:../historical-data
       zod:
         specifier: ^4.1.5
         version: 4.4.3
