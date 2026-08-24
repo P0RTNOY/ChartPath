@@ -243,8 +243,10 @@ Persistence payload schema `3` adds `analysisSessions` and an explicit quarantin
 records while preserving all v1/v2 attempts. Native SQLite migration `2` adds an
 `analysis_sessions` JSON mirror with triggers; web storage uses the same repository behavior.
 Create-or-resume prevents duplicate active sessions for the canonical exercise. Saves use a
-monotonic revision for optimistic conflict detection. Restart first marks the old draft abandoned,
-then creates a distinct active session; historical attempts are untouched. A malformed record is
+monotonic revision for optimistic conflict detection. Meaningful edits enqueue immediately; explicit
+route exit waits for that serialized queue, and a native background/inactive event idempotently
+re-enqueues the latest revision so a prior failed write is retried before suspension. Restart first
+marks the old draft abandoned, then creates a distinct active session; historical attempts are untouched. A malformed record is
 quarantined and can only be discarded through an explicit localized recovery action that preserves
 attempts and projections.
 

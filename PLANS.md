@@ -66,6 +66,6 @@ Milestone 2 reuses reviewed capstone `u10-capstone-e03` and its unchanged author
 rubrics, hints, explanations, misconceptions and source reference. It adds a versioned pure session
 state machine, web/native repository parity, guarded restart/recovery, and an atomic link between one
 finalized session and one append-only attempt. Historical market data, execution, news, brokerage and
-AI tutoring remain out of scope. Final verification produced 268 passing repository tests, 10/10
+AI tutoring remain out of scope. Final verification produced 269 passing repository tests, 10/10
 production-export browser journeys, 53 web routes, both native Hermes bundles and ten inspected
 Guided Analysis screenshots.

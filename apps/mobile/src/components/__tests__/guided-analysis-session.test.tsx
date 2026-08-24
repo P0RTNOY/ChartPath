@@ -1,4 +1,5 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { exercises } from '@chartpath/content';
 import {
@@ -200,6 +201,28 @@ function renderSession(current: GuidedAnalysisSession) {
 }
 
 describe('GuidedAnalysisSessionView', () => {
+  it('flushes the current revision through the serialized save queue when backgrounded', async () => {
+    let onAppStateChange: ((state: AppStateStatus) => void) | undefined;
+    const subscription = { remove: jest.fn() };
+    const listener = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_type, handler) => {
+        onAppStateChange = handler;
+        return subscription;
+      });
+    const current = session();
+    const screen = await renderSession(current);
+    const save = mockLearning.saveAnalysisSession as jest.Mock;
+    save.mockClear();
+
+    await act(async () => onAppStateChange?.('background'));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(current));
+
+    await act(async () => screen.unmount());
+    await waitFor(() => expect(subscription.remove).toHaveBeenCalled());
+    listener.mockRestore();
+  });
+
   it('shows progress, gates submission, autosaves, and visibly invalidates a revised step', async () => {
     const screen = await renderSession(session());
 

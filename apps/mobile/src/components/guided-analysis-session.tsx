@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, useWindowDimensions, View } from 'react-native';
 
 import {
   contentVersion,
@@ -366,6 +366,7 @@ export function GuidedAnalysisSessionView({
 }) {
   const theme = useTheme();
   const learning = useLearning();
+  const { saveAnalysisSession } = learning;
   const { width } = useWindowDimensions();
   const exercise = useMemo(() => canonicalExercise(), []);
   const [session, setSession] = useState(persistedSession);
@@ -378,11 +379,46 @@ export function GuidedAnalysisSessionView({
   const [finalizing, setFinalizing] = useState(false);
   const [recovering, setRecovering] = useState(false);
 
+  const enqueue = useCallback(
+    (next: GuidedAnalysisSession) => {
+      sessionRef.current = next;
+      setSession(next);
+      setSaveStatus('saving');
+      saveQueue.current = saveQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          const saved = await saveAnalysisSession(next);
+          lastSaveFailed.current = false;
+          if (sessionRef.current.revision <= saved.revision) {
+            sessionRef.current = saved;
+            setSession(saved);
+          }
+          if (sessionRef.current.revision === saved.revision) setSaveStatus('saved');
+        })
+        .catch(() => {
+          lastSaveFailed.current = true;
+          setSaveStatus('error');
+          setMessage('לא הצלחנו לשמור את השינוי. הטיוטה נשארה על המסך; נסו שוב לפני יציאה.');
+        });
+    },
+    [saveAnalysisSession],
+  );
+
   useEffect(() => {
     if (persistedSession.revision <= sessionRef.current.revision) return;
     sessionRef.current = persistedSession;
     setSession(persistedSession);
   }, [persistedSession]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' || sessionRef.current.status !== 'active') return;
+      // Meaningful edits already save immediately. Re-enqueuing the exact latest revision here is
+      // idempotent and also retries a failed write before the process can be suspended.
+      enqueue(sessionRef.current);
+    });
+    return () => subscription?.remove();
+  }, [enqueue]);
 
   if (persistedSession.status === 'finalized') return <GuidedDebrief session={persistedSession} />;
   if (persistedSession.status === 'abandoned') {
@@ -398,28 +434,6 @@ export function GuidedAnalysisSessionView({
       </Screen>
     );
   }
-
-  const enqueue = (next: GuidedAnalysisSession) => {
-    sessionRef.current = next;
-    setSession(next);
-    setSaveStatus('saving');
-    saveQueue.current = saveQueue.current
-      .catch(() => undefined)
-      .then(async () => {
-        const saved = await learning.saveAnalysisSession(next);
-        lastSaveFailed.current = false;
-        if (sessionRef.current.revision <= saved.revision) {
-          sessionRef.current = saved;
-          setSession(saved);
-        }
-        if (sessionRef.current.revision === saved.revision) setSaveStatus('saved');
-      })
-      .catch(() => {
-        lastSaveFailed.current = true;
-        setSaveStatus('error');
-        setMessage('לא הצלחנו לשמור את השינוי. הטיוטה נשארה על המסך; נסו שוב לפני יציאה.');
-      });
-  };
 
   const exitAfterSave = async () => {
     setMessage(null);
