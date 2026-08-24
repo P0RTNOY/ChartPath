@@ -9,6 +9,11 @@
 
 This is a requirements document, not evidence that the described capabilities are already implemented or verified.
 
+**Milestone 3 status (2026-08-24): implementation and repository verification complete.** The frozen,
+provider-neutral historical-replay flow is learner-accessible as an explicitly internal practice
+scenario. The only historical-format candles in the repository are a ChartPath-generated
+development fixture, not real market observations.
+
 ## 1. Document status and evidence labels
 
 This specification distinguishes requested product behavior from source-backed curriculum evidence:
@@ -156,6 +161,19 @@ These content counts can be considered met only after the source references have
 - Optional tutor explanations through a guarded `TutorProvider`.
 - Additional curriculum depth and more exercise variants.
 
+The implemented Milestone 3 foundation adds provider-neutral historical import, integrity,
+publication-gate and persistence contracts without adding a market-data dependency to the core
+product. Its sole installed dataset is a non-publishable 96-candle ChartPath-generated fixture with
+one recorded gap. It contains no real ticker, issuer, market or price history; no provider keys or
+runtime network request are configured. The historical registry is separate from the reviewed
+curriculum catalog and currently has zero course-credit-eligible scenarios and four explicit
+publication blockers.
+
+Paper trading, portfolios, profit-and-loss scoring, live or delayed feeds, streaming quotes,
+simulated or real orders, news and brokerage connectivity remain out of scope. Databento and the
+other researched vendors in `docs/HISTORICAL_DATA_POLICY.md` are procurement candidates only, not
+approved sources or implemented integrations.
+
 Future capabilities do not belong in beta claims unless implemented and verified.
 
 ## 7. Information architecture
@@ -234,6 +252,28 @@ The developer content catalog is a development-only or clearly separated diagnos
 2. The learner completes the 11 steps in sequence, with no future-candle leakage.
 3. Each step is graded against its own rubric; later steps may depend only on accepted earlier information.
 4. The summary reports process strengths, misconceptions, uncertainty handling, and review recommendations—not hypothetical profit.
+
+### 8.9 Frozen historical replay
+
+The implemented internal-practice journey is:
+
+1. The app resolves an installed scenario and exact dataset ID, version and SHA-256 checksum before
+   starting or resuming a session.
+2. The learner sees only the candle prefix and scenario evidence available at the current replay
+   cursor, never beyond the minimum authored cutoff.
+3. Blind presentation omits identity and timestamps and derives chart scale, summaries and
+   accessibility text from that same visible prefix.
+4. The existing reviewed 11-step capstone prompts, rubrics, explanations, hints, misconceptions and
+   educational source references are reused unchanged.
+5. Draft answers, current and maximum-seen replay cursors, annotation authorship and checkpoint
+   snapshots survive an offline resume under the pinned identity.
+6. A missing scenario/dataset, checksum disagreement, metadata disagreement or modified dataset
+   stops resume and requires an explicit recovery choice; the app never substitutes or silently
+   repins evidence.
+7. Finalizing a development-only, non-credit scenario freezes the practice session but creates no
+   ordinary attempt and changes no mastery, review, completion, XP, streak or activity projection.
+8. Identity may be disclosed only under the authored reveal policy after finalization. Later outcome
+   remains excluded from the original grade.
 
 ## 9. Hebrew RTL, bilingual content, and accessibility
 
@@ -332,6 +372,20 @@ Additional product enforcement:
 - The app clearly explains what is stored locally and how a learner can clear it.
 - No brokerage credentials, holdings, trade history, or financial account connection is requested.
 - Cloud synchronization is future work and must require separate authentication, authorization, tenant isolation, retention, and deletion review.
+- Guided-session schema version 2 distinguishes synthetic seed/generator identity from historical
+  scenario/dataset/version/checksum identity. Persistence payload schema version 4 and native SQLite
+  migration 3 preserve that pin, replay high-water state, annotation authorship and checkpoint
+  snapshots without rewriting attempt history.
+- Historical session resolution has six exact outcomes: `ready`, `scenario-missing`,
+  `dataset-missing`, `checksum-mismatch`, `metadata-mismatch`, and `dataset-modified`. Non-ready
+  states fail closed; they do not fetch, repair or replace data.
+- Blind historical presentation protects the learning sequence in ordinary UI and accessibility
+  output. It is not a promise that bundled data is secret from source inspection, application
+  bundles or developer tools on a learner-controlled client.
+- No real candles may be committed or shipped until human legal/procurement review establishes the
+  intended provider rights and a human editorial review clears the separate historical publication
+  gate. The current fixture checksum is
+  `sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`.
 
 ## 13. Content and exercise contract
 
@@ -395,6 +449,12 @@ Publication is blocked when required fields, Hebrew content, prerequisite refere
 - Content migration preserves attempts and progress.
 - Lint, formatting, type checking, unit/integration tests, content validation, persistence tests, and supported builds pass.
 - At least one critical end-to-end journey runs in an available target; environment-only gaps are documented precisely.
+
+Milestone 3 implementation includes the historical learner flow, fail-closed recovery presentation,
+cutoff-safe visual/accessibility output, offline resume, non-credit finalization behavior and
+light/dark/reduced-motion phone/tablet web captures. The full repository, browser and export command
+inventory passes. Browser automation and screenshots do not establish
+native screen-reader, native largest-text, gesture/lifecycle or physical-device usability.
 
 ### 14.6 Safety
 

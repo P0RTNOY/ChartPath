@@ -243,6 +243,9 @@ For drawing tasks, the learner should receive specific feedback such as “the z
 ### 7.5 No future leakage
 
 - The visible chart, annotations available to the learner, grader input, and explanation of the original choice are all limited to candles `≤ N`.
+- Chart scaling, visible statistics, candle summaries, timestamps and accessibility labels are
+  derived from the same cutoff-limited prefix; a future value may not leak indirectly through an
+  axis, extrema, aggregate, label or screen-reader description.
 - Ground-truth annotations for future candles are kept outside the grading view.
 - A post-submission reveal is clearly labeled as later information.
 - Outcome information may prompt reflection but cannot determine whether the earlier process was defensible.
@@ -433,7 +436,10 @@ Each unit should identify which doctrine points it teaches, practices, and asses
 
 ## 14. Capstone design
 
-The capstone uses an unseen deterministic seed and records a response for every workflow stage.
+The implemented beta capstone uses an unseen deterministic seed and records a response for every
+workflow stage. A frozen historical replay may reuse the same authored exercise only when it pins a
+validated dataset/scenario identity and preserves the same decision-time evidence and grading
+contract; changing chart provenance does not authorize changing the curriculum doctrine.
 
 ### 14.1 Stages
 
@@ -588,6 +594,45 @@ source provenance and the deterministic next-review dates. It never converts lat
 into a score or describes hypothetical profit. Finalization creates the same immutable capstone
 attempt used by the rest of the learning system, so mastery, review, XP, activity and lesson progress
 remain separate deterministic projections.
+
+## 18.2 Frozen Historical Replay Foundation (implemented and verified)
+
+Milestone 3 reuses reviewed exercise `u10-capstone-e03` as the educational contract. Its canonical
+eleven-step order, Hebrew prompts, answer presentations, per-step rubrics, explanations, three
+session-wide hints, misconception mappings, safety note and educational source reference are not
+forked or rewritten for a historical chart. The separate historical registry binds a scenario to
+that exact content and deterministic grader identity. It does not add to or alter the existing 60
+reviewed exercise records.
+
+The installed development scenario uses 96 ChartPath-generated hourly candles with one explicitly
+recorded gap. It is synthetic, development-only and non-publishable. Registry validation derives
+zero course-credit eligibility and four publication blockers: neither scenario nor dataset is
+published, redistribution permission is not verified, and human editorial review is missing. These
+are deliberate gates, not warnings that an author or UI may override.
+
+Historical learning integrity uses three cumulative evidence records:
+
+1. a monotonic maximum-cursor-seen high-water mark, so returning the visible cursor backward cannot
+   erase what was already observable;
+2. an authorship cursor on every learner annotation, so geometry drawn with later knowledge cannot
+   appear in an earlier view; and
+3. append-only checkpoints that snapshot the current cursor, high-water mark and annotations visible
+   at capture time for the associated workflow step.
+
+Every chart slice, scenario annotation, corporate action, statistic, scale and accessibility label
+is computed from the current prefix bounded by the decision, permitted-replay and knowledge cutoffs.
+Blind mode withholds instrument identity and timestamps from ordinary visual and assistive UI until
+the authored reveal policy permits them after finalization. This is a pedagogical interface boundary,
+not adversarial secrecy against a learner inspecting bundled clients, source maps or developer tools.
+
+A non-credit development replay may be finalized for read-only reflection, but it creates no
+ordinary attempt and contributes nothing to mastery, review scheduling, lesson progress, XP, streak
+or daily activity. Course credit remains unavailable until the exact dataset rights, publication,
+human editorial and future-leak gates pass. The current implementation provides separate scenario
+selection, blind cutoff-aware replay, exact offline resume, fail-closed recovery, read-only reveal
+and history, and non-credit practice finalization. Focused and full-suite evidence covers the
+implemented flow; native screen-reader, gesture/lifecycle and physical-device usability verification
+remain pending.
 
 ## 19. Verified evidence and tunable decisions
 

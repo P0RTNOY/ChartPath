@@ -34,3 +34,32 @@ position sizing, the authored no-trade decision, finalized process debrief, loca
 dark / largest in-app text / reduced motion, and tablet composition. Captures retain their native
 `390×844` or `1024×768` viewport because the React Native scroll container owns scrolling. The set
 demonstrates browser layout and state distinctions, not native gestures or screen-reader behavior.
+
+The ten `historical-replay-*` images were generated with `pnpm screenshots:historical` against the
+production static export for branch `codex/historical-replay-foundation`:
+
+- `historical-replay-entry-light-phone.png` — the separate internal, generated-data entry and
+  development/no-credit disclosures;
+- `historical-replay-blind-before-decision-light-phone.png` — the initial blind session, exact
+  dataset/checksum pin and `24/73` cutoff without final identity/dates;
+- `historical-replay-mid-light-phone.png` — cutoff-only candle chart, neutral accessible notebook and
+  replay controls;
+- `historical-replay-resumed-light-phone.png` — restored submitted answers and active workflow step;
+- `historical-replay-provenance-status-light-phone.png` — resumed cursor/status disclosure while
+  identity remains blind;
+- `historical-replay-final-reveal-light-phone.png` — after-finalization generated identity,
+  provenance, terms, limitations and process/outcome disclosure;
+- `historical-replay-debrief-light-phone.png` — read-only process score beside the no-credit reveal;
+- `historical-replay-history-light-phone.png` — finalized local history and revealed generated
+  provenance;
+- `historical-replay-dark-very-large-reduced-phone.png` — dark theme, very-large in-app text and
+  reduced-motion state; and
+- `historical-replay-light-tablet.png` — wide two-column tablet composition.
+
+The nine phone images are exactly `390×844`; the tablet image is exactly `1024×768`. They were
+inspected at those original dimensions for Hebrew RTL hierarchy, LTR checksum/dataset/date strings,
+clipping, line wrapping, chart chronology, label/control overlap, non-color status, blind-versus-
+revealed identity, dark contrast, very-large text, reduced-motion messaging and responsive
+composition. The set confirms browser presentation and persisted browser state only. It does not
+establish native rendering, gestures, VoiceOver/TalkBack focus or speech, native largest OS text,
+force-close/reopen behavior, physical-device ergonomics or application-bundle secrecy.

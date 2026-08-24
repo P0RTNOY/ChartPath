@@ -1,9 +1,10 @@
 # ChartPath Architecture
 
-> Status snapshot: 2026-08-23. This document is an implementation contract for the
-> beta. At the time of writing, the repository contained no application code, so no
-> capability below is claimed to be implemented unless a later status table says
-> otherwise. Release evidence belongs in `docs/RELEASE_READINESS.md`.
+> Status snapshot: 2026-08-24. This document is an implementation contract for the
+> beta and records implemented foundations only where the repository contains the
+> corresponding code. Milestone 3 implementation and final repository verification
+> are complete; native distribution gates remain open. Release evidence belongs in
+> `docs/RELEASE_READINESS.md`.
 
 ## Status language
 
@@ -11,8 +12,8 @@
   verification are still required.
 - **Future design**: a compatibility direction, not a beta dependency or a claim
   that infrastructure exists.
-- **Implemented**: may be used only after code and relevant verification evidence
-  exist. No item has this status in this initial document.
+- **Implemented**: may be used only after corresponding code and relevant focused
+  verification exist; it does not imply that a larger milestone is complete.
 
 ## Architectural goals
 
@@ -26,8 +27,8 @@ The beta has four hard constraints:
 
 1. A learner can complete the core journey without an account, network, market-data
    provider, or AI key.
-2. The same chart seed, parameters, generator version, and decision candle produce
-   the same visible candles, annotations, and grade.
+2. The same synthetic chart seed/generator identity or pinned historical dataset
+   version/checksum and decision candle produce the same visible evidence and grade.
 3. Only curated, schema-valid content and pure grading rules determine correctness.
 4. Learning history is durable and append-only; derived progress can be rebuilt.
 
@@ -44,6 +45,7 @@ apps/
 packages/
   domain/              Learning types, pure graders, mastery, review scheduling
   chart-engine/        Seeded OHLCV generation and semantic ground truth
+  historical-data/     Provider-neutral schema, import, integrity and replay views
   content/             Versioned curriculum data, schemas, migrations, validator
   ui/                  Accessible React Native primitives and chart presentation
 docs/                   Product, learning, source, architecture, and release records
@@ -55,11 +57,13 @@ Allowed production dependencies are one-way:
 apps/mobile  ───────>  packages/content
      │               ↘ packages/domain
      ├───────────────> packages/chart-engine ──> packages/domain
+     ├───────────────> packages/historical-data
      └───────────────> packages/ui
 
-packages/content ───> packages/domain
+packages/content ───> packages/domain + packages/historical-data
 packages/ui ────────> React / React Native / react-native-svg
 packages/domain ────> platform-independent TypeScript only
+packages/historical-data ──> platform-independent TypeScript only
 ```
 
 `packages/content` may call `packages/chart-engine` from its validation command or
@@ -239,9 +243,13 @@ contract.
 
 ### Draft repository and atomic finalization
 
-Persistence payload schema `3` adds `analysisSessions` and an explicit quarantine for invalid draft
-records while preserving all v1/v2 attempts. Native SQLite migration `2` adds an
-`analysis_sessions` JSON mirror with triggers; web storage uses the same repository behavior.
+Guided-session schema `2` uses a discriminated chart identity: synthetic sessions pin seed and
+generator identity, while historical sessions pin scenario ID/version, dataset ID/version, canonical
+SHA-256 checksum, interval, candle bounds, decision index and learning-credit status. Persistence
+payload schema `4` stores this identity and preserves the explicit quarantine for invalid draft
+records while retaining all earlier attempts. Native SQLite migration `3` expands the
+`analysis_sessions` mirror with the corresponding historical columns; web storage uses the same
+repository behavior.
 Create-or-resume prevents duplicate active sessions for the canonical exercise. Saves use a
 monotonic revision for optimistic conflict detection. Meaningful edits enqueue immediately; explicit
 route exit waits for that serialized queue, and a native background/inactive event idempotently
@@ -256,6 +264,83 @@ attempt in one repository transaction. The same attempt ID and finalization key 
 readback returns the committed result and projection replay cannot add XP twice. The ordinary
 projection path remains authoritative for mastery, review scheduling, lesson progress, daily
 activity and XP; the Guided Analysis feature does not duplicate those reducers.
+
+## Frozen Historical Replay Foundation
+
+**Implemented and verified 2026-08-24.** `packages/historical-data` is pure,
+provider-neutral TypeScript. Canonical dataset and scenario schema version 1 define UTC/local
+timestamps, OHLCV, interval/session policy, adjustment and explicit corporate-action policy,
+recorded missing intervals, provenance/rights evidence, editorial/publication state, scenario
+cutoffs and exact dataset/rubric checksum pins. The package owns deterministic canonical
+serialization, a pure SHA-256 implementation, CSV import/normalization, structural/integrity
+validation and cutoff-aware replay views. It imports no React, React Native, Expo, storage, file
+system, network client, environment variable or provider SDK; callers provide raw bytes/text and
+metadata.
+
+The only installed data is `chartpath-generated-hourly-fixture@1.0.0-dev`: 96 hourly candles
+created by ChartPath integer formulas, one explicitly recorded omitted interval, no corporate
+actions and canonical checksum
+`sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`. Its symbol, prices,
+volume and calendar are synthetic. No real prices, provider response, provider credential or runtime
+market-data request is bundled or configured.
+
+### Registry, publication and course-credit gate
+
+Historical content is registered separately from the 60 reviewed curriculum exercises. The single
+development scenario binds to the unchanged reviewed `u10-capstone-e03` exercise, deterministic
+grader identity and exact educational source reference, but it does not change the exercise or its
+rubric. Registry validation currently reports one dataset, one internal scenario, zero scenarios
+eligible for course credit and four blockers: scenario not published, dataset not published,
+redistribution not verified, and human editorial review required. Learning credit is derived from
+the gate; authors cannot opt a scenario in.
+
+Real historical data may enter only after a human has verified provider/contract rights for the
+intended use, caching, retention, external display and redistribution; normalized the source under
+`docs/HISTORICAL_DATA_SCHEMA.md`; reviewed the educational scenario; and passed dataset, registry,
+future-leak and publication validation. `docs/HISTORICAL_DATA_POLICY.md` records the current
+provider research. No provider page or public API response is treated as permission to commit or
+redistribute candles.
+
+### Knowledge boundary and persisted evidence
+
+Replay derives every learner view from the minimum of the decision, permitted-replay and knowledge
+cutoffs. Only candles, corporate actions and authored scenario annotations knowable at the current
+cursor are returned. Visible statistics, price scale and accessibility text are calculated from that
+same visible prefix. In blind mode, instrument identity, title details and timestamps remain redacted
+until allowed finalization; later candles never enter chart evidence or deterministic grading.
+
+Blind mode is a learner-interface and accessibility non-leak boundary, not adversarial secrecy.
+Bundled clients, source maps, application bundles and developer tools can inspect installed data;
+the architecture makes no cryptographic claim against a learner controlling the client. A future
+production release must exclude authoring/debug surfaces and must not describe bundled data as
+secret.
+
+Historical guided sessions use the schema-2 discriminated checksum pin described above. Replay state
+stores both the current cursor and a monotonic maximum-cursor-seen high-water mark. Learner geometry
+records its authorship cursor so a hindsight annotation cannot reappear at an earlier cursor, and
+each append-only checkpoint snapshots the current cursor, high-water mark and annotations visible at
+capture time. The payload-v4 migration converts legacy sessions only to synthetic identity and uses
+empty legacy checkpoint snapshots rather than manufacturing historical authorship evidence.
+
+Resolution never repairs, substitutes, repins or clamps persisted historical evidence. It returns
+exact states `ready`, `scenario-missing`, `dataset-missing`, `checksum-mismatch`,
+`metadata-mismatch`, or `dataset-modified`. A changed logical scenario with different pinned evidence
+must be abandoned explicitly before a replacement can be created. Non-credit historical practice
+can be finalized read-only through the practice transaction, which appends no attempt and changes no
+mastery, review, lesson, XP, streak or daily-activity projection. Course-credit finalization requires
+exact pinned evidence in the immutable attempt.
+
+The Lab preserves its synthetic entry and separately exposes the internal historical scenario. The
+historical path resolves the exact installed evidence before entry/resume, renders the cutoff-only
+blind chart and disclosures, autosaves and resumes the schema-2 session, blocks editing on a
+non-ready recovery result, reveals identity/provenance only in the finalized debrief/history, and
+uses the practice finalization transaction so attempts and projections remain unchanged. Focused
+historical evidence includes 18/18 focused component tests, 2/2 focused browser journeys across
+phone/tablet projects, 413/413 repository tests, 12/12 full browser journeys, 53 exported web routes,
+iOS and Android Hermes bundles, an iOS Expo Go Lab smoke check and ten original-resolution web
+captures. This evidence does not close native VoiceOver/TalkBack, native largest-text, gesture, lifecycle or
+physical-device gates. Paper trading, live feeds, streaming quotes, portfolios, simulated or real
+orders and brokerage integration are outside this milestone.
 
 ## Runtime flows
 

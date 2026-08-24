@@ -7,22 +7,25 @@ claim app-store, production, or human-learning validation.
 
 ## Candidate identity
 
-| Field                      | Value                                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| Product version            | `0.1.0`                                                                                |
-| Content version            | `2026.08-beta.1`                                                                       |
-| Content schema             | `1`                                                                                    |
-| Persistence schema         | Web payload `3`; native SQLite migrations `2`                                          |
-| Branch                     | `codex/chart-workbench-foundation`                                                     |
-| Foundation commit          | `f394380`                                                                              |
-| Catalog commit             | `1e194e0`                                                                              |
-| Mobile commit              | `f928497`                                                                              |
-| Journey-evidence commit    | `3bc11d4`                                                                              |
-| Integrity-hardening commit | `dc992bd`                                                                              |
-| Source PDF SHA-256         | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
-| Verified runtime           | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
-| Bundle-verified targets    | Expo iOS and Android Hermes bundles                                                    |
-| Decision                   | **GO for the local web beta; NO-GO for native distribution**                           |
+| Field                          | Value                                                                                  |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| Product version                | `0.1.0`                                                                                |
+| Content version                | `2026.08-beta.1`                                                                       |
+| Content schema                 | `1`                                                                                    |
+| Guided-session schema          | `2`                                                                                    |
+| Persistence schema             | Web payload `4`; native SQLite migrations `3`                                          |
+| Historical-data schema         | `1`                                                                                    |
+| Branch                         | `codex/historical-replay-foundation`                                                   |
+| Milestone 3 implementation tip | `37ebb67`; final documentation is committed separately                                 |
+| Foundation commit              | `f394380`                                                                              |
+| Catalog commit                 | `1e194e0`                                                                              |
+| Mobile commit                  | `f928497`                                                                              |
+| Journey-evidence commit        | `3bc11d4`                                                                              |
+| Integrity-hardening commit     | `dc992bd`                                                                              |
+| Source PDF SHA-256             | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
+| Verified runtime               | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
+| Bundle-verified targets        | Expo iOS and Android Hermes bundles                                                    |
+| Decision                       | **GO for the local web beta; NO-GO for native distribution**                           |
 
 ## Verified product scope
 
@@ -50,6 +53,13 @@ claim app-store, production, or human-learning validation.
   review, and daily-path ordering. Runtime AI is disabled and cannot alter a grade.
 - Append-only, idempotent attempts; replayable projections; content and schema migration; native
   SQLite and web local-storage adapters behind the same repository interface.
+- A separate internal Frozen Historical Replay entry uses one 96-candle ChartPath-generated
+  development dataset with one recorded gap. It provides cutoff-only blind replay, exact local
+  resume/recovery, post-finalization provenance reveal, and read-only history without ordinary
+  attempt or projection credit.
+- The historical registry reports zero course-credit-eligible scenarios and four publication
+  blockers. No real candle, provider payload, provider key, or runtime market-data request is
+  bundled or configured.
 - Static pages are generated for every unit and lesson so supported web deep links survive refresh.
 - No authentication, cloud sync, analytics, live-market requests, brokerage connection, production
   service, or API key is required by the core journey.
@@ -57,6 +67,9 @@ claim app-store, production, or human-learning validation.
 ## Command evidence
 
 All commands were run from the repository root on macOS with Node `v22.23.2` and pnpm `11.21.0`.
+
+The table below is the previously completed candidate baseline and is retained as historical
+evidence. The current Milestone 3 verification is recorded with exact results in its addendum.
 
 | Check                                   | Command                                                                                         | Result                                                                              |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -231,17 +244,19 @@ roles do not replace a manual VoiceOver/TalkBack pass.
 
 ## Unresolved limitations and exact next steps
 
-| Limitation                                                                                                                                     | Impact                                                                                                                                                 | Required next step                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| The iOS runtime journey was executed in Expo Go on one simulator, not in a standalone signed build or on physical hardware.                    | React Native UI and SQLite restart behavior are proven for that simulator, but standalone lifecycle, signing, and hardware behavior remain unverified. | Run the same journey in a release-profile standalone build on at least one physical iPhone.                           |
-| No Android emulator/device was connected.                                                                                                      | Android Hermes bundle is verified, but the native Android UI and SQLite journey were not executed.                                                     | Run `pnpm --filter @chartpath/mobile android` on an emulator, complete the same restart journey, and attach evidence. |
-| No manual VoiceOver or TalkBack pass was performed.                                                                                            | Automated roles, labels, contrast, motion, and font-scale coverage cannot prove real assistive-technology usability.                                   | Test onboarding, drawing, feedback, glossary, and settings with both screen readers and the largest OS text size.     |
-| iOS backup exclusion is not configured or verified; only Android has `allowBackup: false`.                                                     | Local SQLite data may be incorporated into an iCloud/device backup according to platform and user settings.                                            | Set and verify the intended iOS backup policy in a native build, then disclose the confirmed behavior.                |
-| The required manual journey matrix was not fully executed by a human; complex interactions currently have automated component/domain evidence. | Automated correctness does not establish gesture ergonomics, comprehension, or end-to-end human usability.                                             | Execute and record all 11 journeys on phone, including chart gestures, review, capstone, and accessibility variants.  |
-| The Guided Analysis entry point rendered in Expo Go, but native input automation was unavailable in this environment.                          | The iOS bundle and Lab hub are native-rendered, but Guided pinch/pan and force-close/resume were not manually completed.                               | Complete a native Guided draft, force-quit/reopen it, and exercise pinch/pan on an interactable simulator or device.  |
-| Guided-analysis drafts are local-only and have no cloud synchronization.                                                                       | A device loss or explicit local-data reset removes unfinished sessions; this milestone only guarantees the supported local repository.                 | Treat any future account/sync work as a separate privacy, security and conflict-resolution project.                   |
-| No external learner study or editorial sign-off by a licensed financial educator was performed.                                                | The beta is technically and internally content-validated, not validated for learning outcomes or regulated use.                                        | Run a small beginner usability study and independent content/safety review before public distribution.                |
-| No store signing, privacy form, production deployment, or device matrix was requested.                                                         | This is a local beta, not a distributable release candidate.                                                                                           | Treat distribution as a separate explicitly authorized release project.                                               |
+| Limitation                                                                                                                                     | Impact                                                                                                                                                 | Required next step                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The iOS runtime journey was executed in Expo Go on one simulator, not in a standalone signed build or on physical hardware.                    | React Native UI and SQLite restart behavior are proven for that simulator, but standalone lifecycle, signing, and hardware behavior remain unverified. | Run the same journey in a release-profile standalone build on at least one physical iPhone.                                                          |
+| No Android emulator/device was connected.                                                                                                      | Android Hermes bundle is verified, but the native Android UI and SQLite journey were not executed.                                                     | Run `pnpm --filter @chartpath/mobile android` on an emulator, complete the same restart journey, and attach evidence.                                |
+| No manual VoiceOver or TalkBack pass was performed.                                                                                            | Automated roles, labels, contrast, motion, and font-scale coverage cannot prove real assistive-technology usability.                                   | Test onboarding, drawing, feedback, glossary, and settings with both screen readers and the largest OS text size.                                    |
+| iOS backup exclusion is not configured or verified; only Android has `allowBackup: false`.                                                     | Local SQLite data may be incorporated into an iCloud/device backup according to platform and user settings.                                            | Set and verify the intended iOS backup policy in a native build, then disclose the confirmed behavior.                                               |
+| The required manual journey matrix was not fully executed by a human; complex interactions currently have automated component/domain evidence. | Automated correctness does not establish gesture ergonomics, comprehension, or end-to-end human usability.                                             | Execute and record all 11 journeys on phone, including chart gestures, review, capstone, and accessibility variants.                                 |
+| The Guided Analysis entry point rendered in Expo Go, but native input automation was unavailable in this environment.                          | The iOS bundle and Lab hub are native-rendered, but Guided pinch/pan and force-close/resume were not manually completed.                               | Complete a native Guided draft, force-quit/reopen it, and exercise pinch/pan on an interactable simulator or device.                                 |
+| Guided-analysis drafts are local-only and have no cloud synchronization.                                                                       | A device loss or explicit local-data reset removes unfinished sessions; this milestone only guarantees the supported local repository.                 | Treat any future account/sync work as a separate privacy, security and conflict-resolution project.                                                  |
+| The historical scenario is development-only, has zero course credit and retains four publication blockers.                                     | Focused engineering evidence does not establish redistribution rights, production publication, or independent educational approval.                    | Obtain explicit human licensing/procurement and editorial approval, then publish a new immutable dataset/scenario version only if every gate passes. |
+| Historical replay was inspected and exercised in browser phone/tablet profiles, not with native assistive technology.                          | Browser roles and screenshots cannot prove VoiceOver/TalkBack, native focus, gestures, lifecycle resume, or largest OS text.                           | Execute the full historical journey on native iOS and Android with screen readers, largest text, reduced motion and force-close/reopen.              |
+| No external learner study or editorial sign-off by a licensed financial educator was performed.                                                | The beta is technically and internally content-validated, not validated for learning outcomes or regulated use.                                        | Run a small beginner usability study and independent content/safety review before public distribution.                                               |
+| No store signing, privacy form, production deployment, or device matrix was requested.                                                         | This is a local beta, not a distributable release candidate.                                                                                           | Treat distribution as a separate explicitly authorized release project.                                                                              |
 
 ## Release decision
 
@@ -284,10 +299,11 @@ capstone `u10-capstone-e03` and its shared `ta-he-v2` provenance: physical PDF p
 book pages 61–62, Chapter 19 case C. No new technical-analysis doctrine, market data, execution,
 brokerage, news, AI grading or tutoring was added.
 
-The persistent payload is now schema `3`; the native SQLite migration set is version `2`. Active
-sessions autosave answers, exact replay position, learner candle/price annotations, hints, current
-step and deterministic step results. Earlier-step edits explicitly invalidate that result and every
-later submitted result. Restart/abandon keeps append-only attempts, malformed drafts enter an
+At the Milestone 2 evidence point, the persistent payload was schema `3` and the native SQLite
+migration set was version `2`; Milestone 3 supersedes them with payload `4` and SQLite migration `3`.
+Active sessions autosave answers, exact replay position, learner candle/price annotations, hints,
+current step and deterministic step results. Earlier-step edits explicitly invalidate that result and
+every later submitted result. Restart/abandon keeps append-only attempts, malformed drafts enter an
 explicit quarantine flow, and finalization atomically pairs one read-only session with one stable
 attempt. Retrying the same allocation reads back the pair without duplicating XP or projection
 effects.
@@ -309,3 +325,62 @@ effects.
 Native pinch/pan, a native Guided Analysis force-close/reopen, VoiceOver, TalkBack and the largest
 operating-system text setting remain unverified manual gates. An Android Hermes bundle was produced,
 but `adb devices` reported no connected emulator or device.
+
+## Frozen Historical Replay Milestone 3 addendum
+
+Implemented and verified on branch `codex/historical-replay-foundation` on 2026-08-24. This addendum
+does not promote the internal scenario to published content or change the native-distribution NO-GO.
+
+The historical-data package implements provider-neutral canonical schema version 1, deterministic
+serialization, pure SHA-256, CSV import/normalization, data/scenario validation and knowledge-cutoff
+views. The only installed dataset is the ChartPath-generated
+`chartpath-generated-hourly-fixture@1.0.0-dev`: 96 hourly candles, one recorded gap, no corporate
+actions, and canonical checksum
+`sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`. It is not real
+market data. No provider response, credential, SDK or runtime acquisition request is present.
+
+The separate historical registry resolves one internal scenario against the unchanged reviewed
+`u10-capstone-e03` content and reports zero course-credit eligibility plus four blockers:
+`scenario-not-published`, `dataset-not-published`, `redistribution-not-verified`, and
+`human-editorial-review-required`. These gates are authoritative. Databento and other researched
+providers remain procurement candidates only; the official-source conclusions in
+`docs/HISTORICAL_DATA_POLICY.md` do not grant rights.
+
+Guided-session schema `2`, persistence payload `4`, and native SQLite migration `3` distinguish and
+pin historical scenario/dataset/version/checksum evidence. The integrated Lab path preserves the
+synthetic entry and adds an explicit internal historical entry. It keeps identity, exact dates and
+future data out of the pre-final visual/accessibility projection; derives candles, annotations,
+corporate actions, statistics and scale from the current cutoff-only prefix; and stores the current
+cursor, monotonic maximum-seen cursor, annotation authorship and checkpoint snapshots. Exact resume
+fails closed for `scenario-missing`, `dataset-missing`, `checksum-mismatch`, `metadata-mismatch`, or
+`dataset-modified`; only `ready` is editable, and no state silently repairs, substitutes or repins
+evidence.
+
+After explicit finalization, the debrief and history are read-only and may reveal the generated
+identity/provenance under the authored policy. Because the development scenario has learning credit
+`none`, finalization creates no ordinary attempt and changes no mastery, review, lesson, XP, streak
+or daily-activity projection. Blind mode is a learner UI/accessibility boundary, not adversarial
+secrecy from application bundles or developer tools.
+
+| Check                           | Current result                                                                                                                                                                                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Historical component/UI tests   | PASS, 18/18 across Lab entry/resume, session shell/recovery/final reveal, cutoff-only chart/authorship behavior, and history disclosure.                                                                                                                                      |
+| Focused historical browser E2E  | PASS, 2/2 across the phone and tablet Chromium projects. The journey verifies blind entry, cursor/answer resume, finalization once, reveal/history, reload, and unchanged learning credit.                                                                                    |
+| Historical data validation      | PASS; 96 generated candles, one recorded gap, checksum `sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`, development-only publication block.                                                                                                         |
+| Historical registry validation  | PASS structurally; one dataset/scenario, zero course-credit eligible, four explicit publication blockers.                                                                                                                                                                     |
+| Visual inspection               | PASS for ten web captures at original resolution: nine `390×844` phone states and one `1024×768` tablet state, including entry, blind/mid/resume, provenance status, reveal/debrief/history, dark + very large + reduced motion, and tablet layout.                           |
+| Full repository check           | PASS; `pnpm check` completed formatting, lint, type checks, 413/413 tests and content validation in 37.53s. Test inventory: domain 125, historical-data 70, chart engine 57, content 35, UI 14 and mobile 112.                                                                |
+| Package build                   | PASS; `pnpm build` completed domain, historical-data, UI, chart-engine and content builds.                                                                                                                                                                                    |
+| Full browser suite              | PASS; 12/12 production-export journeys on Pixel 7 and iPad Pro 11 Chromium profiles, with zero failures, retries or duplicate learning credit.                                                                                                                                |
+| Production web export           | PASS; 53 static routes, a 1,496-module server render bundle and a 970-module web bundle.                                                                                                                                                                                      |
+| Native bundle exports           | PASS; iOS Hermes bundle emitted from 1,878 modules and Android Hermes bundle from 1,967 modules.                                                                                                                                                                              |
+| Native historical smoke check   | PASS within stated scope; Expo Go 57.0.9 on the booted iPhone 17 Pro / iOS 26.5 simulator loaded the current 2,046-module native bundle and deep-linked to `/lab`, where the internal historical entry rendered in RTL dark/very-large state. Native input was not automated. |
+| Diff integrity                  | PASS; `git diff --check`.                                                                                                                                                                                                                                                     |
+| Native historical accessibility | **PENDING GATE.** VoiceOver, TalkBack, native largest text, gesture ergonomics, force-close/resume and physical-device coverage have not been established by browser evidence.                                                                                                |
+| Human publication approval      | **BLOCKED.** Explicit market-data licensing/redistribution approval and independent Hebrew editorial, pedagogy, financial-safety and accessibility review are still required.                                                                                                 |
+
+The ten screenshots were inspected at their original pixel dimensions for Hebrew RTL hierarchy,
+explicit LTR isolation of checksum/dataset/date strings, clipping, overlap, chart chronology,
+non-color status, blind-versus-revealed identity, reduced-motion copy, very-large text wrapping and
+phone/tablet composition. This is visual browser evidence only; it is not a native gesture,
+screen-reader, lifecycle or physical-device pass.

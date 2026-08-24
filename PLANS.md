@@ -51,11 +51,11 @@ Native UI/runtime, SQLite-on-device, and screen-reader verification remain distr
 
 ## Chart-simulator roadmap
 
-| Milestone                                 | Status   | Evidence / next work                                                                                                  |
-| ----------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| 1. Interactive Chart Workbench foundation | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass. |
-| 2. Persistent Guided Analysis Session     | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                      |
-| 3. Historical replay and paper execution  | Planned  | Requires a separately scoped, licensed-data and simulated-order design; no implementation has begun.                  |
+| Milestone                                 | Status   | Evidence / next work                                                                                                                                                 |
+| ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Interactive Chart Workbench foundation | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass.                                                |
+| 2. Persistent Guided Analysis Session     | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                     |
+| 3. Frozen Historical Replay Foundation    | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified. |
 
 Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
 data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
@@ -69,3 +69,22 @@ finalized session and one append-only attempt. Historical market data, execution
 AI tutoring remain out of scope. Final verification produced 269 passing repository tests, 10/10
 production-export browser journeys, 53 web routes, both native Hermes bundles and ten inspected
 Guided Analysis screenshots.
+
+Milestone 3 is complete on branch `codex/historical-replay-foundation`; native accessibility and
+human publication gates remain pending. The repository has a pure
+provider-neutral historical-data package with canonical schema version 1, deterministic canonical
+serialization, a pure SHA-256 implementation and CSV import/validation. Its only bundled dataset is
+a ChartPath-generated, development-only 96-candle fixture with one recorded gap and canonical checksum
+`sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`; it contains no real
+market prices. A separate historical registry currently reports one internal scenario, zero
+course-credit-eligible scenarios and four explicit publication blockers. Guided-session schema 2,
+persistence payload schema 4 and native SQLite migration 3 pin and preserve historical evidence. The
+Lab now offers an explicitly internal historical entry, blind cutoff-aware replay, exact offline
+resume and fail-closed recovery, read-only post-finalization provenance reveal, and local history.
+Because the scenario has no course credit, finalization appends no ordinary attempt and changes no
+learning projections. Final evidence consists of 413 passing unit/integration tests, 12/12
+production-export browser journeys, 53 web routes, iOS and Android Hermes exports, 18/18 focused
+historical component tests, 2/2 focused phone/tablet historical browser journeys, an iOS Expo Go
+native Lab smoke check and ten inspected web screenshots. There are no provider
+keys, runtime market-data requests or real candles in the repository. Paper trading, live data,
+simulated or real orders, news and brokerage integration remain out of scope.

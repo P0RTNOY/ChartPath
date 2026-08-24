@@ -50,33 +50,39 @@ readability.
 
 ### 3.1 `ContentVersion`
 
-| Field               | Type                             | Requirement                                                                                                                                   |
-| ------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                | `string`                         | Unique immutable catalog release ID.                                                                                                          |
-| `schemaVersion`     | positive integer                 | Parser/data-shape version.                                                                                                                    |
-| `curriculumVersion` | semantic-version string          | Editorial curriculum version.                                                                                                                 |
-| `publishedAt`       | ISO-8601 UTC string              | Required for a published bundle. A working draft stays in authoring tooling and does not become a `ContentVersion` until this value is known. |
-| `sourceHash`        | non-empty string                 | Digest of normalized bundled source inputs and content records.                                                                               |
-| `minimumAppVersion` | optional semantic-version string | Lowest compatible app version.                                                                                                                |
+The current serialized content-version record is:
+
+| Field              | Type                      | Requirement                                                                                  |
+| ------------------ | ------------------------- | -------------------------------------------------------------------------------------------- |
+| `id`               | `string`                  | Unique immutable catalog release ID; exercises persist this value as `contentVersionId`.     |
+| `schemaVersion`    | positive integer          | Parser/data-shape version.                                                                   |
+| `generatorVersion` | non-empty version string  | Seeded synthetic chart-engine version used by this catalog.                                  |
+| `titleHe`          | non-empty Hebrew string   | Human-readable catalog title.                                                                |
+| `releasedAt`       | ISO-8601 UTC string       | Date attached to this frozen reviewed catalog version; it is not market-data retrieval time. |
+| `sourceIds`        | non-empty source-ID array | Educational source registry IDs used by the catalog.                                         |
+| `editorialStatus`  | literal `reviewed`        | Truthful status of the current bundled beta catalog version.                                 |
 
 An exercise inherits the enclosing content-version ID. Attempts persist that ID so a later catalog
-cannot rewrite the meaning of the answer.
+cannot rewrite the meaning of the answer. Historical dataset versions and checksums are separate
+identities and never overload this record.
 
 ### 3.2 `SourceReference`
 
 The current domain shape is retained and interpreted strictly:
 
-| Field       | Type             | Requirement                                                                                                                                            |
-| ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sourceId`  | `string`         | `ta-he-v2` for the audited book.                                                                                                                       |
-| `pageStart` | positive integer | First **physical PDF** page.                                                                                                                           |
-| `pageEnd`   | positive integer | Last physical PDF page, inclusive and not below `pageStart`.                                                                                           |
-| `section`   | `string`         | Required for ChartPath source-backed records. Format: `book pp. 25–27; Ch. 8; figs. 8.1–8.3`, or `book p. iii; How to use the guide` for front matter. |
+| Field           | Type                       | Requirement                                                                                   |
+| --------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
+| `sourceId`      | `string`                   | `ta-he-v2` for the audited book.                                                              |
+| `pageStart`     | positive integer           | First **physical PDF** page.                                                                  |
+| `pageEnd`       | positive integer           | Last physical PDF page, inclusive and not below `pageStart`.                                  |
+| `bookPageStart` | positive integer or string | First printed Arabic or Roman-numbered book page.                                             |
+| `bookPageEnd`   | positive integer or string | Last printed Arabic or Roman-numbered book page.                                              |
+| `section`       | non-empty string           | Chapter, case, figure, appendix, or other narrow locator, for example `Ch. 8; figs. 8.1–8.3`. |
 
-`pageStart/pageEnd` never contain printed book pages. The printed page(s), chapter/appendix, and
-figure IDs belong in `section`, making both numbering systems human-auditable without changing the
-existing domain interface. A broad chapter range is not sufficient when a prompt, rubric, or figure
-comes from a narrower page. Multiple disjoint ranges use multiple references.
+`pageStart/pageEnd` contain physical viewer pages; `bookPageStart/bookPageEnd` contain the printed
+numbering. For Arabic-numbered pages in `ta-he-v2`, the validator enforces
+`physical PDF page = printed book page + 13`. A broad chapter range is not sufficient when a prompt,
+rubric, or figure comes from a narrower page. Multiple disjoint ranges use multiple references.
 
 `SOURCE_TBD`, guessed pages, a bibliography reference without the book page that discusses it, and
 a local filesystem path are invalid publication references. Current legal, exchange, broker, or
@@ -112,9 +118,8 @@ Required fields are `id`, `order`, `titleHe`, `descriptionHe`, `prerequisiteUnit
 | `editorialStatus`       | status enum              | Governed by Section 4.                                                                 |
 | `schemaVersion`         | positive integer         | Record-shape version.                                                                  |
 
-The content schema must additionally expose `workflowStepIds` on lessons and exercises before beta
-publication. It is a non-empty unique subset of the canonical eleven IDs in the curriculum map,
-stored in canonical order. This field is not present in the initial domain interface; publication
+The content schema exposes `workflowStepIds` on lessons and exercises. It is a non-empty unique
+subset of the canonical eleven IDs in the curriculum map, stored in canonical order. Publication
 must not hide it in free-form prose or infer it from titles.
 
 ### 3.6 `Exercise`
@@ -131,7 +136,7 @@ Required core fields are:
 | `promptEn`                | optional string                 | Translation, not a substitute for Hebrew.                                                  |
 | `interactionType`         | supported interaction enum      | Must be supported by the player and compatible with the rubric/answer adapter.             |
 | `options`                 | optional option array           | Required when the interaction displays authored choices.                                   |
-| `chartSpec`               | optional `ChartSpec`            | Required for chart-dependent tasks.                                                        |
+| `chartSpec`               | `ChartSpec`                     | Required by the current reviewed catalog; see below.                                       |
 | `rubric`                  | `AnswerRubric`                  | Required and deterministic.                                                                |
 | `explanationHe`           | non-empty Hebrew string         | Explains evidence and why the accepted answer follows.                                     |
 | `explanationEn`           | optional string                 | Secondary translation.                                                                     |
@@ -143,11 +148,14 @@ Required core fields are:
 | `editorialStatus`         | status enum                     | Governed by Section 4.                                                                     |
 | `schemaVersion`           | positive integer                | Record-shape version.                                                                      |
 
-Every exercise also needs an authored uncertainty/safety note. Until a dedicated field is added, it
-is the final clearly labelled paragraph of `explanationHe`; the schema should prefer a future
-`safetyNoteHe`/`safetyNoteEn` pair so it can be validated and surfaced contextually. It states the
-relevant limit—for example target-as-estimate, fragmented volume, gap risk, or lack of statistical
-proof—without generic disclaimer spam.
+Every exercise also has a non-empty `safetyNoteHe`. It states the relevant limit—for example
+target-as-estimate, fragmented volume, gap risk, or lack of statistical proof—without generic
+disclaimer spam. It remains distinct from the correct-answer explanation so the UI can surface it
+contextually.
+
+Every current reviewed exercise carries a seeded synthetic `chartSpec`, even when its
+`chartPresentation` is `hidden`. A historical replay scenario references a separate immutable dataset
+and does not replace or reinterpret that field.
 
 `interactionType` may be `multiple-choice`, `selection`, `sequence`, `point`, `zone`, `line`,
 `risk`, `decision`, `label-placement`, `timeframe-comparison`, `mistake-diagnosis`, or
@@ -162,10 +170,11 @@ not position (`option-wait`, not `option-2`), so display reordering is harmless.
 `ExerciseHint` requires `id`, integer `level`, and `textHe`; `textEn` is optional. Levels are unique,
 contiguous, and increasing from 1.
 
-`AlternativeExplanation` requires `answerId` and `explanationHe`; `explanationEn` and
-`misconceptionId` are optional. `answerId` must resolve to an option, reason, selection, or stable
-feedback key used by the rubric. When an alternative embodies a known misconception,
-`misconceptionId` is required.
+`AlternativeExplanation` requires `explanationHe` and exactly one match key: either a learner-visible
+`answerId` or a stable grader `feedbackCode`. `explanationEn` and `misconceptionId` are optional. An
+`answerId` must resolve to an authored option, reason, or selection; a `feedbackCode` must be reachable
+from the matching rubric. When an alternative embodies a known misconception, `misconceptionId` is
+required.
 
 ### 3.8 `Misconception`
 
@@ -245,19 +254,20 @@ the domain schema should add explicit input/result fields rather than overloadin
   the learner production path. Draft metadata may reserve an ID and source range without generic
   lesson prose.
 - `reviewed`: the record is complete and has passed source, Hebrew, pedagogy, grading, safety, and
-  deterministic chart review by humans other than the primary author. It may be used in an explicit
-  internal beta catalog, but is not a release claim.
-- `published`: a reviewed record has passed catalog validation and release approval in a frozen
-  `ContentVersion`. Only published content is resolved by the production learner path.
+  deterministic chart review by humans other than the primary author. The current bundled beta
+  catalog and its 60 exercises truthfully use this state; it is not a public-distribution claim.
+- `published`: a reserved record-level state for content that additionally received release approval
+  in a frozen version. The current `ContentVersion` schema records `reviewed`, so documentation must
+  not imply that the existing bundle has already been promoted to this state.
 
 Promotion is monotonic within a catalog version: `draft → reviewed → published`. A correction does
 not demote or mutate a catalog already used by attempts; it creates a new content version and, when
 needed, a new semantic ID or retirement manifest.
 
-The “60 reviewed exercises” gate means all 60 have evidence of completed human review. In a shipped
-learner catalog their current status is `published`; publication is proof that review occurred, not a
-fourth unreviewed category. Reviewer identity/date may live in editorial sidecar metadata excluded
-from the learner bundle, but release evidence must retain it.
+The “60 reviewed exercises” gate means all 60 have evidence of completed human review. Reviewer
+identity/date may live in editorial sidecar metadata excluded from the learner bundle, but release
+evidence must retain it. Dataset publication status is a separate registry field: a reviewed exercise
+does not make an associated market dataset or historical replay scenario publishable.
 
 ## 5. Source and reference rules
 
@@ -293,6 +303,34 @@ source audit, not a UI-only change.
 8. Unsupported course expansions—indicator systems, candlestick catalogs, options strategies,
    microstructure, broker behavior, tax, or portfolio optimization—need a separately audited source
    and curriculum decision.
+
+### 5.2 Historical replay dual-source contract
+
+A frozen historical replay scenario lives in a separate registry and resolves an existing reviewed
+educational content record. It does not become a 61st exercise, replace that exercise's seeded
+`ChartSpec`, or copy the dataset into the exercise. The scenario pins the content identity and rubric
+plus the historical dataset ID, version, and canonical checksum.
+
+Historical replay publication requires two independent provenance chains:
+
+1. Exact educational references under Section 3.2 for every prompt, rubric, hint, explanation,
+   misconception, and safety claim.
+2. Market-data provenance covering provider/origin, source URL, exact dataset/endpoint, retrieval
+   time, official terms/license URL, permitted use, redistribution, caching/retention, attribution,
+   raw/canonical checksums, instrument/venue/timezone/currency/interval/range, adjustment/actions,
+   session/missing-interval policies, and known limitations.
+
+Market-data provenance never uses `SourceReference`, because its terms URLs, checksums, and rights
+decisions are not book pages. Conversely, a provider's price history never supports educational
+doctrine. The provider evaluation and status vocabulary are in
+[HISTORICAL_DATA_POLICY.md](./HISTORICAL_DATA_POLICY.md); the normative manifest, cutoff, and
+publication checklist are in [HISTORICAL_DATA_SCHEMA.md](./HISTORICAL_DATA_SCHEMA.md).
+
+Dataset status and scenario editorial status remain separate. A development-only dataset may support
+an internal scenario and automated tests, but it cannot masquerade as reviewed real history or award
+ordinary published-course mastery/XP. A scenario cannot become publishable unless exact bundled
+redistribution and retention permission is verified and independent human editorial review is
+recorded.
 
 ## 6. Hebrew-first and mixed-direction authoring
 
@@ -425,9 +463,9 @@ validated from accepted rubric values and scenario metadata, not the presence of
    The same inputs must reproduce exactly the same outputs.
 
 Do not use `Math.random()`, an unpinned current generator, live market data, or a source figure's data
-points. If frozen historical/licensed data is proposed later, record instrument, venue, source,
-timezone, session, adjustment method, data latency/date, and rights; otherwise it cannot be
-published.
+points. Frozen historical replay follows the separate registry, checksum, dual-source, cutoff, and
+rights contract in [HISTORICAL_DATA_SCHEMA.md](./HISTORICAL_DATA_SCHEMA.md). A provider response may
+not be placed into an exercise `ChartSpec` or committed merely because it is free to access.
 
 ## 11. Integrated workflow and capstone records
 
@@ -441,7 +479,7 @@ single free-form answer. It stores separate response fields or step exercises fo
 5. `confirmation`
 6. `entry`
 7. `invalidation`
-8. `positionSize`
+8. `position-size`
 9. `target`
 10. `management`
 11. `review`
@@ -458,27 +496,29 @@ uncertainty handling, costs, and review—not simulated profit.
 
 ## 12. Versioning, retirement, and migrations
 
-There are three independent versions:
+Current synthetic exercise reproduction uses three independent identities:
 
 - `schemaVersion`: shape/parser compatibility;
-- `curriculumVersion`: authored catalog release;
+- `contentVersionId`: authored catalog release identity;
 - `generatorVersion`: seeded chart algorithm identity.
 
-All three are persisted where required to reproduce an attempt. Published bundles are immutable.
-Old generator versions needed by retained attempts remain available, or the app keeps the generated
-snapshot/hash necessary to explain the historical result.
+Historical replay additionally pins dataset ID, dataset version, canonical checksum, scenario version,
+and knowledge cutoff. These do not replace the content or generator identities. All applicable values
+are persisted where required to reproduce an attempt. Frozen bundles are immutable. Old generator or
+dataset versions needed by retained attempts remain available when rights allow, or the product enters
+the documented safe recovery/retirement flow; it never substitutes new data silently.
 
 A content migration manifest must declare:
 
-| Field                                    | Meaning                                                            |
-| ---------------------------------------- | ------------------------------------------------------------------ |
-| `id`                                     | Stable migration ID.                                               |
-| `fromContentVersion`, `toContentVersion` | Exact version edge; no wildcard migration.                         |
-| `idAliases`                              | Old-to-new navigation aliases; never rewrites IDs in old attempts. |
-| `retiredExerciseIds`, `retiredLessonIds` | Content no longer assigned to new sessions.                        |
-| `replacementIds`                         | Optional learner-path successors.                                  |
-| `projectionPolicy`                       | Which derived progress/mastery projections may be rebuilt and why. |
-| `notesHe`                                | Learner-safe explanation when retirement affects the visible path. |
+| Field                           | Meaning                                                                                 |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `id`                            | Stable migration ID.                                                                    |
+| `fromContentVersionId`          | Exact source version; no wildcard migration.                                            |
+| `toContentVersionId`            | Exact destination version.                                                              |
+| `aliases`                       | Old-to-new navigation aliases; never rewrites IDs in old attempts.                      |
+| `retiredIds`                    | Content no longer assigned to new sessions.                                             |
+| `invalidatedProjectionSkillIds` | Derived skill projections explicitly invalidated by the migration.                      |
+| `preservesAttempts`             | Literal `true`; original attempt events are never deleted or rewritten by the manifest. |
 
 Migrations are forward-only, deterministic, idempotent at their guarded entry, and tested from every
 supported beta version. They preserve append-only attempts and completion evidence. Retiring an
@@ -506,6 +546,11 @@ retirement discipline.
 8. Run deterministic generation/grading tests and interaction/accessibility checks.
 9. Promote to `reviewed` only when evidence is recorded.
 10. Assemble a frozen catalog, rerun the full gates, and promote approved records to `published`.
+
+Historical scenarios add the authoring and publication checklist in
+[HISTORICAL_DATA_SCHEMA.md](./HISTORICAL_DATA_SCHEMA.md). Dataset licensing, normalization, checksum,
+knowledge-cutoff, blind-view, and human-review evidence must be completed independently of this
+ordinary exercise sequence.
 
 ### Required automated validation
 
@@ -537,6 +582,14 @@ The content command (intended as `pnpm --filter @chartpath/content validate`) fa
 - collapsed invalidation/stop/take-profit fields in integrated work;
 - certainty, personalized recommendation, guaranteed-return, or casino/profit-reward language; and
 - published visuals copied from the source or lacking rights/provenance metadata.
+
+For historical replay, the historical validation command must additionally refuse **publication**
+for a missing educational source, market-data source, official terms URL, redistribution decision,
+retention decision, dataset checksum, decision candle, knowledge cutoff, Hebrew disclosure,
+adjustment/session policy, editorial status, deterministic rubric identity, or passed future-leak
+validation. A structurally valid generated development fixture may remain `development-only`; that
+truthful blocker is not converted into verified permission or hidden merely to make catalog
+validation pass.
 
 ### Human review record
 

@@ -18,6 +18,12 @@ orders do not guarantee execution price, and costs, spread, slippage, liquidity,
 gaps, correlation, and leverage can change outcomes. “Wait,” “no trade,” and
 “insufficient evidence” are valid and positively reinforced answers.
 
+Milestone 3 implementation and final repository verification are complete, while native
+accessibility remains pending. Its only installed historical-format dataset is a ChartPath-generated development
+fixture; no real price history, provider credential or runtime market-data integration is present.
+Paper trading, portfolios, live feeds, news, simulated or real orders and brokerage connectivity
+remain out of scope.
+
 ## Status language
 
 - **Beta requirement** means implementation and verification are required before
@@ -42,15 +48,17 @@ ads, ad SDKs, cross-app tracking, public profiles, social feeds, or leaderboards
 
 ### Intended local data inventory
 
-| Data                                          | Purpose                                                      | Location                    | Retention/control                              |
-| --------------------------------------------- | ------------------------------------------------------------ | --------------------------- | ---------------------------------------------- |
-| Attempts and deterministic results            | Feedback, mastery, review, resume                            | Local SQLite                | Until in-app reset or app-data removal         |
-| Hint and misconception history                | Better local feedback/review                                 | Local SQLite                | Until in-app reset or app-data removal         |
-| Lesson/progress projections                   | Learning path and resume                                     | Local SQLite; rebuildable   | Until reset; rebuildable from attempts         |
-| XP, streak, and daily activity                | Non-monetary learning motivation                             | Local SQLite                | Until reset                                    |
-| Theme, RTL, text, motion, daily-goal settings | Accessibility and preferences                                | Local app storage           | Until reset                                    |
-| Response duration                             | Optional local diagnostics; never a material mastery penalty | Local SQLite if implemented | Delete with attempts; do not upload by default |
-| Content/schema versions                       | Migration and reproducibility                                | Local SQLite                | Retained with relevant attempts                |
+| Data                                          | Purpose                                                      | Location                    | Retention/control                                      |
+| --------------------------------------------- | ------------------------------------------------------------ | --------------------------- | ------------------------------------------------------ |
+| Attempts and deterministic results            | Feedback, mastery, review, resume                            | Local SQLite                | Until in-app reset or app-data removal                 |
+| Hint and misconception history                | Better local feedback/review                                 | Local SQLite                | Until in-app reset or app-data removal                 |
+| Lesson/progress projections                   | Learning path and resume                                     | Local SQLite; rebuildable   | Until reset; rebuildable from attempts                 |
+| XP, streak, and daily activity                | Non-monetary learning motivation                             | Local SQLite                | Until reset                                            |
+| Theme, RTL, text, motion, daily-goal settings | Accessibility and preferences                                | Local app storage           | Until reset                                            |
+| Response duration                             | Optional local diagnostics; never a material mastery penalty | Local SQLite if implemented | Delete with attempts; do not upload by default         |
+| Content/schema versions                       | Migration and reproducibility                                | Local SQLite                | Retained with relevant attempts                        |
+| Guided-analysis drafts                        | Offline resume, replay integrity and final reflection        | Local SQLite                | Until explicit reset; finalized sessions are read-only |
+| Generated development candles                 | Exercise infrastructure validation only                      | Bundled application data    | Replaced only by a reviewed build; not learner data    |
 
 The app may generate a random installation-scoped identifier for database
 idempotency. It must not derive that ID from hardware identifiers or use it to track
@@ -144,6 +152,12 @@ Dependency versions are locked, install scripts reviewed, and release checks inc
 license and known-vulnerability review. Findings are assessed for actual reachability
 and fixed without disabling platform protections merely to pass a test.
 
+The historical-data package is a pure importer/validator/replay library. It has no provider SDK,
+runtime fetch, filesystem lookup, key reader or environment-variable dependency. Callers supply the
+source bytes/text and a manifest explicitly. The current app bundles no real provider payload and
+does not cache provider responses. Adding acquisition code, credentials or a remote endpoint would
+be a separate privacy, security, licensing and product-scope decision.
+
 ### Platform and release behavior
 
 **Beta requirement.** Request no camera, microphone, photo-library, contacts,
@@ -173,6 +187,55 @@ Malformed numeric answers are rejected: `NaN`, infinity, negative risk, invalid
 prices, zero entry-stop distance, and overflows must never create a favorable grade.
 Drawing tolerances are documented and evaluated in chart coordinates so device size
 does not change correctness.
+
+### Frozen historical replay boundary
+
+Canonical historical schema version 1 pins provenance, UTC/local timestamps, interval/session and
+adjustment policies, recorded gaps, editorial/publication status and lowercase SHA-256 identity. The
+only installed fixture has 96 ChartPath-generated candles, one recorded gap and checksum
+`sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e`. It represents no
+issuer, exchange or real prices.
+
+Every historical visual and accessibility view is derived from the same prefix bounded by the
+current replay cursor and the minimum decision/permitted/knowledge cutoff. Future candles cannot
+affect extrema, scale, aggregate volume, visible scenario annotations, corporate actions, timestamps,
+titles or screen-reader text. Blind mode redacts instrument identity and timestamps until the
+authored post-finalization reveal policy allows them.
+
+This boundary limits ordinary learner UI and accessibility leakage; it is not cryptographic or DRM
+protection. A learner controlling a bundled client may inspect application bundles, source maps,
+memory or developer tools. Therefore production safety must not depend on installed candles, answer
+metadata or source identities being secret, and development/debug surfaces must remain excluded or
+gated from production.
+
+Guided-session schema 2 distinguishes a synthetic seed/generator pin from a historical
+scenario/dataset/version/checksum pin. Persistence payload schema 4 and native SQLite migration 3
+retain the replay cursor, monotonic maximum-seen high-water mark, annotation authorship cursor and
+append-only checkpoint snapshots. Resume resolves exact pinned evidence and fails closed as
+`scenario-missing`, `dataset-missing`, `checksum-mismatch`, `metadata-mismatch` or
+`dataset-modified`; `ready` is the only editable resolution. The system never downloads a
+replacement, repairs a checksum, substitutes a nearby version, repins silently or clamps inconsistent
+session evidence.
+
+The installed scenario is practice-only. Its finalization stores the immutable read-only session but
+adds no attempt and changes no mastery, review, lesson, XP, streak or daily-activity projection. Any
+future credited historical scenario must include the exact pinned chart identity in its immutable
+attempt and pass the human/licensing publication gate first.
+
+### Historical data rights and publication
+
+`docs/HISTORICAL_DATA_POLICY.md` records dated official-source research; it does not grant rights.
+No real candle may be committed, cached for shipment or externally displayed until an accountable
+human confirms the governing agreement permits the exact commercial/educational use, retention,
+caching, display, bundling, redistribution, attribution and derived-data treatment. Procurement and
+legal approval are distinct from a technically successful API call.
+
+The separate historical registry currently reports zero course-credit-eligible scenarios and four
+blocking conditions: scenario not published, dataset not published, redistribution not verified and
+human editorial review required. Authors cannot self-declare credit. Publication also requires exact
+dataset and rubric pins, canonical validation, market and educational provenance, Hebrew disclosure,
+cutoff/future-leak validation and human editorial evidence. Databento is only a procurement lead;
+none of the researched providers is an approved bundled-data source.
 
 ## Financial-safety content rules
 
@@ -309,6 +372,9 @@ No beta-readiness claim is valid until the release record contains evidence for:
 - position-size validation including costs and invalid/zero-distance cases;
 - append-only attempt integrity, restart persistence, safe migrations, and deletion;
 - production exclusion/gating of answer-reveal and debug functionality;
+- for historical replay, exact dataset/checksum resume failures, cutoff-only scale/accessibility
+  output, practice finalization with no attempt/projection mutation, and a human-approved rights and
+  editorial publication record;
 - Hebrew RTL plus LTR numbers/formulas, screen reader, large text, contrast, and
   reduced-motion manual journeys;
 - content review for advice, guarantees, profit-based rewards, and unsafe leverage;
