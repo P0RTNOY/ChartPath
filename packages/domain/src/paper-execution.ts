@@ -545,7 +545,7 @@ export function assertValidPaperExecutionSession(
     throw new RangeError('Execution update precedes creation');
 
   const canonicalPlan = createTradePlan(session.plan, session.source, session.costModel);
-  if (JSON.stringify(canonicalPlan) !== JSON.stringify(session.plan)) {
+  if (!structurallyEqual(canonicalPlan, session.plan)) {
     throw new Error('Persisted trade plan does not match its deterministic validation');
   }
   assertEvents(session.events, session.sessionId, session.createdAt, session.updatedAt);
@@ -1325,7 +1325,7 @@ function assertSessionState(session: PaperExecutionSession): void {
     if (
       session.workingOrder.direction !== session.plan.direction ||
       session.workingOrder.quantity !== session.plan.quantity ||
-      JSON.stringify(session.workingOrder.intent) !== JSON.stringify(session.plan.entryIntent)
+      !structurallyEqual(session.workingOrder.intent, session.plan.entryIntent)
     )
       throw new Error('Working order does not match the submitted trade plan');
     assertTimestamp(session.workingOrder.submittedAt, 'Working order submission timestamp');
@@ -1348,7 +1348,7 @@ function assertSessionState(session: PaperExecutionSession): void {
       throw new Error('Position does not match the submitted trade plan');
     if (
       session.workingOrder?.fill === undefined ||
-      JSON.stringify(session.position.entryFill) !== JSON.stringify(session.workingOrder.fill)
+      !structurallyEqual(session.position.entryFill, session.workingOrder.fill)
     )
       throw new Error('Position entry does not match the filled order');
     assertFill(session.position.entryFill, session.source.candleCount, session.position.quantity);
@@ -1388,7 +1388,7 @@ function assertSessionState(session: PaperExecutionSession): void {
     if (session.debrief.debriefId !== session.debriefId)
       throw new Error('Execution debrief identity mismatch');
     const canonicalDebrief = createDebrief(session, session.debrief.createdAt);
-    if (JSON.stringify(canonicalDebrief) !== JSON.stringify(session.debrief))
+    if (!structurallyEqual(canonicalDebrief, session.debrief))
       throw new Error('Persisted execution debrief does not match deterministic state');
   } else if (session.debrief !== undefined)
     throw new Error('Unresolved execution contains a debrief');
@@ -1414,6 +1414,32 @@ function assertFill(fill: ExecutionFill, candleCount: number, quantity: number):
     fill.modeledSlippageAmount < 0
   )
     throw new RangeError('Execution fill contains invalid values');
+}
+
+/** JSON persistence may reorder object keys; derived-state validation must compare values. */
+function structurallyEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => structurallyEqual(value, right[index]))
+    );
+  }
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return false;
+  const leftRecord = left as Readonly<Record<string, unknown>>;
+  const rightRecord = right as Readonly<Record<string, unknown>>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) =>
+        key === rightKeys[index] && structurallyEqual(leftRecord[key], rightRecord[key]),
+    )
+  );
 }
 
 function assertExecutionIdentity(identity: HistoricalExecutionIdentity): void {

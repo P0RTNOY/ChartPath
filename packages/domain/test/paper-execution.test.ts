@@ -820,4 +820,20 @@ describe('sequential replay, idempotency, cancellation, and completion', () => {
       assertValidPaperExecutionSession({ ...value, debrief: { debriefId: 'forged' } as never }),
     ).toThrow('Unresolved');
   });
+
+  it('accepts a valid resolved session after persistence reorders object keys', () => {
+    const resolved = process(submit(), [candle(3), candle(4, { low: 89 })]);
+    const reorder = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(reorder);
+      if (value === null || typeof value !== 'object') return value;
+      return Object.fromEntries(
+        Object.entries(value as Readonly<Record<string, unknown>>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, reorder(item)]),
+      );
+    };
+    const restored = JSON.parse(JSON.stringify(reorder(resolved))) as PaperExecutionSession;
+
+    expect(() => assertValidPaperExecutionSession(restored)).not.toThrow();
+  });
 });
