@@ -566,6 +566,29 @@ Observe representative Hebrew-speaking beginners completing the required journey
 
 Also inspect the same journey with dark mode, reduced motion, larger text, and screen-reader navigation. Exact usability success thresholds require a beta research plan and are not asserted here.
 
+## 18.1 Guided Analysis Session implementation
+
+The Chart Lab now presents the existing reviewed `u10-capstone-e03` as one continuous, resumable
+eleven-step analysis rather than eleven unrelated screens. The authored order, prompts, answer
+choices, rubrics, three progressive session-wide hints, explanations, misconception references and
+safety note are reused without editorial changes. The synthetic chart is a neutral observation
+notebook because every current capstone step has a non-geometric rubric; learner drawings are saved
+for process reflection but do not change correctness.
+
+Draft, submitted and finalized are deliberately different learning states. Structural completeness
+enables submission, submission advances the linear process, and finalization requires all eleven
+submitted results plus a separate confirmation. A learner may revisit an earlier answer. Any edit to
+a submitted step invalidates that result and all later submitted results, keeps the answers visible,
+and requires sequential resubmission. This makes changed assumptions observable instead of silently
+leaving contradictory downstream credit.
+
+The final debrief reports process score, each step result, demonstrated/review skills, authored
+misconception guidance, hints, correct no-trade use, risk/target accuracy, learner notebook marks,
+source provenance and the deterministic next-review dates. It never converts later price movement
+into a score or describes hypothetical profit. Finalization creates the same immutable capstone
+attempt used by the rest of the learning system, so mastery, review, XP, activity and lesson progress
+remain separate deterministic projections.
+
 ## 19. Verified evidence and tunable decisions
 
 ### Source verification completed

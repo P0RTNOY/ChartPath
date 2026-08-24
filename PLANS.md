@@ -54,9 +54,18 @@ Native UI/runtime, SQLite-on-device, and screen-reader verification remain distr
 | Milestone                                 | Status   | Evidence / next work                                                                                                  |
 | ----------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
 | 1. Interactive Chart Workbench foundation | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass. |
-| 2. Historical replay and paper execution  | Planned  | Add licensed/frozen historical inputs and simulated order journaling without live brokerage connectivity.             |
+| 2. Persistent Guided Analysis Session     | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                      |
+| 3. Historical replay and paper execution  | Planned  | Requires a separately scoped, licensed-data and simulated-order design; no implementation has begun.                  |
 
 Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
 data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
 web export, iOS and Android Hermes bundles, and four new Workbench screenshots. Native pinch/pan,
 physical-device ergonomics, and VoiceOver/TalkBack remain manual gates rather than passing claims.
+
+Milestone 2 reuses reviewed capstone `u10-capstone-e03` and its unchanged authored prompts,
+rubrics, hints, explanations, misconceptions and source reference. It adds a versioned pure session
+state machine, web/native repository parity, guarded restart/recovery, and an atomic link between one
+finalized session and one append-only attempt. Historical market data, execution, news, brokerage and
+AI tutoring remain out of scope. Final verification produced 268 passing repository tests, 10/10
+production-export browser journeys, 53 web routes, both native Hermes bundles and ten inspected
+Guided Analysis screenshots.

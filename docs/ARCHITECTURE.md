@@ -214,6 +214,47 @@ The guided scenario cites `ta-he-v2`, physical PDF page 31 / printed page 18, Ch
 6.1. Learner-facing task, hints, explanation, safety note, and rubric come from the existing reviewed
 content record. Controls and navigation add no new technical-analysis doctrine.
 
+## Persistent Guided Analysis Session
+
+**Implemented 2026-08-24.** `packages/domain/src/analysis-session.ts` owns the schema-versioned,
+platform-free state machine for the reviewed `u10-capstone-e03` journey. A session records stable
+session, attempt and finalization IDs; content/exercise/chart identities; an explicit revision;
+status; current canonical step; the authored rubric and draft/result for each of the eleven steps;
+learner annotations in candle/price coordinates; replay cursor/checkpoints; hints; and the immutable
+final result. Timestamps and IDs enter as explicit action inputs. React, storage and system clocks do
+not enter the pure package.
+
+Only the first incomplete step and earlier steps are navigable. A structurally complete answer is
+still a draft until explicit submission. Editing a submitted step marks it `invalidated`, removes its
+old result, and invalidates every later submitted result while retaining those later answers for
+visible review and resubmission. Finalized and abandoned sessions reject edits. Replay state and
+learner annotations are capped at the authored decision boundary; the replay slicer also filters
+semantic and learner annotations whose anchors are not yet visible.
+
+The mobile composition uses the existing controlled capstone interactions for all eleven authored
+non-geometric rubrics and adds a separate neutral chart notebook. Notebook drawings are never
+converted into official answers for this capstone and generated semantic/reference geometry is
+never rendered. The notebook therefore supports observation without changing the reviewed grading
+contract.
+
+### Draft repository and atomic finalization
+
+Persistence payload schema `3` adds `analysisSessions` and an explicit quarantine for invalid draft
+records while preserving all v1/v2 attempts. Native SQLite migration `2` adds an
+`analysis_sessions` JSON mirror with triggers; web storage uses the same repository behavior.
+Create-or-resume prevents duplicate active sessions for the canonical exercise. Saves use a
+monotonic revision for optimistic conflict detection. Restart first marks the old draft abandoned,
+then creates a distinct active session; historical attempts are untouched. A malformed record is
+quarantined and can only be discarded through an explicit localized recovery action that preserves
+attempts and projections.
+
+Finalization validates all authored steps and the pinned content/chart identity, grades the canonical
+capstone once with the existing grader, and commits the finalized session plus its stable append-only
+attempt in one repository transaction. The same attempt ID and finalization key make retries exact:
+readback returns the committed result and projection replay cannot add XP twice. The ordinary
+projection path remains authoritative for mastery, review scheduling, lesson progress, daily
+activity and XP; the Guided Analysis feature does not duplicate those reducers.
+
 ## Runtime flows
 
 ### Startup and content loading

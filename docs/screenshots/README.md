@@ -27,3 +27,10 @@ production static export. They record the new Lab at phone and tablet widths, th
 reference trendline overlay, and the combined dark / largest in-app text / reduced-motion state.
 They were inspected at their original `390×844` and `1024×768` resolutions. These web captures do
 not establish native gesture or screen-reader usability.
+
+The `guided-analysis-*` set is generated with `pnpm screenshots:guided` against the same production
+static export. It records a new session, mid-session state, notebook drawing, leave/resume recovery,
+position sizing, the authored no-trade decision, finalized process debrief, local history, combined
+dark / largest in-app text / reduced motion, and tablet composition. Captures retain their native
+`390×844` or `1024×768` viewport because the React Native scroll container owns scrolling. The set
+demonstrates browser layout and state distinctions, not native gestures or screen-reader behavior.

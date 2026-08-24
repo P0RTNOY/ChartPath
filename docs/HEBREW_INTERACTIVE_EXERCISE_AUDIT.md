@@ -178,3 +178,24 @@ phone capture also combines the in-app largest text setting and reduced motion.
 Native Gesture Handler bundles successfully for iOS and Android, but pinch/pan was not manually
 performed on a native simulator or physical device in this milestone. VoiceOver, TalkBack, largest
 operating-system text, and native touch ergonomics therefore remain unverified manual gates.
+
+## Guided Analysis Session interaction audit
+
+Milestone 2 keeps the application shell, progress, authored task, status language, hints, recovery,
+final confirmation, history and debrief Hebrew-first and RTL. Step numbers, replay counts, candle
+indexes, dates, prices, formulas, ratios and the chart itself use explicit LTR containers. The
+responsive screen is one column on a `390×844` phone and separates the LTR notebook from the guided
+panel at `1024×768`; navigation and exact candle/price controls provide non-gesture alternatives.
+
+The status vocabulary distinguishes טיוטה (draft), הוגש (submitted), דורש בדיקה מחדש
+(invalidated), and סופי (finalized). A submitted step cannot be submitted redundantly; editing it
+first exposes the invalidated state. Analysis history shows only scenario identity, status, date,
+step and progress for unfinished records. Only finalized records open the authored debrief, and that
+screen contains no editing or submission controls.
+
+The chart notebook keeps chronological order LTR, clips replay to candle 59, filters future learner
+anchors, labels all six tools for assistive technology, and keeps learner annotations separate from
+hidden semantic/reference geometry. Dark mode, the largest in-app text size and reduced motion are
+covered together by the production-web visual set. These automated and visual checks do not replace
+VoiceOver, TalkBack, largest operating-system text or native gesture ergonomics; those remain manual
+distribution gates.

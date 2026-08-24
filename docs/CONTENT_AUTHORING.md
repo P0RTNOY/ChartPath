@@ -261,6 +261,21 @@ from the learner bundle, but release evidence must retain it.
 
 ## 5. Source and reference rules
 
+### 5.1 Guided-session publication contract
+
+A guided session does not create a second content record. It resolves one reviewed capstone and
+persists the capstone's stable exercise/content/schema identity, pinned chart identity and the exact
+authored rubric for every canonical step. A later editorial change that alters any of those
+identities must use an explicit migration or ask the learner to preserve the old draft as abandoned
+and start a compatible draft; the player must not silently reinterpret saved answers.
+
+The current Guided Analysis scenario is `u10-capstone-e03`. All eleven steps inherit its verified
+`ta-he-v2` reference: physical PDF pages 74–75, printed book pages 61–62, Chapter 19, case C. The
+record does not provide narrower step-specific references, so the UI truthfully labels that shared
+range as the source for the scenario and all steps. The chart notebook is learner-authored scratch
+evidence only: adding an official geometric requirement would require a reviewed step rubric and
+source audit, not a UI-only change.
+
 1. Read the entire relevant page range, including caption, warning, exercise, and nearby qualifier;
    do not extract a rule from a diagram alone.
 2. Cite the narrowest range that supports the prompt and rubric. Cite separate disjoint ranges
