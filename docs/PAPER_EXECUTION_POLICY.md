@@ -1,9 +1,9 @@
 # Deterministic paper-execution policy
 
-**Policy date:** 2026-08-24  
-**Execution schema:** `1`  
-**Execution policy:** `paper-execution-policy-v1`  
-**Cost model:** `paper-cost-model-v1`  
+**Policy date:** 2026-08-24
+**Execution schema:** `1`
+**Execution policy:** `paper-execution-policy-v1`
+**Cost model:** `paper-cost-model-v1`
 **Status:** normative contract for the Milestone 4 educational simulator
 
 ChartPath paper execution is an offline, deterministic learning simulation over a checksum-pinned
