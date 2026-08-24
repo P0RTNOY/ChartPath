@@ -154,9 +154,16 @@ async function startGuidedAnalysis(page: Page) {
   await expect(page.getByTestId('guided-analysis-session')).toBeVisible();
 }
 
-async function completeGuidedAnalysis(page: Page) {
-  await submitGuidedSelections(page, ['המגמה השבועית עולה', 'הרעיון הוא מכירה בחסר נגד המגמה']);
-  await submitGuidedSelections(page, ['מועמד לשלושה שיאים', 'שפל ביניים נצפה']);
+async function startHistoricalAnalysis(page: Page) {
+  await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+  const historicalEntry = page.getByTestId('historical-replay-entry');
+  await expect(historicalEntry).toBeVisible();
+  await historicalEntry.getByRole('button').click();
+  await expect(page.getByTestId('guided-analysis-session')).toBeVisible();
+  await expect(page.getByTestId('historical-session-disclosure')).toBeVisible();
+}
+
+async function completeGuidedAnalysisFromLevel(page: Page) {
   await submitGuidedSelections(page, ['תמיכה שבועית 82.7', 'אזור קו צוואר 88']);
   await submitGuidedSelections(page, ['ראש וכתפיים אפשרי']);
   await submitGuidedSelections(page, ['סגירה יומית מתחת ל־88']);
@@ -180,6 +187,56 @@ async function completeGuidedAnalysis(page: Page) {
     'המכשול והיחס נבדקו מראש',
     'איכות התהליך נפרדת מן התוצאה',
   ]);
+}
+
+async function completeGuidedAnalysis(page: Page) {
+  await submitGuidedSelections(page, ['המגמה השבועית עולה', 'הרעיון הוא מכירה בחסר נגד המגמה']);
+  await submitGuidedSelections(page, ['מועמד לשלושה שיאים', 'שפל ביניים נצפה']);
+  await completeGuidedAnalysisFromLevel(page);
+}
+
+async function persistedHistoricalSessionState(page: Page) {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('chartpath:guest-learning-data:v1');
+    const parsed = JSON.parse(raw ?? '{}') as {
+      analysisSessions?: readonly {
+        sessionId?: string;
+        status?: string;
+        currentStepId?: string;
+        revision?: number;
+        chart?: { kind?: string };
+        replay?: { cursorCandleIndex?: number; decisionCandleIndex?: number };
+        steps?: Record<string, { status?: string; answer?: unknown }>;
+        annotations?: readonly unknown[];
+      }[];
+    };
+    const session = parsed.analysisSessions?.find(
+      ({ chart, status }) => chart?.kind === 'historical' && status === 'active',
+    );
+    if (!session) return null;
+    return {
+      sessionId: session.sessionId,
+      currentStepId: session.currentStepId,
+      revision: session.revision,
+      replay: session.replay,
+      steps: session.steps,
+      annotations: session.annotations,
+    };
+  });
+}
+
+async function persistedLearningCreditState(page: Page) {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('chartpath:guest-learning-data:v1');
+    const parsed = JSON.parse(raw ?? '{}') as {
+      attempts?: readonly unknown[];
+      projections?: unknown;
+    };
+    return {
+      attempts: parsed.attempts ?? [],
+      projections: parsed.projections ?? null,
+    };
+  });
 }
 
 test('guided analysis resumes exact answers, replay, and learner annotations after leaving', async ({
@@ -268,4 +325,79 @@ test('guided analysis finalizes once, survives reload, and reopens read-only fro
   await page.getByRole('button', { name: 'פתיחת התחקיר' }).click();
   await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
   await expect(page.getByRole('button', { name: /הגשת השלב/ })).toHaveCount(0);
+});
+
+test('historical replay stays blind, resumes exactly, and finalizes once without learning credit', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await beginFreshGuest(page);
+  const learningBefore = await persistedLearningCreditState(page);
+  await startHistoricalAnalysis(page);
+
+  const blindSession = page.getByTestId('guided-analysis-session');
+  await expect(blindSession).toContainText('24/73');
+  await expect(blindSession).toContainText('הזהות והתאריכים מוסתרים עד הסיום');
+  await expect(blindSession).not.toContainText('Generated fixture 001');
+  await expect(blindSession).not.toContainText('DEV-BLIND-001');
+  await expect(blindSession).not.toContainText('2025-01-05');
+  await expect(blindSession).not.toContainText('2025-01-09');
+  await expect(page.getByTestId('historical-replay-reveal')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'הנר הבא' }).click();
+  await expect(blindSession).toContainText('25/73');
+  await submitGuidedSelections(page, ['המגמה השבועית עולה', 'הרעיון הוא מכירה בחסר נגד המגמה']);
+  await submitGuidedSelections(page, ['מועמד לשלושה שיאים', 'שפל ביניים נצפה']);
+  await expect(page.getByText('נשמר במכשיר')).toBeVisible();
+  const beforeLeaving = await persistedHistoricalSessionState(page);
+  expect(beforeLeaving).not.toBeNull();
+
+  await page.goto('/home');
+  await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();
+  await expect(page.getByTestId('historical-analysis-resume-card')).toContainText('2/11');
+  await expect(page.getByTestId('historical-analysis-resume-card')).toContainText('cursor 25');
+  await page.getByTestId('historical-analysis-resume-card').getByRole('button').first().click();
+  await expect(page.getByTestId('guided-analysis-session')).toContainText('25/73');
+  expect(await persistedHistoricalSessionState(page)).toEqual(beforeLeaving);
+  await expect(page.getByRole('checkbox', { name: 'תמיכה שבועית 82.7', exact: true })).toHaveCount(
+    1,
+  );
+
+  await page.getByRole('button', { name: 'לנקודת ההחלטה' }).click();
+  await expect(page.getByTestId('guided-analysis-session')).toContainText('73/73');
+  await completeGuidedAnalysisFromLevel(page);
+  await expect(page.getByRole('heading', { name: /השלבים הוגשו/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'סיום מפורש של הניתוח' }).click();
+  await expect(page.getByLabel('אישור סיום הניתוח')).toBeVisible();
+  await page.getByRole('button', { name: 'אישור וסיום' }).click();
+
+  const debrief = page.getByTestId('guided-analysis-debrief').last();
+  const reveal = page.getByTestId('historical-replay-reveal');
+  await expect(debrief).toBeVisible();
+  await expect(reveal).toBeVisible();
+  await expect(reveal).toContainText('זהות נחשפה לאחר סיום');
+  await expect(reveal).toContainText('תרחיש נתונים סינתטיים שנוצר');
+  await expect(reveal).toContainText('Generated fixture 001');
+  await expect(reveal).toContainText('2025-01-05T07:00:00.000Z');
+  await expect(page.getByTestId('historical-no-credit')).toContainText('לא נוצר ניסיון רגיל');
+  expect(await persistedLearningCreditState(page)).toEqual(learningBefore);
+
+  await page.reload();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  await expect(page.getByTestId('historical-replay-reveal')).toContainText('Generated fixture 001');
+  expect(await persistedLearningCreditState(page)).toEqual(learningBefore);
+
+  await page.getByRole('button', { name: 'היסטוריית ניתוחים' }).click();
+  const finalizedHistorical = page.getByTestId('analysis-history-finalized');
+  await expect(finalizedHistorical).toHaveCount(1);
+  await expect(finalizedHistorical).toContainText('סופי · קריאה בלבד');
+  await expect(finalizedHistorical).toContainText('היסטורי נחשף');
+  await expect(page.getByTestId('historical-history-reveal')).toContainText(
+    'Generated fixture 001',
+  );
+  await page.getByRole('button', { name: 'פתיחת התחקיר' }).click();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  await expect(page.getByRole('button', { name: /הגשת השלב/ })).toHaveCount(0);
+  expect(await persistedLearningCreditState(page)).toEqual(learningBefore);
 });

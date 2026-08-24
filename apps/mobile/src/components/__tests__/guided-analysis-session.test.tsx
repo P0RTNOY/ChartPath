@@ -55,6 +55,7 @@ function result(correct = true) {
 }
 
 function session(): GuidedAnalysisSession {
+  const decisionCandleIndex = exercise.chartSpec!.decisionCandleIndex!;
   return createGuidedAnalysisSession({
     sessionId: 'guided-ui-session',
     attemptId: 'guided-ui-attempt',
@@ -67,8 +68,8 @@ function session(): GuidedAnalysisSession {
       id: exercise.chartSpec!.id,
       seed: exercise.chartSpec!.seed,
       generatorVersion: exercise.chartSpec!.generatorVersion,
-      candleCount: exercise.chartSpec!.candleCount,
-      decisionCandleIndex: exercise.chartSpec!.decisionCandleIndex!,
+      candleCount: Math.min(exercise.chartSpec!.candleCount, decisionCandleIndex + 1),
+      decisionCandleIndex,
     },
     createdAt: '2026-08-24T10:00:00.000Z',
     initialReplayCursorCandleIndex: 23,
@@ -225,8 +226,7 @@ function renderSession(current: GuidedAnalysisSession) {
 describe('GuidedAnalysisSessionView', () => {
   it('accepts the persisted full source count even when the decision cutoff is earlier', async () => {
     const current = session();
-    expect(current.chart.candleCount).toBe(exercise.chartSpec!.candleCount);
-    expect(current.chart.candleCount).toBeGreaterThan(current.chart.decisionCandleIndex + 1);
+    expect(current.chart.candleCount).toBe(current.chart.decisionCandleIndex + 1);
 
     const screen = await renderSession(current);
     expect(screen.getByTestId('guided-analysis-session')).toBeTruthy();

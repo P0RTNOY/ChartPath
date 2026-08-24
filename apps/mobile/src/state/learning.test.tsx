@@ -478,11 +478,12 @@ describe('guided analysis learning integration', () => {
     const exercise = exercises.find(({ rubric }) => rubric.kind === 'multiple-choice')!;
     if (exercise.rubric.kind !== 'multiple-choice') throw new Error('Expected choice exercise');
     const lesson = lessons.find(({ exerciseIds }) => exerciseIds.includes(exercise.id))!;
+    const answer = correctAnswer(exercise.rubric);
     await act(async () => {
       await harness.current().submitAttempt({
         exercise,
         lessonId: lesson.id,
-        answer: correctAnswer(exercise.rubric),
+        answer,
         hintIdsUsed: [],
         startedAt: '2026-08-24T08:00:00.000Z',
       });

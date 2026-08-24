@@ -129,6 +129,10 @@ function sessionMatchesExercise(
       resolveHistoricalAnalysisSession(session).status === 'ready'
     );
   }
+  const permittedCandleCount =
+    chartSpec?.decisionCandleIndex === undefined
+      ? chartSpec?.candleCount
+      : Math.min(chartSpec.candleCount, chartSpec.decisionCandleIndex + 1);
   return Boolean(
     chartSpec &&
     session.exerciseId === exercise.id &&
@@ -137,7 +141,7 @@ function sessionMatchesExercise(
     session.chart.id === chartSpec.id &&
     session.chart.seed === chartSpec.seed &&
     session.chart.generatorVersion === chartSpec.generatorVersion &&
-    session.chart.candleCount === chartSpec.candleCount &&
+    session.chart.candleCount === permittedCandleCount &&
     session.chart.decisionCandleIndex === chartSpec.decisionCandleIndex,
   );
 }
