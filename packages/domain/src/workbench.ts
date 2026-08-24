@@ -10,6 +10,8 @@ export type ChartTool =
 
 interface BaseLearnerChartAnnotation {
   readonly id: string;
+  /** Replay cursor at which the learner committed this geometry. */
+  readonly authoredAtCursorCandleIndex?: number;
 }
 
 export interface LearnerPointAnnotation extends BaseLearnerChartAnnotation {
@@ -47,12 +49,14 @@ export interface PendingTrendline {
   readonly kind: 'trendline';
   readonly id: string;
   readonly start: ChartAnchor;
+  readonly authoredAtCursorCandleIndex?: number;
 }
 
 export interface PendingZone {
   readonly kind: 'zone';
   readonly id: string;
   readonly start: ChartAnchor;
+  readonly authoredAtCursorCandleIndex?: number;
 }
 
 export type PendingDrawing = PendingTrendline | PendingZone;
@@ -73,7 +77,12 @@ export interface AnalysisDraft {
 
 export type AnalysisDraftAction =
   | { readonly type: 'set-tool'; readonly tool: ChartTool }
-  | { readonly type: 'place-anchor'; readonly id: string; readonly anchor: ChartAnchor }
+  | {
+      readonly type: 'place-anchor';
+      readonly id: string;
+      readonly anchor: ChartAnchor;
+      readonly authoredAtCursorCandleIndex?: number;
+    }
   | { readonly type: 'add-annotation'; readonly annotation: LearnerChartAnnotation }
   | { readonly type: 'select-annotation'; readonly id?: string }
   | { readonly type: 'cancel-drawing' }
@@ -110,7 +119,7 @@ export function reduceAnalysisDraft(
         pendingDrawing: undefined,
       };
     case 'place-anchor':
-      return placeAnchor(draft, action.id, action.anchor);
+      return placeAnchor(draft, action.id, action.anchor, action.authoredAtCursorCandleIndex);
     case 'add-annotation':
       assertValidLearnerAnnotation(action.annotation);
       if (draft.annotations.some(({ id }) => id === action.annotation.id)) {
@@ -160,8 +169,38 @@ export function learnerAnnotationLastCandleIndex(annotation: LearnerChartAnnotat
   }
 }
 
-function placeAnchor(draft: AnalysisDraft, id: string, anchor: ChartAnchor): AnalysisDraft {
+/**
+ * Projects learner geometry using both its candle anchors and its authorship boundary.
+ * This prevents an annotation drawn with hindsight from appearing at an earlier replay cursor.
+ */
+export function learnerAnnotationsVisibleAtCursor(
+  annotations: readonly LearnerChartAnnotation[],
+  cursorCandleIndex: number,
+): readonly LearnerChartAnnotation[] {
+  if (!Number.isInteger(cursorCandleIndex) || cursorCandleIndex < 0) {
+    throw new RangeError('Replay cursor must be a non-negative integer');
+  }
+  return annotations.filter(
+    (annotation) =>
+      learnerAnnotationLastCandleIndex(annotation) <= cursorCandleIndex &&
+      (annotation.authoredAtCursorCandleIndex ?? 0) <= cursorCandleIndex,
+  );
+}
+
+function placeAnchor(
+  draft: AnalysisDraft,
+  id: string,
+  anchor: ChartAnchor,
+  authoredAtCursorCandleIndex?: number,
+): AnalysisDraft {
   assertAnchor(anchor);
+  if (
+    authoredAtCursorCandleIndex !== undefined &&
+    (!Number.isInteger(authoredAtCursorCandleIndex) ||
+      authoredAtCursorCandleIndex < anchor.candleIndex)
+  ) {
+    throw new RangeError('Annotation authorship cursor must include its placed anchor');
+  }
   if (id.length === 0) throw new Error('Learner annotation ID must not be empty');
   if (draft.annotations.some((annotation) => annotation.id === id)) {
     throw new Error(`Learner annotation ID already exists: ${id}`);
@@ -169,11 +208,31 @@ function placeAnchor(draft: AnalysisDraft, id: string, anchor: ChartAnchor): Ana
 
   switch (draft.activeTool.kind) {
     case 'point':
-      return commitDraft(draft, [...draft.annotations, { id, kind: 'point', anchor }], id);
+      return commitDraft(
+        draft,
+        [
+          ...draft.annotations,
+          {
+            id,
+            kind: 'point',
+            anchor,
+            ...(authoredAtCursorCandleIndex === undefined ? {} : { authoredAtCursorCandleIndex }),
+          },
+        ],
+        id,
+      );
     case 'horizontal-level':
       return commitDraft(
         draft,
-        [...draft.annotations, { id, kind: 'horizontal-level', ...anchor }],
+        [
+          ...draft.annotations,
+          {
+            id,
+            kind: 'horizontal-level',
+            ...anchor,
+            ...(authoredAtCursorCandleIndex === undefined ? {} : { authoredAtCursorCandleIndex }),
+          },
+        ],
         id,
       );
     case 'trendline':
@@ -183,15 +242,26 @@ function placeAnchor(draft: AnalysisDraft, id: string, anchor: ChartAnchor): Ana
         return {
           ...draft,
           selectedAnnotationId: undefined,
-          pendingDrawing: { kind: draft.activeTool.kind, id, start: anchor },
+          pendingDrawing: {
+            kind: draft.activeTool.kind,
+            id,
+            start: anchor,
+            ...(authoredAtCursorCandleIndex === undefined ? {} : { authoredAtCursorCandleIndex }),
+          },
         };
       }
+      const committedAtCursorCandleIndex =
+        authoredAtCursorCandleIndex ?? pending.authoredAtCursorCandleIndex;
       const annotation: LearnerChartAnnotation = {
         id: pending.id,
         kind: pending.kind,
         start: pending.start,
         end: anchor,
+        ...(committedAtCursorCandleIndex === undefined
+          ? {}
+          : { authoredAtCursorCandleIndex: committedAtCursorCandleIndex }),
       };
+      assertValidLearnerAnnotation(annotation);
       return commitDraft(draft, [...draft.annotations, annotation], annotation.id);
     }
     case 'inspect':
@@ -253,14 +323,21 @@ function assertValidLearnerAnnotation(annotation: LearnerChartAnnotation): void 
   switch (annotation.kind) {
     case 'point':
       assertAnchor(annotation.anchor);
-      return;
+      break;
     case 'horizontal-level':
       assertAnchor({ candleIndex: annotation.candleIndex, price: annotation.price });
-      return;
+      break;
     case 'trendline':
     case 'zone':
       assertAnchor(annotation.start);
       assertAnchor(annotation.end);
+  }
+  if (
+    annotation.authoredAtCursorCandleIndex !== undefined &&
+    (!Number.isInteger(annotation.authoredAtCursorCandleIndex) ||
+      annotation.authoredAtCursorCandleIndex < learnerAnnotationLastCandleIndex(annotation))
+  ) {
+    throw new RangeError('Annotation authorship cursor must include all geometry anchors');
   }
 }
 

@@ -94,6 +94,7 @@ function createSession(): GuidedAnalysisSession {
     contentVersionId: 'curriculum-2026-08',
     exerciseSchemaVersion: 3,
     chart: {
+      kind: 'synthetic',
       id: 'capstone-chart-01',
       seed: 482_991,
       generatorVersion: 'chart-generator-v2',
@@ -162,13 +163,20 @@ describe('guided analysis session creation', () => {
       updatedAt: at(0),
       currentStepId: 'context',
       chart: {
+        kind: 'synthetic',
         id: 'capstone-chart-01',
         seed: 482_991,
         generatorVersion: 'chart-generator-v2',
         candleCount: 60,
         decisionCandleIndex: 47,
       },
-      replay: { cursorCandleIndex: 23, decisionCandleIndex: 47, checkpoints: [] },
+      replay: {
+        initialCursorCandleIndex: 23,
+        cursorCandleIndex: 23,
+        maxCursorSeenCandleIndex: 23,
+        decisionCandleIndex: 47,
+        checkpoints: [],
+      },
     });
     expect(Object.keys(session.steps)).toEqual(ANALYSIS_WORKFLOW_STEP_IDS);
     expect(Object.values(session.steps)).toHaveLength(11);
@@ -192,6 +200,7 @@ describe('guided analysis session creation', () => {
       contentVersionId: 'c',
       exerciseSchemaVersion: 1,
       chart: {
+        kind: 'synthetic',
         id: 'chart',
         seed: 1,
         generatorVersion: 'v1',
@@ -241,6 +250,7 @@ describe('guided analysis session creation', () => {
       contentVersionId: 'content-v1',
       exerciseSchemaVersion: 1,
       chart: {
+        kind: 'synthetic' as const,
         id: 'chart-001',
         seed: 5,
         generatorVersion: 'v1',
@@ -393,6 +403,7 @@ describe('answer completeness and step transitions', () => {
         contentVersionId: 'content-v1',
         exerciseSchemaVersion: 1,
         chart: {
+          kind: 'synthetic',
           id: 'chart',
           seed: 1,
           generatorVersion: 'v1',
@@ -579,6 +590,7 @@ describe('annotations, replay, and hints', () => {
       contentVersionId: 'content-v1',
       exerciseSchemaVersion: 1,
       chart: {
+        kind: 'synthetic',
         id: 'chart',
         seed: 1,
         generatorVersion: 'v1',
@@ -609,14 +621,24 @@ describe('annotations, replay, and hints', () => {
       checkpoint: {
         id: 'checkpoint-context',
         stepId: 'context',
-        cursorCandleIndex: 31,
         capturedAt: at(2),
       },
     });
     expect(session.replay).toMatchObject({
+      initialCursorCandleIndex: 23,
       cursorCandleIndex: 31,
+      maxCursorSeenCandleIndex: 31,
       decisionCandleIndex: 47,
-      checkpoints: [{ id: 'checkpoint-context', stepId: 'context' }],
+      checkpoints: [
+        {
+          id: 'checkpoint-context',
+          sequence: 1,
+          stepId: 'context',
+          cursorCandleIndex: 31,
+          maxCursorSeenCandleIndex: 31,
+          annotations: [],
+        },
+      ],
     });
 
     expect(() =>

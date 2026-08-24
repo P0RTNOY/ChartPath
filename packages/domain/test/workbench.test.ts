@@ -133,4 +133,39 @@ describe('chart workbench analysis draft', () => {
     expect(draft.redoStack).toEqual([]);
     expect(draft.annotations.map(({ id }) => id)).toEqual(['replacement']);
   });
+
+  it('carries an explicit replay authorship cursor through point and two-anchor tools', () => {
+    let pointDraft = createAnalysisDraft({ kind: 'point' });
+    pointDraft = reduceAnalysisDraft(pointDraft, {
+      type: 'place-anchor',
+      id: 'authored-point',
+      anchor: { candleIndex: 3, price: 100 },
+      authoredAtCursorCandleIndex: 5,
+    });
+    expect(pointDraft.annotations[0]).toMatchObject({ authoredAtCursorCandleIndex: 5 });
+
+    let lineDraft = createAnalysisDraft({ kind: 'trendline' });
+    lineDraft = reduceAnalysisDraft(lineDraft, {
+      type: 'place-anchor',
+      id: 'authored-line',
+      anchor: { candleIndex: 2, price: 99 },
+      authoredAtCursorCandleIndex: 4,
+    });
+    lineDraft = reduceAnalysisDraft(lineDraft, {
+      type: 'place-anchor',
+      id: 'second-anchor',
+      anchor: { candleIndex: 5, price: 103 },
+      authoredAtCursorCandleIndex: 6,
+    });
+    expect(lineDraft.annotations[0]).toMatchObject({ authoredAtCursorCandleIndex: 6 });
+
+    expect(() =>
+      reduceAnalysisDraft(createAnalysisDraft({ kind: 'point' }), {
+        type: 'place-anchor',
+        id: 'future-point',
+        anchor: { candleIndex: 5, price: 100 },
+        authoredAtCursorCandleIndex: 4,
+      }),
+    ).toThrow('authorship cursor');
+  });
 });

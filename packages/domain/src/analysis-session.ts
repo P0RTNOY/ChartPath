@@ -4,9 +4,13 @@ import type {
   AttemptResult,
   ExerciseId,
 } from './types.js';
-import type { LearnerChartAnnotation } from './workbench.js';
+import {
+  learnerAnnotationLastCandleIndex,
+  learnerAnnotationsVisibleAtCursor,
+  type LearnerChartAnnotation,
+} from './workbench.js';
 
-export const ANALYSIS_SESSION_SCHEMA_VERSION = 1 as const;
+export const ANALYSIS_SESSION_SCHEMA_VERSION = 2 as const;
 
 /** The reviewed ChartPath analysis workflow. Its order is part of the persisted contract. */
 export const ANALYSIS_WORKFLOW_STEP_IDS = [
@@ -27,7 +31,8 @@ export type AnalysisWorkflowStepId = (typeof ANALYSIS_WORKFLOW_STEP_IDS)[number]
 export type AnalysisSessionStatus = 'active' | 'finalized' | 'abandoned';
 export type AnalysisStepStatus = 'draft' | 'submitted' | 'invalidated';
 
-export interface AnalysisChartIdentity {
+export interface SyntheticAnalysisChartIdentity {
+  readonly kind: 'synthetic';
   readonly id: string;
   readonly seed: number;
   readonly generatorVersion: string;
@@ -35,15 +40,46 @@ export interface AnalysisChartIdentity {
   readonly decisionCandleIndex: number;
 }
 
+export type AnalysisLearningCredit = 'course' | 'none';
+
+export interface HistoricalAnalysisChartIdentity {
+  readonly kind: 'historical';
+  readonly id: string;
+  readonly scenarioId: string;
+  readonly scenarioVersion: string;
+  readonly datasetId: string;
+  readonly datasetVersion: string;
+  readonly canonicalChecksum: string;
+  readonly candleCount: number;
+  readonly interval: string;
+  readonly firstCandleTimestamp: string;
+  readonly lastCandleTimestamp: string;
+  readonly decisionCandleIndex: number;
+  readonly learningCredit: AnalysisLearningCredit;
+}
+
+export type AnalysisChartIdentity =
+  SyntheticAnalysisChartIdentity | HistoricalAnalysisChartIdentity;
+
 export interface AnalysisReplayCheckpoint {
   readonly id: string;
+  readonly sequence: number;
   readonly stepId: AnalysisWorkflowStepId;
   readonly cursorCandleIndex: number;
+  readonly maxCursorSeenCandleIndex: number;
+  readonly annotations: readonly LearnerChartAnnotation[];
   readonly capturedAt: string;
 }
 
+export type AnalysisReplayCheckpointInput = Pick<
+  AnalysisReplayCheckpoint,
+  'id' | 'stepId' | 'capturedAt'
+>;
+
 export interface AnalysisReplayState {
+  readonly initialCursorCandleIndex: number;
   readonly cursorCandleIndex: number;
+  readonly maxCursorSeenCandleIndex: number;
   readonly decisionCandleIndex: number;
   readonly checkpoints: readonly AnalysisReplayCheckpoint[];
 }
@@ -136,7 +172,7 @@ export type GuidedAnalysisSessionAction =
     }
   | {
       readonly type: 'add-replay-checkpoint';
-      readonly checkpoint: AnalysisReplayCheckpoint;
+      readonly checkpoint: AnalysisReplayCheckpointInput;
     }
   | {
       readonly type: 'finalize';
@@ -184,7 +220,9 @@ export function createGuidedAnalysisSession(
     ) as unknown as Readonly<Record<AnalysisWorkflowStepId, AnalysisSessionStepState>>,
     annotations: [],
     replay: {
+      initialCursorCandleIndex: cursor,
       cursorCandleIndex: cursor,
+      maxCursorSeenCandleIndex: cursor,
       decisionCandleIndex: input.chart.decisionCandleIndex,
       checkpoints: [],
     },
@@ -243,6 +281,9 @@ export function reduceGuidedAnalysisSession(
     case 'replace-annotations':
       assertActionTime(session, action.updatedAt);
       assertValidAnnotations(action.annotations, session.chart.decisionCandleIndex + 1);
+      if (session.chart.kind === 'historical') {
+        assertHistoricalAnnotationReplacement(session, action.annotations);
+      }
       next = {
         ...session,
         annotations: [...action.annotations],
@@ -251,13 +292,24 @@ export function reduceGuidedAnalysisSession(
       break;
     case 'set-replay-cursor':
       assertActionTime(session, action.updatedAt);
-      assertReplayCursor(action.cursorCandleIndex, session.replay.decisionCandleIndex);
+      assertReplayCursor(
+        action.cursorCandleIndex,
+        session.replay.decisionCandleIndex,
+        session.replay.initialCursorCandleIndex,
+      );
       next =
         action.cursorCandleIndex === session.replay.cursorCandleIndex
           ? session
           : {
               ...session,
-              replay: { ...session.replay, cursorCandleIndex: action.cursorCandleIndex },
+              replay: {
+                ...session.replay,
+                cursorCandleIndex: action.cursorCandleIndex,
+                maxCursorSeenCandleIndex: Math.max(
+                  session.replay.maxCursorSeenCandleIndex,
+                  action.cursorCandleIndex,
+                ),
+              },
               updatedAt: action.updatedAt,
             };
       break;
@@ -286,6 +338,50 @@ export function reduceGuidedAnalysisSession(
 
 export function analysisSessionHintIdsUsed(session: GuidedAnalysisSession): readonly string[] {
   return [...new Set(ANALYSIS_WORKFLOW_STEP_IDS.flatMap((id) => session.steps[id].hintIdsUsed))];
+}
+
+export function analysisChartIdentitiesEqual(
+  left: AnalysisChartIdentity,
+  right: AnalysisChartIdentity,
+): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === 'synthetic' && right.kind === 'synthetic') {
+    return (
+      left.id === right.id &&
+      left.seed === right.seed &&
+      left.generatorVersion === right.generatorVersion &&
+      left.candleCount === right.candleCount &&
+      left.decisionCandleIndex === right.decisionCandleIndex
+    );
+  }
+  if (left.kind === 'historical' && right.kind === 'historical') {
+    return (
+      left.id === right.id &&
+      left.scenarioId === right.scenarioId &&
+      left.scenarioVersion === right.scenarioVersion &&
+      left.datasetId === right.datasetId &&
+      left.datasetVersion === right.datasetVersion &&
+      left.canonicalChecksum === right.canonicalChecksum &&
+      left.candleCount === right.candleCount &&
+      left.interval === right.interval &&
+      left.firstCandleTimestamp === right.firstCandleTimestamp &&
+      left.lastCandleTimestamp === right.lastCandleTimestamp &&
+      left.decisionCandleIndex === right.decisionCandleIndex &&
+      left.learningCredit === right.learningCredit
+    );
+  }
+  return false;
+}
+
+export function assertCompatibleAnalysisChartIdentity(
+  pinned: AnalysisChartIdentity,
+  available: AnalysisChartIdentity,
+): void {
+  assertChartIdentity(pinned);
+  assertChartIdentity(available);
+  if (!analysisChartIdentitiesEqual(pinned, available)) {
+    throw new Error('Analysis chart identity does not match the pinned session data');
+  }
 }
 
 export function isAtomicExerciseAnswerComplete(
@@ -410,6 +506,13 @@ export function assertValidGuidedAnalysisSession(
   }
   assertSequentialSubmissions(session.steps);
   assertValidAnnotations(session.annotations, session.chart.decisionCandleIndex + 1);
+  if (session.chart.kind === 'historical') {
+    assertHistoricalAnnotations(
+      session.annotations,
+      session.replay.maxCursorSeenCandleIndex,
+      'Session annotations',
+    );
+  }
   assertReplay(session.replay, session.chart, session.createdAt, session.updatedAt);
 
   if (session.status === 'active') {
@@ -553,14 +656,23 @@ function recordHint(
 
 function addReplayCheckpoint(
   session: GuidedAnalysisSession,
-  checkpoint: AnalysisReplayCheckpoint,
+  input: AnalysisReplayCheckpointInput,
 ): GuidedAnalysisSession {
-  assertActionTime(session, checkpoint.capturedAt);
-  assertId(checkpoint.id, 'Replay checkpoint ID');
-  if (session.replay.checkpoints.some(({ id }) => id === checkpoint.id)) {
-    throw new Error(`Replay checkpoint ID already exists: ${checkpoint.id}`);
+  assertActionTime(session, input.capturedAt);
+  assertId(input.id, 'Replay checkpoint ID');
+  if (session.replay.checkpoints.some(({ id }) => id === input.id)) {
+    throw new Error(`Replay checkpoint ID already exists: ${input.id}`);
   }
-  assertReplayCursor(checkpoint.cursorCandleIndex, session.replay.decisionCandleIndex);
+  const checkpoint: AnalysisReplayCheckpoint = {
+    ...input,
+    sequence: session.replay.checkpoints.length + 1,
+    cursorCandleIndex: session.replay.cursorCandleIndex,
+    maxCursorSeenCandleIndex: session.replay.maxCursorSeenCandleIndex,
+    annotations: learnerAnnotationsVisibleAtCursor(
+      session.annotations,
+      session.replay.cursorCandleIndex,
+    ),
+  };
   return {
     ...session,
     replay: {
@@ -568,7 +680,7 @@ function addReplayCheckpoint(
       cursorCandleIndex: checkpoint.cursorCandleIndex,
       checkpoints: [...session.replay.checkpoints, checkpoint],
     },
-    updatedAt: checkpoint.capturedAt,
+    updatedAt: input.capturedAt,
   };
 }
 
@@ -688,8 +800,6 @@ function assertSequentialSubmissions(
 
 function assertChartIdentity(chart: AnalysisChartIdentity): void {
   assertId(chart.id, 'Chart ID');
-  assertId(chart.generatorVersion, 'Chart generator version');
-  if (!Number.isSafeInteger(chart.seed)) throw new RangeError('Chart seed must be a safe integer');
   if (!Number.isInteger(chart.candleCount) || chart.candleCount < 1) {
     throw new RangeError('Chart candle count must be a positive integer');
   }
@@ -699,6 +809,32 @@ function assertChartIdentity(chart: AnalysisChartIdentity): void {
   ) {
     throw new RangeError('Chart decision candle is outside chart bounds');
   }
+  if (chart.kind === 'synthetic') {
+    assertId(chart.generatorVersion, 'Chart generator version');
+    if (!Number.isSafeInteger(chart.seed))
+      throw new RangeError('Chart seed must be a safe integer');
+    return;
+  }
+  if (chart.kind === 'historical') {
+    assertId(chart.scenarioId, 'Historical scenario ID');
+    assertId(chart.scenarioVersion, 'Historical scenario version');
+    assertId(chart.datasetId, 'Historical dataset ID');
+    assertId(chart.datasetVersion, 'Historical dataset version');
+    if (!/^sha256:[0-9a-f]{64}$/.test(chart.canonicalChecksum)) {
+      throw new Error('Historical canonical checksum must be a lowercase SHA-256 digest');
+    }
+    assertId(chart.interval, 'Historical candle interval');
+    assertUtcTimestamp(chart.firstCandleTimestamp, 'Historical first candle timestamp');
+    assertUtcTimestamp(chart.lastCandleTimestamp, 'Historical last candle timestamp');
+    if (toTime(chart.firstCandleTimestamp) > toTime(chart.lastCandleTimestamp)) {
+      throw new RangeError('Historical first candle timestamp must not follow the last candle');
+    }
+    if (!['course', 'none'].includes(chart.learningCredit)) {
+      throw new Error(`Unknown historical learning credit: ${String(chart.learningCredit)}`);
+    }
+    return;
+  }
+  throw new Error(`Unknown analysis chart kind: ${String((chart as { kind?: unknown }).kind)}`);
 }
 
 function assertReplay(
@@ -710,16 +846,65 @@ function assertReplay(
   if (replay.decisionCandleIndex !== chart.decisionCandleIndex) {
     throw new Error('Replay and chart decision boundaries disagree');
   }
-  assertReplayCursor(replay.cursorCandleIndex, replay.decisionCandleIndex);
+  assertReplayCursor(
+    replay.initialCursorCandleIndex,
+    replay.decisionCandleIndex,
+    replay.initialCursorCandleIndex,
+  );
+  assertReplayCursor(
+    replay.cursorCandleIndex,
+    replay.decisionCandleIndex,
+    replay.initialCursorCandleIndex,
+  );
+  if (
+    !isNonNegativeInteger(replay.maxCursorSeenCandleIndex) ||
+    replay.maxCursorSeenCandleIndex < replay.cursorCandleIndex ||
+    replay.maxCursorSeenCandleIndex > replay.decisionCandleIndex
+  ) {
+    throw new RangeError(
+      'Replay maximum cursor must include the cursor and stay within the cutoff',
+    );
+  }
   const ids = new Set<string>();
-  for (const checkpoint of replay.checkpoints) {
+  let previousMaxCursor = replay.initialCursorCandleIndex;
+  let previousCapturedAt = createdAt;
+  for (const [index, checkpoint] of replay.checkpoints.entries()) {
     assertId(checkpoint.id, 'Replay checkpoint ID');
     if (ids.has(checkpoint.id)) throw new Error(`Duplicate replay checkpoint ID: ${checkpoint.id}`);
     ids.add(checkpoint.id);
+    if (checkpoint.sequence !== index + 1) {
+      throw new Error('Replay checkpoint sequence must be contiguous and one-based');
+    }
     if (!ANALYSIS_WORKFLOW_STEP_IDS.includes(checkpoint.stepId)) {
       throw new Error(`Unknown replay checkpoint step: ${String(checkpoint.stepId)}`);
     }
-    assertReplayCursor(checkpoint.cursorCandleIndex, replay.decisionCandleIndex);
+    assertReplayCursor(
+      checkpoint.cursorCandleIndex,
+      replay.decisionCandleIndex,
+      replay.initialCursorCandleIndex,
+    );
+    if (
+      !isNonNegativeInteger(checkpoint.maxCursorSeenCandleIndex) ||
+      checkpoint.maxCursorSeenCandleIndex < checkpoint.cursorCandleIndex ||
+      checkpoint.maxCursorSeenCandleIndex < previousMaxCursor ||
+      checkpoint.maxCursorSeenCandleIndex > replay.maxCursorSeenCandleIndex
+    ) {
+      throw new RangeError('Replay checkpoint maximum cursor is invalid or non-monotonic');
+    }
+    assertValidAnnotations(checkpoint.annotations, replay.decisionCandleIndex + 1);
+    if (
+      learnerAnnotationsVisibleAtCursor(checkpoint.annotations, checkpoint.cursorCandleIndex)
+        .length !== checkpoint.annotations.length
+    ) {
+      throw new Error('Replay checkpoint contains annotations unavailable at its cursor');
+    }
+    if (chart.kind === 'historical') {
+      assertHistoricalAnnotations(
+        checkpoint.annotations,
+        checkpoint.maxCursorSeenCandleIndex,
+        'Replay checkpoint annotations',
+      );
+    }
     assertTimestamp(checkpoint.capturedAt, 'Replay checkpoint timestamp');
     if (
       toTime(checkpoint.capturedAt) < toTime(createdAt) ||
@@ -727,6 +912,11 @@ function assertReplay(
     ) {
       throw new RangeError('Replay checkpoint timestamp is outside session bounds');
     }
+    if (toTime(checkpoint.capturedAt) < toTime(previousCapturedAt)) {
+      throw new RangeError('Replay checkpoint timestamps must be monotonic');
+    }
+    previousMaxCursor = checkpoint.maxCursorSeenCandleIndex;
+    previousCapturedAt = checkpoint.capturedAt;
   }
 }
 
@@ -740,6 +930,13 @@ function assertValidAnnotations(
     if (ids.has(annotation.id))
       throw new Error(`Duplicate learner annotation ID: ${annotation.id}`);
     ids.add(annotation.id);
+    if (
+      annotation.authoredAtCursorCandleIndex !== undefined &&
+      (!isNonNegativeInteger(annotation.authoredAtCursorCandleIndex) ||
+        annotation.authoredAtCursorCandleIndex < learnerAnnotationLastCandleIndex(annotation))
+    ) {
+      throw new RangeError('Annotation authorship cursor must include all geometry anchors');
+    }
     switch (annotation.kind) {
       case 'point':
         assertBoundedAnchor(annotation.anchor, candleCount);
@@ -757,6 +954,47 @@ function assertValidAnnotations(
         break;
       default:
         throw new Error('Unknown learner annotation kind');
+    }
+  }
+}
+
+function assertHistoricalAnnotations(
+  annotations: readonly LearnerChartAnnotation[],
+  maxCursorSeenCandleIndex: number,
+  label: string,
+): void {
+  for (const annotation of annotations) {
+    if (annotation.authoredAtCursorCandleIndex === undefined) {
+      throw new Error(`${label} require an authored replay cursor`);
+    }
+    if (annotation.authoredAtCursorCandleIndex > maxCursorSeenCandleIndex) {
+      throw new RangeError(`${label} contain an authorship cursor beyond replay history`);
+    }
+  }
+}
+
+function assertHistoricalAnnotationReplacement(
+  session: GuidedAnalysisSession,
+  annotations: readonly LearnerChartAnnotation[],
+): void {
+  assertHistoricalAnnotations(
+    annotations,
+    session.replay.maxCursorSeenCandleIndex,
+    'Historical annotations',
+  );
+  const existingById = new Map(
+    session.annotations.map((annotation) => [annotation.id, annotation]),
+  );
+  for (const annotation of annotations) {
+    const existing = existingById.get(annotation.id);
+    if (existing !== undefined && JSON.stringify(existing) === JSON.stringify(annotation)) continue;
+    if (
+      annotation.authoredAtCursorCandleIndex !== session.replay.cursorCandleIndex ||
+      learnerAnnotationLastCandleIndex(annotation) > session.replay.cursorCandleIndex
+    ) {
+      throw new RangeError(
+        'New or changed historical annotations must be authored from geometry visible at the current cursor',
+      );
     }
   }
 }
@@ -818,8 +1056,8 @@ function assertActionTime(session: GuidedAnalysisSession, value: string): void {
   }
 }
 
-function assertReplayCursor(cursor: number, decisionBoundary: number): void {
-  if (!isNonNegativeInteger(cursor) || cursor > decisionBoundary) {
+function assertReplayCursor(cursor: number, decisionBoundary: number, initialCursor = 0): void {
+  if (!isNonNegativeInteger(cursor) || cursor < initialCursor || cursor > decisionBoundary) {
     throw new RangeError('Replay cursor is outside the decision-safe boundary');
   }
 }
@@ -917,6 +1155,13 @@ function isNonEmptyId(value: string): boolean {
 function assertTimestamp(value: string | undefined, label: string): asserts value is string {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) {
     throw new Error(`${label} must be a valid timestamp`);
+  }
+}
+
+function assertUtcTimestamp(value: string, label: string): void {
+  assertTimestamp(value, label);
+  if (new Date(Date.parse(value)).toISOString() !== value) {
+    throw new Error(`${label} must be a canonical UTC timestamp`);
   }
 }
 
