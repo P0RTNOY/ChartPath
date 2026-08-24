@@ -5,3 +5,4 @@ export * from './review.js';
 export * from './risk.js';
 export * from './tutor.js';
 export * from './types.js';
+export * from './workbench.js';
