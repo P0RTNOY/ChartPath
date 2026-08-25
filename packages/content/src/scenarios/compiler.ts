@@ -31,7 +31,14 @@ import {
   type ScenarioAuthoringManifestV1,
   type ScenarioExecutionSnapshotV1,
   type ScenarioLearnerExerciseProjection,
+  type ScenarioReviewRecordV1,
 } from './types.js';
+import {
+  formatScenarioSchemaIssues,
+  freezeValidatedScenarioManifest,
+  preflightScenarioAuthoringInput,
+  scenarioAuthoringManifestSchema,
+} from './schema.js';
 
 const FIXED_COMPILATION_TIME = '2026-01-01T00:00:00.000Z';
 
@@ -40,53 +47,37 @@ export type ScenarioManifestParseResult =
   | { readonly ok: false; readonly issues: readonly string[] };
 
 export interface ScenarioCompilerOptions {
-  /** IDs verified by an external authenticated human-review authority. Empty by default. */
-  readonly authenticatedReviewerRecordIds?: readonly string[];
-}
-
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  /** Exact canonical record digests asserted by an external authenticated review authority. */
+  readonly trustedReviewRecordChecksums?: ReadonlyMap<string, Sha256Checksum>;
 }
 
 /** Runtime boundary for JSON/untrusted authoring input. It fails closed before compilation. */
 export function parseScenarioAuthoringManifest(input: unknown): ScenarioManifestParseResult {
-  if (!record(input)) return { ok: false, issues: ['manifest must be an object'] };
-  const issues: string[] = [];
-  const requiredStrings = [
-    'scenarioId',
-    'scenarioVersion',
-    'compilerVersion',
-    'compilerContractChecksum',
-    'datasetId',
-    'datasetVersion',
-    'titleHe',
-    'promptHe',
-    'chartSpecChecksum',
-    'generatedDatasetChecksum',
-    'materialArtifactChecksum',
-    'reviewFingerprint',
-  ];
-  for (const field of requiredStrings)
-    if (typeof input[field] !== 'string' || (input[field] as string).trim() === '')
-      issues.push(`${field} must be a non-empty string`);
-  if (input.schemaVersion !== 1) issues.push('unsupported scenario authoring schema version');
-  if (!record(input.source)) issues.push('source must be an object');
-  if (!record(input.chartSpec)) issues.push('chartSpec must be an object');
-  if (!record(input.application)) issues.push('application must be an object');
-  if (!record(input.processRubric)) issues.push('processRubric must be an object');
-  if (!record(input.publication)) issues.push('publication must be an object');
-  if (!record(input.reviewStates)) issues.push('reviewStates must be an object');
-  if (!record(input.retirement)) issues.push('retirement must be an object');
-  if (!Array.isArray(input.hintsHe)) issues.push('hintsHe must be an array');
-  if (!Number.isInteger(input.decisionCandleIndex))
-    issues.push('decisionCandleIndex must be an integer');
-  return issues.length === 0
-    ? { ok: true, value: input as unknown as ScenarioAuthoringManifestV1 }
-    : { ok: false, issues };
+  const preflight = preflightScenarioAuthoringInput(input);
+  if (!preflight.ok) return preflight;
+  const parsed = scenarioAuthoringManifestSchema.safeParse(preflight.value);
+  if (!parsed.success) return { ok: false, issues: formatScenarioSchemaIssues(parsed.error) };
+  return { ok: true, value: freezeValidatedScenarioManifest(parsed.data) };
 }
 
 function checksum(value: unknown): Sha256Checksum {
   return `sha256:${sha256Hex(canonicalSerialize(value))}`;
+}
+
+export function computeScenarioReviewRecordChecksum(
+  record: ScenarioReviewRecordV1,
+): Sha256Checksum {
+  return checksum(record);
+}
+
+function reviewRecordIsAuthenticated(
+  record: ScenarioReviewRecordV1,
+  options: ScenarioCompilerOptions,
+): boolean {
+  return (
+    options.trustedReviewRecordChecksums?.get(record.reviewerRecordId) ===
+    computeScenarioReviewRecordChecksum(record)
+  );
 }
 
 export function computeScenarioMaterialChecksum(
@@ -717,6 +708,11 @@ export function compileScenario(
   for (const [area, status] of Object.entries(manifest.reviewStates)) {
     if (status !== 'approved') publicationBlockers.push(`${area} review is pending`);
   }
+  const reviewRecordIds = manifest.publication.records.map(({ reviewerRecordId }) =>
+    reviewerRecordId.trim(),
+  );
+  if (new Set(reviewRecordIds).size !== reviewRecordIds.length)
+    structuralIssues.push('human review record IDs must be globally unique');
   for (const record of manifest.publication.records) {
     if (
       record.reviewerRecordId.trim() === '' ||
@@ -724,7 +720,7 @@ export function compileScenario(
       !Number.isFinite(Date.parse(record.reviewedAt))
     )
       publicationBlockers.push(`malformed ${record.scope} human review record`);
-    if (!options.authenticatedReviewerRecordIds?.includes(record.reviewerRecordId))
+    if (!reviewRecordIsAuthenticated(record, options))
       publicationBlockers.push(
         `unauthenticated ${record.scope} reviewer record cannot grant approval`,
       );
@@ -748,7 +744,7 @@ export function compileScenario(
           (record) =>
             record.scope === scope &&
             record.materialArtifactChecksum === canonicalMaterialChecksum &&
-            options.authenticatedReviewerRecordIds?.includes(record.reviewerRecordId) &&
+            reviewRecordIsAuthenticated(record, options) &&
             Number.isFinite(Date.parse(record.reviewedAt)),
         )
         .sort((left, right) => {
@@ -797,14 +793,13 @@ export type ScenarioCompilationResult =
   | { readonly ok: true; readonly candidate: CompiledScenarioCandidate }
   | { readonly ok: false; readonly issues: readonly string[] };
 
-export function compileScenarioSafely(
-  input: unknown,
-  options: ScenarioCompilerOptions = {},
-): ScenarioCompilationResult {
+export function compileScenarioSafely(input: unknown): ScenarioCompilationResult {
   const parsed = parseScenarioAuthoringManifest(input);
   if (!parsed.ok) return parsed;
   try {
-    const candidate = compileScenario(parsed.value, options);
+    // The public untrusted path deliberately has no authority-injection parameter. Trusted review
+    // assertions are available only to internal publication tooling through compileScenario.
+    const candidate = compileScenario(parsed.value);
     return candidate.structuralIssues.length === 0
       ? { ok: true, candidate }
       : { ok: false, issues: candidate.structuralIssues };

@@ -10,15 +10,16 @@ import {
 import {
   buildScenarioLibraryReport,
   buildScenarioPreview,
-  compileScenario,
   compileScenarioSafely,
   computeScenarioMaterialChecksum,
+  computeScenarioReviewRecordChecksum,
   resolveScenarioCandidate,
   scenarioAuthoringManifests,
   scenarioCandidateRegistry,
   validateScenarioVersionHistory,
   type ScenarioAuthoringManifestV1,
 } from '../src/scenarios/index.js';
+import { compileScenario } from '../src/scenarios/compiler.js';
 
 function clone(index = 0): ScenarioAuthoringManifestV1 {
   return structuredClone(scenarioAuthoringManifests[index]!);
@@ -154,7 +155,7 @@ describe('scenario authoring library', () => {
     expect(compileScenarioSafely({ schemaVersion: 1 })).toMatchObject({ ok: false });
     expect(compileScenarioSafely(null)).toEqual({
       ok: false,
-      issues: ['manifest must be an object'],
+      issues: ['$: Invalid input: expected object, received null'],
     });
     const malformedSource = clone();
     Object.assign(malformedSource.source, { pageStart: 999, pageEnd: 999 });
@@ -256,7 +257,6 @@ describe('scenario authoring library', () => {
     );
 
     const superseded = clone();
-    const reviewerRecordId = 'authenticated-reviewer-record';
     Object.assign(superseded.reviewStates, {
       source: 'approved',
       accessibility: 'approved',
@@ -277,7 +277,7 @@ describe('scenario authoring library', () => {
             'publication',
           ] as const
         ).map((scope) => ({
-          reviewerRecordId,
+          reviewerRecordId: `authenticated-${scope}-approval`,
           reviewedAt: '2026-01-02T23:00:00.000+14:00',
           decision: 'approved' as const,
           materialArtifactChecksum: superseded.materialArtifactChecksum,
@@ -285,7 +285,7 @@ describe('scenario authoring library', () => {
           note: 'authenticated approval under test',
         })),
         {
-          reviewerRecordId,
+          reviewerRecordId: 'authenticated-publication-change-request',
           reviewedAt: '2026-01-02T10:00:00.000Z',
           decision: 'changes-requested',
           materialArtifactChecksum: superseded.materialArtifactChecksum,
@@ -293,7 +293,7 @@ describe('scenario authoring library', () => {
           note: 'later changes requested must supersede approval',
         },
         {
-          reviewerRecordId,
+          reviewerRecordId: 'authenticated-publication-equal-time-approval',
           reviewedAt: '2026-01-02T12:00:00.000+02:00',
           decision: 'approved',
           materialArtifactChecksum: superseded.materialArtifactChecksum,
@@ -302,9 +302,15 @@ describe('scenario authoring library', () => {
         },
       ],
     });
+    const trustedReviewRecordChecksums = new Map(
+      superseded.publication.records.map((record) => [
+        record.reviewerRecordId,
+        computeScenarioReviewRecordChecksum(record),
+      ]),
+    );
     expect(
       compileScenario(superseded, {
-        authenticatedReviewerRecordIds: [reviewerRecordId],
+        trustedReviewRecordChecksums,
       }).publicationBlockers,
     ).toContain(
       'approved/published status requires a current authenticated publication approval not superseded by changes requested',
