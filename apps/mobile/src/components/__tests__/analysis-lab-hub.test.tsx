@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import { exercises } from '@chartpath/content';
 import {
@@ -94,27 +94,17 @@ function renderHub(sessions: readonly GuidedAnalysisSession[] = []) {
 describe('AnalysisLabHub historical replay', () => {
   beforeEach(() => mockPush.mockClear());
 
-  it('keeps synthetic entry intact and starts the internal historical source explicitly', async () => {
+  it('keeps synthetic entry intact and routes ordinary users to the publication-gated library', async () => {
     const screen = await renderHub();
 
     expect(screen.getByRole('button', { name: 'התחלת ניתוח חדש' })).toBeTruthy();
-    expect(screen.getByTestId('historical-replay-entry')).toBeTruthy();
-    expect(screen.getByText(/Beta.*פנימי/)).toBeTruthy();
-    expect(screen.getByText(/ללא.*XP.*רגיל/)).toBeTruthy();
-    expect(screen.getByText(/ללא מסחר חי, פקודות או בקרי קנייה ומכירה/)).toBeTruthy();
+    expect(screen.getByTestId('historical-scenario-library-entry')).toBeTruthy();
+    expect(screen.getByText(/שערי פרסום וביקורת/)).toBeTruthy();
+    expect(screen.getByText(/מועמדים סינתטיים.*אינם מופיעים/)).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(screen.getByRole('button', { name: /פתיחת.*Replay.*היסטורי פנימי/ }));
-    });
-    await waitFor(() =>
-      expect(mockLearning.createOrResumeAnalysisSession).toHaveBeenCalledWith({
-        kind: 'historical',
-        scenarioId: 'blind-generated-development-scenario',
-      }),
-    );
-    await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=historical-active-session'),
-    );
+    fireEvent.press(screen.getByTestId('historical-scenario-library-open'));
+    expect(mockPush).toHaveBeenCalledWith('/historical-scenarios');
+    expect(mockLearning.createOrResumeAnalysisSession).not.toHaveBeenCalled();
   });
 
   it('shows a separate blind resume action without revealing market identity', async () => {

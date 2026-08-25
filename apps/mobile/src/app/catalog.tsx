@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, type Href, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { contentVersion, glossary } from '@chartpath/content';
@@ -47,6 +47,28 @@ export default function DeveloperCatalogScreen() {
               RTL • React Native • deterministic grading
             </LtrText>
           </View>
+        </View>
+      </Card>
+      <Card testID="scenario-qa-catalog-entry" variant="outlined">
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Badge tone="warning">QA פנימי</Badge>
+            <Badge tone="neutral">נתונים סינתטיים</Badge>
+            <Badge tone="neutral">ללא קרדיט</Badge>
+          </View>
+          <Heading level={2}>בדיקת מועמדי תרחישים</Heading>
+          <UiText color="textMuted" variant="bodySmall">
+            הכניסה דורשת אישור מפורש. תשובות, מקורות, מזהים וחסמי פרסום נשארים מוסתרים עד לפעולת
+            חשיפה נפרדת.
+          </UiText>
+          <Button
+            fullWidth
+            onPress={() => router.push('/historical-scenario-qa?developer=1' as Href)}
+            testID="scenario-qa-catalog-open"
+            variant="secondary"
+          >
+            פתיחת שער QA תרחישים
+          </Button>
         </View>
       </Card>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

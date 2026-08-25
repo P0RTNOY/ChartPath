@@ -18,13 +18,8 @@ import {
 import { ErrorState, LoadingState } from './app-state';
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { TopBar } from './top-bar';
-import {
-  resolveHistoricalAnalysisSession,
-  resolveHistoricalReplayScenario,
-} from '@/data/historical-replay';
+import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
-
-const HISTORICAL_SCENARIO_ID = 'blind-generated-development-scenario';
 
 function progress(session: GuidedAnalysisSession): number {
   return ANALYSIS_WORKFLOW_STEP_IDS.filter((id) => session.steps[id].status === 'submitted').length;
@@ -68,7 +63,6 @@ export function AnalysisLabHub() {
         session.chart.kind === 'historical',
     )
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
-  const historicalEntry = resolveHistoricalReplayScenario(HISTORICAL_SCENARIO_ID);
   const activeHistoricalResolution = activeHistorical
     ? resolveHistoricalAnalysisSession(activeHistorical)
     : undefined;
@@ -80,15 +74,11 @@ export function AnalysisLabHub() {
     router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href);
   };
 
-  const start = async (kind: 'synthetic' | 'historical') => {
+  const start = async () => {
     setWorking(true);
     setError(null);
     try {
-      const session = await learning.createOrResumeAnalysisSession(
-        kind === 'historical'
-          ? { kind: 'historical', scenarioId: HISTORICAL_SCENARIO_ID }
-          : { kind: 'synthetic' },
-      );
+      const session = await learning.createOrResumeAnalysisSession({ kind: 'synthetic' });
       openSession(session);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'לא הצלחנו לפתוח ניתוח.');
@@ -147,12 +137,7 @@ export function AnalysisLabHub() {
             התרחיש סינתטי ומיועד ללמידה בלבד. אין בו אות, תחזית או המלצה אישית.
           </UiText>
           {!activeSynthetic ? (
-            <Button
-              disabled={working}
-              fullWidth
-              onPress={() => void start('synthetic')}
-              size="large"
-            >
+            <Button disabled={working} fullWidth onPress={() => void start()} size="large">
               {working ? 'פותח ניתוח…' : 'התחלת ניתוח חדש'}
             </Button>
           ) : undefined}
@@ -203,46 +188,29 @@ export function AnalysisLabHub() {
         </Card>
       ) : undefined}
 
-      <Card testID="historical-replay-entry" variant="outlined">
+      <Card testID="historical-scenario-library-entry" variant="outlined">
         <View style={{ gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Badge tone="warning">Beta פנימי</Badge>
             <Badge tone="neutral">Frozen Historical Replay</Badge>
-            <Badge tone="neutral">ללא XP רגיל</Badge>
+            <Badge tone="teal">שערי פרסום וביקורת</Badge>
           </View>
-          <Heading level={2}>Replay היסטורי עיוור</Heading>
+          <Heading level={2}>ספריית Replay היסטורי עיוור</Heading>
           <UiText>
-            הזהות, התאריכים והתוצאה מוסתרים בזמן העבודה. נחשפים נרות קפואים בלבד, אחד־אחד, עד נקודת
-            ההחלטה — ללא מסחר חי, פקודות או בקרי קנייה ומכירה.
+            הספרייה הרגילה מציגה רק תרחישים שפורסמו כדין ועברו ביקורת אנושית. זהות, תאריכים, כיוון
+            ההחלטה ותוצאה נשארים מוסתרים עד לסיום.
           </UiText>
-          {historicalEntry.status === 'ready' ? (
-            <>
-              <UiText color="textMuted" variant="bodySmall">
-                {historicalEntry.content.scenario.hebrewDisclosure}
-              </UiText>
-              <LtrText color="textMuted" variant="caption">
-                {`${historicalEntry.content.dataset.manifest.datasetId}@${historicalEntry.content.dataset.manifest.datasetVersion}`}
-              </LtrText>
-              <UiText color="textMuted" variant="caption">
-                סטטוס: {historicalEntry.content.scenario.publicationStatus} · התאמה:{' '}
-                {historicalEntry.content.dataset.manifest.adjustment.mode} · סשן:{' '}
-                {historicalEntry.content.dataset.manifest.sessionPolicy.includedSessions.join(', ')}{' '}
-                · חוסרים נשמרים ואינם מומצאים.
-              </UiText>
-              {!activeHistorical ? (
-                <Button
-                  disabled={working}
-                  fullWidth
-                  onPress={() => void start('historical')}
-                  variant="secondary"
-                >
-                  {working ? 'פותח Replay…' : 'פתיחת Replay היסטורי פנימי'}
-                </Button>
-              ) : undefined}
-            </>
-          ) : (
-            <UiText color="warning">תרחיש ה־Replay הפנימי אינו זמין כעת.</UiText>
-          )}
+          <UiText color="textMuted" variant="caption">
+            מועמדים סינתטיים, תרחישי QA ורשומות ללא אישור אינם מופיעים בספרייה הרגילה ואינם מעניקים
+            קרדיט.
+          </UiText>
+          <Button
+            fullWidth
+            onPress={() => router.push('/historical-scenarios' as Href)}
+            testID="historical-scenario-library-open"
+            variant="secondary"
+          >
+            פתיחת ספריית התרחישים
+          </Button>
         </View>
       </Card>
 
