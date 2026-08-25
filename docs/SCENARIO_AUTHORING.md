@@ -1,7 +1,7 @@
 # Scenario authoring and deterministic generation
 
-**Status:** Milestone 5 internal candidate contract implemented and repository verification
-complete; this is not a publication or native-distribution claim
+**Status:** Milestone 5 internal candidate contract complete; Milestone 6 adds locally verified
+schema-1 internal position-management extensions and strict external-input envelopes
 
 **Authoring schema:** `1`
 
@@ -13,10 +13,12 @@ eleven-step capstone exercise, and a historical replay scenario that can optiona
 versioned paper-execution engine. UI components consume those artifacts; they do not define source
 truth, scoring, or execution outcomes.
 
-The current authoring surface is TypeScript. `parseScenarioAuthoringManifest` checks the required
-top-level runtime shape and `compileScenarioSafely` converts parse/compilation failures into issues,
-but nested runtime-schema validation is not yet exhaustive. Serialized external authoring input is
-therefore not an approved workflow. There is also no standalone JSON editor or approval service.
+The current authoring surface is TypeScript. `parseScenarioAuthoringManifest` now performs a deep,
+strict runtime parse before compilation: ordinary JSON objects/arrays only; no accessors, cycles,
+prototype-sensitive keys, unknown fields, non-finite values or oversized text/collections; exact
+IDs, semantic versions, sources, policies, rubrics, reviews, publication state, expected snapshots
+and checksums. `compileScenarioSafely` converts parse/compilation failures into issues without
+constructing a partial trusted manifest. There is no standalone JSON editor or approval service.
 
 ## 1. Authoring manifest
 
@@ -233,3 +235,45 @@ Before proposing a candidate for human review:
 
 Publication, approval invalidation, retirement and the internal-QA boundary are normative in
 [SCENARIO_PUBLICATION_POLICY.md](./SCENARIO_PUBLICATION_POLICY.md).
+
+## 8. Position-management extension
+
+Milestone 6 does not mutate the nine Milestone 5 candidate manifests. It builds separately
+versioned `ScenarioPositionManagementVariantV1` records from exact base scenario/dataset identities.
+Each enabled extension pins:
+
+- an immutable management-scenario identity/version and exact dataset identity/version/checksum;
+  a new dataset version is required only when future candles or other dataset material change;
+- the base scenario version, base dataset version and base checksum;
+- `position-management-policy-v1` and the scenario permission version;
+- allowed full exit, partial exit, scale-in, stop replacement and target replacement actions;
+- maximum open quantity, cumulative scale-in, soft-risk and hard-risk limits;
+- a schema-1 rubric ID, version, checksum and deterministic domain criteria;
+- exact authored QA action sequences, evidence labels and checksum-pinned state snapshots; and
+- a material artifact checksum, seven pending review scopes and learning credit `none`.
+
+The current extension registry contains three internal variants derived from
+`internal-long-range-breakout` and `internal-short-double-top`. It covers partial/full exit,
+accepted and rejected scale-in, manual stop/target replacement, cancellation, pending-action reload,
+partial-then-stop/target, adverse opening stop, voluntary/opening ambiguity and a later short gap.
+These are deterministic contract cases, not claimed best practices.
+
+Original candidates remain management-disabled unless an exact extension exists. No-trade candidates
+use reason `no-trade`; an authored unfilled entry uses `unfilled-entry`; other originals use
+`scenario-disabled`. Unknown identity and learning-credit mismatch also fail closed. An author must
+not add UI-only permission or reuse a published material identity for new management mechanics.
+
+Management source doctrine uses reviewed Unit 8 risk material and `u10-capstone-e05`. Across the
+relevant curriculum, audited physical PDF pages are 51, 54, 59 and 62–79, corresponding to printed
+pages 38, 41, 46 and 49–66. Source-backed distinctions include planning before outcome, invalidation,
+risk, manual management evidence and process review. N/N+1 timing, replacement precedence, integer
+rounding, FIFO realization, database structure and ambiguity states are neutral ChartPath simulator
+mechanics and must be labelled as such.
+
+Strict extension parsing verifies schema bounds, Hebrew/source shapes, internal/no-credit review
+state, policy and authority coherence, expected cases and checksums. External serialized manifests
+and management extensions may cross the boundary only through the deep strict parsers; malformed
+input is rejected as a whole and never merged into trusted defaults. The closed, typed repository
+registry remains the only publishing source of truth. See
+[POSITION_MANAGEMENT_POLICY.md](./POSITION_MANAGEMENT_POLICY.md) and
+[TRADE_JOURNAL_POLICY.md](./TRADE_JOURNAL_POLICY.md).

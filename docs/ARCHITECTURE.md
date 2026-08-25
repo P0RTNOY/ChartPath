@@ -2,9 +2,9 @@
 
 > Status snapshot: 2026-08-25. This document is an implementation contract for the
 > beta and records implemented foundations only where the repository contains the
-> corresponding code. Milestones 1–4 are complete; the Milestone 5 scenario-authoring and internal
-> QA architecture is implemented while final verification and native distribution gates remain
-> open. Release evidence belongs in `docs/RELEASE_READINESS.md`.
+> corresponding code. Milestones 1–5 are complete. The Milestone 6 position-management and
+> append-only journal architecture is implemented and locally verified. Publication and native
+> distribution gates remain open. Release evidence belongs in `docs/RELEASE_READINESS.md`.
 
 ## Status language
 
@@ -457,6 +457,54 @@ Normative details are in `docs/SCENARIO_AUTHORING.md` and
 `docs/SCENARIO_PUBLICATION_POLICY.md`. Native and assistive-technology evidence requirements are in
 `docs/NATIVE_ACCESSIBILITY_READINESS.md`.
 
+## Position Management and Trade Journal
+
+**Implemented and locally verified as a synthetic, internal, no-credit Milestone 6 foundation.**
+`packages/domain/src/position-management.ts` owns the
+pure aggregate and `position-management-policy-v1`. It accepts only an immutable, actually open
+paper-execution handoff plus scenario-pinned authority. The authority carries permitted action
+kinds, risk limits and an exact rubric identity/checksum; the UI cannot grant itself management
+permission or reproduce the accounting rules.
+
+The aggregate supports full and partial voluntary exits, scale-in, and manual stop/target
+replacement. One material action may be pending. It is authored at completed-candle cutoff N and is
+eligible only on N+1. Replacements activate before N+1 opening thresholds; a voluntary/opening
+threshold conflict pauses as ambiguous; a candle that can touch both stop and target also pauses as
+ambiguous. Voluntary fills use the next open, while the inherited paper cost model supplies adverse
+spread/slippage, tick alignment and commission. Automatic trailing is explicitly `false` and is not
+inferred by mobile code.
+
+Authoritative prices, risk, costs and quantities use safe integer minor, tick and quantity units.
+Original 1R is frozen from the confirmed paper handoff. Scale-ins create immutable lots; exits
+realize FIFO slices with deterministic entry-commission allocation. Realized P&L, commission,
+modeled execution cost, open-position estimates and the frozen-R denominator remain separate.
+Neither P&L nor later outcome enters the process grade.
+
+Every material submission appends its rationale to the journal before N+1 is revealed. Independent
+observations and explicit corrections are also append-only; a correction references rather than
+rewrites an earlier entry. Events, fills, lots, journal entries and processed-candle fingerprints
+use deterministic identities and canonical-prefix validation. Same-ID retries are idempotent only
+when their material is identical.
+
+`packages/content/src/scenarios/management.ts` owns schema-1 extensions for three versioned internal
+QA variants derived from two Milestone 5 trade candidates. The extension pins exact base
+scenario/dataset identity, policy, permissions, rubric, expected action cases, snapshots and
+material checksum. Original no-trade, unfilled or non-enabled scenarios remain fail-closed. All
+variants are human-review-required and learning-credit `none`; mechanics expectations are QA
+fixtures, not publication approvals or source doctrine.
+
+`apps/mobile` resolves authority from the immutable handoff, renders only cutoff-safe projections
+and persists transitions through the shared repository. Persistence payload schema 6 adds
+management and quarantine arrays. SQLite migration 5 creates `position_management_sessions` and
+`management_journal_entries`, pins checksum
+`sha256:ddfdc6589ba3ea48862156293c60bb904a3a781fd4c3a73400a193fd1d25eb8a`, rejects journal
+update/delete, rejects terminal-session update and keeps payload plus mirrors in one exclusive
+transaction. Source divergence, duplicate logical handoffs and malformed sessions quarantine or
+fail rather than silently recovering as different evidence.
+
+The normative mechanics are in `docs/POSITION_MANAGEMENT_POLICY.md`; journal integrity, authorship
+and privacy are in `docs/TRADE_JOURNAL_POLICY.md`.
+
 ## Runtime flows
 
 ### Startup and content loading
@@ -529,6 +577,13 @@ processed-candle fingerprints and immutable simulator events. Their repository s
 resume, revision conflict detection, quarantine and explicit abandonment/reset while preserving all
 attempts and projections. A simulated fill or debrief never invokes the learning-credit projector.
 
+Position-management sessions are a third versioned local aggregate. They pin the exact open paper
+handoff, source identity, management policy, permissions, rubric, integer accounting, processed
+candles, immutable events and append-only journal. The repository freezes the claimed paper
+session, permits exactly one logical management session per paper handoff, enforces one-revision
+updates and canonical history prefixes, and makes terminal management read-only. Management and
+journal records never invoke the attempt projector.
+
 Updates and deletes on `attempts` should be rejected by repository design and, where
 supported, SQLite triggers. Corrections are new events that reference the prior
 event. User-requested erasure is the deliberate exception and deletes the local
@@ -559,6 +614,12 @@ recorded in `schema_migrations(version, name, checksum, applied_at)`. Each migra
 SQLite table changes that require replacement use create-copy-validate-rename in a
 transaction. The migration checks row counts and required values before dropping an
 old table. Startup stops with a repairable error when a checksum or invariant fails.
+
+The current application payload is schema 6. Native SQLite migration 5 is
+`create_position_management_and_journal` with checksum
+`sha256:ddfdc6589ba3ea48862156293c60bb904a3a781fd4c3a73400a193fd1d25eb8a`. Older payloads are
+forbidden from smuggling Milestone 6 fields; schema-6 normalization validates the exact analysis and
+paper ancestry and quarantines invalid management records with their canonical payload retained.
 
 Content migrations are separate manifests in `packages/content`. They may add an ID
 alias, retire content, or invalidate a derived projection. They never rewrite the

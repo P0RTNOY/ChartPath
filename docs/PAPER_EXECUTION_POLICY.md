@@ -172,6 +172,13 @@ offline. Persistence validation preserves attempts and progress, quarantines str
 execution records, and requires explicit recovery or reset. Paper execution never rewrites the
 finalized analysis from which it was created.
 
+An exact open position may be handed to Milestone 6 management only when the scenario/version grants
+an explicit management authority. The handoff copies the entire paper session, source identity,
+execution policy and cost model. Once claimed, the paper session is frozen: later stop/target
+replacement, scale-in and voluntary exit belong exclusively to the management aggregate and never
+rewrite paper history. No-trade, unfilled, terminal or unauthorized paper sessions cannot cross the
+boundary. The normative continuation is in `docs/POSITION_MANAGEMENT_POLICY.md`.
+
 ## 8. Debrief and learning-credit boundary
 
 The deterministic debrief evaluates process separately from outcome. It records whether the plan
@@ -220,6 +227,12 @@ mechanics above are ChartPath assumptions and use original explanatory wording.
 
 Source pages support the educational distinctions; they do not define ChartPath's exact fill
 algorithm or cost constants.
+
+Milestone 6 additionally uses the audited flags/gaps/breakout/workflow/risk/review range at physical
+PDF pages 51, 54, 59 and 62–79 (printed pages 38, 41, 46 and 49–66), especially reviewed Unit 8 risk
+material and `u10-capstone-e05`. Those references support doctrine and process language. They do not
+define next-candle eligibility, replacement precedence, FIFO lot accounting, integer rounding,
+SQLite journal mirrors or ChartPath's ambiguity state.
 
 ## 10. Interface and accessibility contract
 

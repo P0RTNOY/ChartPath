@@ -51,13 +51,14 @@ Native UI/runtime, SQLite-on-device, and screen-reader verification remain distr
 
 ## Chart-simulator roadmap
 
-| Milestone                                   | Status   | Evidence / next work                                                                                                                                                     |
-| ------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1. Interactive Chart Workbench foundation   | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass.                                                    |
-| 2. Persistent Guided Analysis Session       | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                         |
-| 3. Frozen Historical Replay Foundation      | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified.     |
-| 4. Deterministic Paper Execution Foundation | Complete | Pure one-plan/order/position engine, checksum-bound persistence, Hebrew ticket/overlays/debrief and final evidence; release gates remain in `docs/RELEASE_READINESS.md`. |
-| 5. Curated Scenarios and Native Readiness   | Complete | Internal authoring, no-trade, QA and fail-closed publication foundations are verified; learner publication and native-distribution gates remain explicitly open.         |
+| Milestone                                   | Status   | Evidence / next work                                                                                                                                                                                      |
+| ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Interactive Chart Workbench foundation   | Complete | Pure viewport/replay/drawing state, Hebrew Lab route, deterministic line task, 205 tests and 6 browser journeys pass.                                                                                     |
+| 2. Persistent Guided Analysis Session       | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                                                          |
+| 3. Frozen Historical Replay Foundation      | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified.                                      |
+| 4. Deterministic Paper Execution Foundation | Complete | Pure one-plan/order/position engine, checksum-bound persistence, Hebrew ticket/overlays/debrief and final evidence; release gates remain in `docs/RELEASE_READINESS.md`.                                  |
+| 5. Curated Scenarios and Native Readiness   | Complete | Internal authoring, no-trade, QA and fail-closed publication foundations are verified; learner publication and native-distribution gates remain explicitly open.                                          |
+| 6. Position Management and Trade Journal    | Complete | Deterministic management, journal, schema-6 persistence and Hebrew UI pass repository, browser, export, visual and bounded iOS simulator verification; publication/native-distribution gates remain open. |
 
 Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
 data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
@@ -138,3 +139,42 @@ dark mode, largest in-app text/reduced motion and tablet layout. They are not na
 evidence. Full native scenario interaction/restart, Android runtime, VoiceOver, TalkBack, largest OS
 text and physical-device checks remain open as recorded in
 `docs/NATIVE_ACCESSIBILITY_READINESS.md`.
+
+Milestone 6 starts from the completed curated-scenario foundation and adds management only for an
+exact, filled, still-open paper position with explicit scenario authority. Its pure aggregate uses
+`position-management-policy-v1`: an action authored at cutoff N is eligible only on N+1;
+stop/target replacements activate before that candle's opening thresholds; voluntary/opening and
+same-candle stop/target conflicts pause as ambiguous. It supports full/partial exit, scale-in and
+manual stop/target replacement. Automatic trailing is intentionally deferred.
+
+Original 1R is frozen from the paper handoff. Prices, tick counts, quantities, commissions, risk and
+realized accounting use safe integers; scale-in creates lots and exits realize FIFO slices. Every
+submitted action appends its rationale before the next candle. Observations and corrections remain
+append-only, while outcome and P&L are excluded from process grading.
+
+The content layer adds three internal schema-1 management variants with exact expected cases and
+snapshots. They remain synthetic, human-review-required and no-credit; original no-trade, unfilled
+and unauthorized identities fail closed. Persistence payload schema 6 and native SQLite migration 5
+add the aggregate and journal mirrors. Migration 5 checksum is
+`sha256:ddfdc6589ba3ea48862156293c60bb904a3a781fd4c3a73400a193fd1d25eb8a`.
+
+Final Milestone 6 evidence at implementation/evidence checkpoint `7cb8dd2` (the final documentation
+commit and clean HEAD are reported in the handoff):
+
+- baseline `pnpm check`: 51 suites / 546 tests; final: 57 suites / 623 tests, plus formatting, lint,
+  typecheck and content validation;
+- production browser journeys: 16/16; full developer-QA matrix: 40/40, including 24/24 focused
+  position-management journeys across phone and tablet, with zero retries;
+- deterministic report/preview repeated byte-for-byte: 47,380 bytes / `3dab3ae2…fea31` and 160,582
+  bytes / `a131a72e…515ef`;
+- exports: 56 web routes; iOS and Android Hermes bundles; exact module/asset/file/byte counts are in
+  `docs/RELEASE_READINESS.md`;
+- 13 original-resolution browser management captures inspected: twelve `390×844` phone views and
+  one `1024×768` tablet view; and
+- iOS 26.5 Expo Go simulator: real schema-6 SQLite handoff, pending partial exit, terminate/relaunch,
+  exact pending restore and one N+1 fill passed without duplicate management/journal rows.
+
+The bounded native run did not continue to a terminal debrief and did not cover VoiceOver, largest
+OS text, increased contrast or a signed build. Android has no device, emulator or SDK. The paired
+physical iPhone did not have ChartPath/Expo installed and was not exercised. Those gates keep native
+distribution **NO-GO**.

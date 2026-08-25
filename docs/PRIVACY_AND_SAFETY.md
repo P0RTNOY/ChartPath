@@ -294,6 +294,38 @@ they have no course credit, finalization must not change attempts, mastery, revi
 XP, streak or activity. A correct no-trade application creates no order/position and cannot be
 regraded from later price action.
 
+### Position-management and journal boundary
+
+Milestone 6 stores one exact open paper handoff, scenario-granted authority, safe-integer lots,
+fills, risk/accounting projections, processed-candle fingerprints, immutable simulator events and
+learner-authored journal text. It does not request real holdings, account balance, brokerage or tax
+identifiers, credentials, order routes or live prices. The management variants are synthetic,
+internal, no-credit and visibly developer-gated.
+
+Journal prose is potentially sensitive local data. It remains inside the guest persistence adapter;
+there is no telemetry, cloud recipient, AI rewriting, analytics or sync. Learners should not enter
+credentials, account numbers, personal identifiers or real trade instructions. A future sync or
+tutor feature would require a new explicit privacy, consent and authorization review rather than
+silently uploading existing entries.
+
+`position-management-policy-v1` uses cutoff N / eligibility N+1, manual replacements, explicit
+ambiguity, a frozen original 1R and deterministic integer/FIFO accounting. These are disclosed
+simulator assumptions, not claims about venue priority or achievable execution. Automatic trailing
+is absent. Soft risk increases require acknowledgement; hard risk, quantity and scale-in violations
+fail closed.
+
+Every material action creates an append-only rationale before the next candle. Corrections reference
+the original entry and never erase it. Repository canonical-prefix checks plus SQLite update/delete
+triggers prevent ordinary journal rewriting. P&L, later outcome and ambiguous intrabar guesses are
+excluded from process grading. Management never appends an attempt or changes mastery, review,
+lesson progress, XP, streak or daily activity.
+
+Persistence payload schema 6 and native SQLite migration 5 preserve and mirror management/journal
+evidence. Migration 5 is pinned to
+`sha256:ddfdc6589ba3ea48862156293c60bb904a3a781fd4c3a73400a193fd1d25eb8a`. Invalid or ancestry-
+divergent payloads quarantine with canonical JSON retained rather than being silently repaired.
+Native lifecycle, assistive-technology and physical-device verification remain open release gates.
+
 ## Financial-safety content rules
 
 These are **beta requirements** for every screen, lesson, exercise, notification,

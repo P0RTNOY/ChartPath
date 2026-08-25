@@ -1,32 +1,34 @@
 # ChartPath beta release readiness
 
-Updated: 2026-08-24 (Asia/Jerusalem)
+Updated: 2026-08-25 (Asia/Jerusalem)
 
 This record distinguishes the verified local beta from native distribution readiness. It does not
 claim app-store, production, or human-learning validation.
 
 ## Candidate identity
 
-| Field                          | Value                                                                                  |
-| ------------------------------ | -------------------------------------------------------------------------------------- |
-| Product version                | `0.1.0`                                                                                |
-| Content version                | `2026.08-beta.1`                                                                       |
-| Content schema                 | `1`                                                                                    |
-| Guided-session schema          | `2`                                                                                    |
-| Persistence schema             | Web payload `5`; native SQLite migrations `4`                                          |
-| Historical-data schema         | `1`                                                                                    |
-| Paper-execution schema/policy  | `1`; `paper-execution-policy-v1`; `paper-cost-model-v1`                                |
-| Branch                         | `codex/paper-execution-foundation`                                                     |
-| Milestone 3 implementation tip | `37ebb67`; final documentation is committed separately                                 |
-| Foundation commit              | `f394380`                                                                              |
-| Catalog commit                 | `1e194e0`                                                                              |
-| Mobile commit                  | `f928497`                                                                              |
-| Journey-evidence commit        | `3bc11d4`                                                                              |
-| Integrity-hardening commit     | `dc992bd`                                                                              |
-| Source PDF SHA-256             | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
-| Verified runtime               | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
-| Bundle-verified targets        | Expo iOS and Android Hermes bundles                                                    |
-| Decision                       | **GO for the local web beta; NO-GO for native distribution**                           |
+| Field                                          | Value                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Product version                                | `0.1.0`                                                                                |
+| Content version                                | `2026.08-beta.1`                                                                       |
+| Content schema                                 | `1`                                                                                    |
+| Guided-session schema                          | `2`                                                                                    |
+| Persistence schema                             | Web/native payload `6`; native SQLite migrations `5`                                   |
+| Historical-data schema                         | `1`                                                                                    |
+| Paper-execution schema/policy                  | `1`; `paper-execution-policy-v1`; `paper-cost-model-v1`                                |
+| Position-management schema/policy              | `1`; `position-management-policy-v1`; automatic trailing disabled                      |
+| Branch                                         | `codex/position-management-journal`                                                    |
+| Milestone 6 implementation/evidence checkpoint | `7cb8dd2`; documentation commit and final clean HEAD are reported in the handoff       |
+| Milestone 3 implementation tip                 | `37ebb67`; final documentation is committed separately                                 |
+| Foundation commit                              | `f394380`                                                                              |
+| Catalog commit                                 | `1e194e0`                                                                              |
+| Mobile commit                                  | `f928497`                                                                              |
+| Journey-evidence commit                        | `3bc11d4`                                                                              |
+| Integrity-hardening commit                     | `dc992bd`                                                                              |
+| Source PDF SHA-256                             | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
+| Previously verified runtime                    | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
+| Bundle-verified targets                        | Expo iOS and Android Hermes bundles                                                    |
+| Decision                                       | **GO for the local web beta; NO-GO for native distribution**                           |
 
 ## Verified product scope
 
@@ -64,6 +66,13 @@ claim app-store, production, or human-learning validation.
 - Milestone 4 defines a narrow local paper-execution simulation over an exact finalized historical
   analysis. It has one plan/order/position, deterministic events, explicit gap/cost/ambiguity
   assumptions and process-first debrief; it is not broker execution or a credited assessment.
+- Milestone 5 provides nine synthetic internal scenario candidates, an empty truthful ordinary
+  learner library, fail-closed seven-scope review and a developer-only QA surface. No candidate is
+  human-approved or published.
+- Milestone 6 provides three exact internal management variants over open paper handoffs. The pure
+  aggregate supports N/N+1 full/partial exits, scale-in and manual stop/target replacements,
+  explicit ambiguity, frozen-1R integer/FIFO accounting and an append-only journal. Automatic
+  trailing, ordinary learning credit and real execution remain absent.
 - Static pages are generated for every unit and lesson so supported web deep links survive refresh.
 - No authentication, cloud sync, analytics, live-market requests, brokerage connection, production
   service, or API key is required by the core journey.
@@ -550,3 +559,73 @@ and responsible human review. The ordinary scenario learner library remains empt
 course credit remains disabled. Public scenario publication and native distribution remain
 **NO-GO** until external human approval, publication licensing, full native iOS/Android lifecycle,
 VoiceOver, TalkBack, largest OS text, standalone build and physical-device gates are recorded.
+
+## Position Management and Trade Journal Milestone 6 addendum
+
+Milestone 6 starts from the completed Milestone 5 checkpoint and remains an internal, synthetic,
+no-credit engineering foundation. It does not publish a scenario, route real orders, consume
+live/delayed market data, connect a brokerage, recommend an action or validate a trading strategy.
+
+### Implemented boundary
+
+- Pure schema-1 management aggregate and `position-management-policy-v1`, bound to one exact open
+  paper handoff and scenario-pinned permission/rubric.
+- Cutoff N actions eligible exactly on N+1; replacement-before-opening-threshold order; explicit
+  voluntary/opening and stop/target ambiguity; completed-open rather than forced liquidation.
+- Full/partial voluntary exits, scale-in, manual protective-stop replacement and manual target
+  replacement. Automatic trailing is intentionally deferred.
+- Frozen original 1R; safe-integer minor/tick/quantity accounting; immutable lots and FIFO realized
+  slices; separate realized P&L, commissions and modeled execution costs.
+- Append-only observations, automatic action rationales and reference-only corrections. Process
+  rubric and P&L/future-outcome scoring remain separate.
+- Three internal management variants derived from exact Milestone 5 identities, with expected action
+  cases/snapshots, strict parsing, material checksums, no course credit and seven open human review
+  scopes. Original no-trade, unfilled and unauthorized scenarios fail closed.
+- Persistence payload schema 6 plus SQLite migration 5,
+  `create_position_management_and_journal`, checksum
+  `sha256:ddfdc6589ba3ea48862156293c60bb904a3a781fd4c3a73400a193fd1d25eb8a`. Repository and SQLite
+  enforce exact ancestry, one logical handoff, revision/prefix integrity, terminal immutability,
+  append-only journal mirrors and explicit quarantine.
+- Hebrew-first mobile management, risk-preview, pending-action, journal, timeline, summary and
+  debrief surfaces consume pure cutoff-safe projections. They do not recalculate authority,
+  accounting or assessment.
+
+### Source and mechanics boundary
+
+Reviewed doctrine is pinned to physical PDF pages 51, 54, 59 and 62–79, corresponding to printed
+pages 38, 41, 46 and 49–66, with relevant Unit 8 risk material and `u10-capstone-e05`. It supports
+planning, invalidation, risk, evidence-based manual management and process review. N/N+1 timing,
+replacement precedence, adverse fills, integer rounding, FIFO allocation, checksums, SQLite layout
+and ambiguity states are neutral simulator mechanics, not claims sourced from the book.
+
+### Final Milestone 6 evidence
+
+| Gate                                                                                  | Milestone 6 result                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Branch and implementation/evidence checkpoint                                         | `codex/position-management-journal` at `7cb8dd2`; the documentation commit and final clean HEAD are reported in the handoff.                                                                                                                                                   |
+| Baseline and final `pnpm check`                                                       | **PASS.** Baseline 51 suites/546 tests. Final 57 suites/623 tests in 83.57 seconds, with formatting, lint, typecheck and content validation green. Two known non-failing overlapping React `act()` warnings remain.                                                            |
+| Historical/scenario strict validation and reports                                     | **PASS.** Historical 96 candles/one gap/five blockers/checksum `sha256:07907f…a144e`. Nine candidates, zero structural errors, 97 blockers; three management variants/13 reducer cases/39 more blockers; strict envelopes pass. Report/preview repeat at 47,380/160,582 bytes. |
+| Production and developer-QA browser journeys                                          | **PASS.** Production 16/16 in 38.43 seconds; full QA 40/40 in 11.0 minutes; four workers, zero retries. Focused management portion 24/24 across phone/tablet.                                                                                                                  |
+| Web export                                                                            | **PASS.** 56 routes, 1,444 server/1,473 browser modules, 78 files, 5,256,875 bytes.                                                                                                                                                                                            |
+| iOS export                                                                            | **PASS AS BUNDLE EVIDENCE.** 1,905 modules, 23 assets, 25 files, 5,699,979 bytes.                                                                                                                                                                                              |
+| Android export                                                                        | **PASS AS BUNDLE EVIDENCE.** 1,994 modules, 27 assets, 29 files, 6,873,653 bytes.                                                                                                                                                                                              |
+| Focused management domain/content/persistence/UI tests                                | **PASS.** 77 additional deterministic assertions are included in the final package totals; the focused browser matrix adds 24 journeys.                                                                                                                                        |
+| Original-resolution management screenshots                                            | **PASS FOR BROWSER VISUAL SCOPE.** 13 inspected files: twelve `390×844` phone captures and one `1024×768` tablet capture; light/dark, large in-app text/reduced motion, overlays, journal, ambiguity and debrief are covered.                                                  |
+| Native iOS management lifecycle                                                       | **PARTIAL PASS.** Expo Go on iPhone 17 Pro/iOS 26.5 loaded the exact QA route, submitted a pending partial exit, restored it after termination/relaunch and executed one N+1 fill. The terminal debrief was not reached.                                                       |
+| Native payload schema 6 / migration 5 / SQLite integrity                              | **PASS.** `integrity_check=ok`; migrations 1–5 and checksums exact; direct migration readback required no further migration; zero management quarantines.                                                                                                                      |
+| Native no-credit/no-duplicate readback                                                | **PASS FOR THE BOUNDED RUN.** Revision 3, open quantity 9, one fill/four events, one management row/one journal row, `learning_credit=none`; existing 21 attempts/366 XP unchanged by management.                                                                              |
+| Android runtime / TalkBack                                                            | **BLOCKED LOCALLY.** No SDK, emulator or device; export is not runtime evidence.                                                                                                                                                                                               |
+| VoiceOver / largest OS text / increased contrast                                      | **NOT RUN — OPEN GATE.**                                                                                                                                                                                                                                                       |
+| Physical-device and signed standalone builds                                          | **NOT RUN — OPEN GATE.** The paired iPhone did not have ChartPath/Expo installed.                                                                                                                                                                                              |
+| External human source/rubric/execution/accessibility/Hebrew/safety/publication review | **BLOCKED.** No authenticated approval records; all seven management review scopes remain open.                                                                                                                                                                                |
+
+The practical M5 activation blocker was cleared for the bounded M6 run by using the host LAN Metro
+address and the exact simulator UDID. The evidence does not prove one exclusive cause for the old
+Code 60 failure, and it does not convert the incomplete native/assistive-technology matrix into a
+distribution pass.
+
+### Milestone 6 release decision
+
+Milestone 6 is complete as a local internal/no-credit engineering checkpoint. Ordinary management
+publication, course credit and native distribution remain **NO-GO** until every applicable native,
+assistive-technology, physical-device and human-review gate passes.

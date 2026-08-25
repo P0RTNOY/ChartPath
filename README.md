@@ -12,6 +12,14 @@ candidate has passed the required external human review and publication gates. â
 first-class completed analysis: it produces process reflection without creating an order or being
 regraded from later price action.
 
+Milestone 6 adds an internal, no-credit position-management foundation over an exact open paper
+handoff: cutoff-N decisions eligible at N+1, partial/full exits, scale-in, manual stop/target
+replacement, frozen-original-1R integer accounting, append-only journal evidence and explicit
+ambiguity. Automatic trailing remains deferred. Final Milestone 6 E2E, export, visual and native
+evidence is recorded in the release documents. The bounded iOS simulator lifecycle passed through
+pending-action cold restore and its single N+1 fill; broader native distribution remains a release
+**NO-GO**.
+
 ## Workspace
 
 - `apps/mobile` â€” Expo Router application for iOS, Android, and the supported web verification path.
@@ -41,6 +49,8 @@ The exact paper-fill, cost, gap, ambiguity, persistence, no-credit and accessibi
 documented in `docs/PAPER_EXECUTION_POLICY.md`.
 Scenario fields and deterministic generation are documented in `docs/SCENARIO_AUTHORING.md`; the
 fail-closed review lifecycle is in `docs/SCENARIO_PUBLICATION_POLICY.md`.
+Position-management timing, risk and accounting are in `docs/POSITION_MANAGEMENT_POLICY.md`; journal
+authorship, correction, privacy and process-grading rules are in `docs/TRADE_JOURNAL_POLICY.md`.
 
 ## Verification
 
@@ -50,8 +60,10 @@ pnpm historical:validate
 pnpm scenarios:validate
 pnpm scenarios:report
 pnpm scenarios:preview
+pnpm screenshots:management
 pnpm build
 pnpm test:e2e:web
+pnpm test:e2e:qa:web
 pnpm --filter @chartpath/mobile export:web
 ```
 
@@ -59,9 +71,10 @@ The production web export is verified end to end at phone and tablet viewports. 
 Android Hermes bundles also export successfully. An iOS Expo Go simulator journey verifies native
 onboarding, lesson completion, device SQLite, and force-quit/reopen persistence; Android runtime,
 standalone/physical-device, and screen-reader runs remain explicit gates before any distribution.
-Those earlier native checks do not establish the new curated-scenario lifecycle. The exact pending
-scenario-native, VoiceOver, TalkBack, largest-OS-text and physical-device matrix is recorded in
-`docs/NATIVE_ACCESSIBILITY_READINESS.md`.
+The Milestone 6 iOS simulator run establishes an internal management launch, native SQLite recovery,
+pending-action cold restore and one deterministic N+1 partial fill. It does not establish a terminal
+debrief, Android, VoiceOver, TalkBack, largest-OS-text, signed-build or physical-device readiness.
+The exact matrix is recorded in `docs/NATIVE_ACCESSIBILITY_READINESS.md`.
 Reproducible screenshot evidence is under `docs/screenshots/`.
 
 ## Educational safety
@@ -75,3 +88,8 @@ the generated development fixture awards no course credit.
 Internal scenario QA is visibly labelled and developer-gated. Its synthetic candidates, answer-key
 material, expected fills and publication blockers are not ordinary learner content and cannot affect
 mastery, review, lesson completion, XP or streaks.
+
+Management QA is equally internal and fail-closed. Simulated P&L never changes the deterministic
+process assessment, and journal text stays local under the guest-first data model. No management
+variant has passed the external human source, rubric, execution, accessibility, Hebrew,
+financial-safety or publication gates.

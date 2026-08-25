@@ -128,3 +128,40 @@ bounded native attempt. Original-resolution inspection shows only a black Expo G
 the iOS status bar. The correct M5 deep link was routed to Expo Go, but native activation timed out
 before Metro received a ChartPath bundle request. This file documents the blocker; it is not a
 ChartPath visual, RTL, lifecycle, or accessibility pass.
+
+## Milestone 6 position-management set
+
+The capture script declares the following named management views under
+`pnpm screenshots:management`:
+
+- `position-management-open-dashboard-light-phone.png`;
+- `position-management-action-selector-light-phone.png`;
+- `position-management-partial-confirmation-light-phone.png`;
+- `position-management-scale-in-risk-light-phone.png`;
+- `position-management-stop-replacement-light-phone.png`;
+- `position-management-pending-action-light-phone.png`;
+- `position-management-journal-timeline-light-phone.png`;
+- `position-management-chart-overlays-light-phone.png`;
+- `position-management-process-debrief-light-phone.png`;
+- `position-management-ambiguity-light-phone.png`;
+- `position-management-dark-phone.png`;
+- `position-management-large-reduced-phone.png`; and
+- `position-management-light-tablet.png`.
+
+The script emitted all 13 named files. Twelve are original `390×844` phone captures and
+`position-management-light-tablet.png` is `1024×768`. Each file was inspected at original
+resolution after the complete browser run.
+
+Inspection passed for Hebrew RTL hierarchy; explicit LTR prices, quantities, risk multiples and
+dates; cutoff N/N+1 wording; initial/current quantity and frozen original 1R; partial, scale-in and
+manual-replacement distinctions; hard/soft risk states; pending/cancel controls; append-only journal
+order; chart overlays; explicit ambiguity; process/P&L separation; non-color cues; clipping and
+wrapping; dark appearance; largest in-app text with reduced motion; and phone/tablet composition.
+No error overlay, hidden required control, clipped Hebrew, bottom-navigation obstruction or invented
+future evidence was observed.
+
+Browser captures cannot establish native SQLite recovery, OS largest-text layout, VoiceOver or
+TalkBack focus/speech, physical-device ergonomics or signed-build behavior. Separate temporary iOS
+simulator captures of the open management screen, pending state before/after relaunch and post-fill
+timeline were inspected during the bounded native lifecycle; they are not a full native visual or
+accessibility matrix and are not committed as release screenshots.
