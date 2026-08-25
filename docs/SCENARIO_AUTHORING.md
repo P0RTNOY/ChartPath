@@ -1,7 +1,7 @@
 # Scenario authoring and deterministic generation
 
-**Status:** Milestone 5 internal candidate contract implemented; final milestone verification is
-still in progress and this is not a publication claim
+**Status:** Milestone 5 internal candidate contract implemented and repository verification
+complete; this is not a publication or native-distribution claim
 
 **Authoring schema:** `1`
 
