@@ -21,6 +21,8 @@ import {
   resolvePaperExecutionSession,
 } from './paper-execution';
 
+const QA_HYPOTHETICAL = { accessMode: 'qa-hypothetical-mechanics' } as const;
+
 type Mutable<T> = T extends readonly (infer Item)[]
   ? Mutable<Item>[]
   : T extends object
@@ -134,7 +136,11 @@ function validPlan(): TradePlanInput {
 describe('paper execution source resolution', () => {
   it('pins the exact finalized analysis, dataset, policy permissions, and boundary', () => {
     const analysis = finalizedAnalysis();
-    const resolved = resolvePaperExecutionAnalysisSession(analysis);
+    const resolved = resolvePaperExecutionAnalysisSession(
+      analysis,
+      historicalContentRegistry,
+      QA_HYPOTHETICAL,
+    );
     expect(resolved.status).toBe('ready');
     if (resolved.status !== 'ready') return;
     expect(resolved.source).toEqual({
@@ -164,6 +170,29 @@ describe('paper execution source resolution', () => {
       targetMatchesAnalysis: false,
       requiredReasoningBypassed: true,
     });
+    expect(resolved).toMatchObject({
+      mode: 'hypothetical-mechanics',
+      application: {
+        alignment: 'matched',
+        nextAction: 'no-trade-review',
+        learner: { kind: 'no-trade', disposition: 'no-trade' },
+      },
+    });
+  });
+
+  it('keeps hypothetical mechanics unavailable to the ordinary no-trade path', () => {
+    expect(resolvePaperExecutionAnalysisSession(finalizedAnalysis()).status).toBe(
+      'hypothetical-mechanics-restricted',
+    );
+  });
+
+  it('fails closed when the proposed paper direction is not authorized', () => {
+    expect(
+      resolvePaperExecutionAnalysisSession(finalizedAnalysis(), historicalContentRegistry, {
+        ...QA_HYPOTHETICAL,
+        proposedDirection: 'long',
+      }).status,
+    ).toBe('execution-direction-mismatch');
   });
 
   it('fails closed before finalization and when canonical data is modified', () => {
@@ -208,7 +237,11 @@ describe('paper execution source resolution', () => {
 
   it('refuses to reattach a persisted execution to a different analysis identity', () => {
     const analysis = finalizedAnalysis();
-    const resolved = resolvePaperExecutionAnalysisSession(analysis);
+    const resolved = resolvePaperExecutionAnalysisSession(
+      analysis,
+      historicalContentRegistry,
+      QA_HYPOTHETICAL,
+    );
     if (resolved.status !== 'ready') throw new Error(resolved.message);
     const execution = createPaperExecutionSession({
       sessionId: 'execution-1',
@@ -219,7 +252,17 @@ describe('paper execution source resolution', () => {
       plan: validPlan(),
       createdAt: '2026-08-24T08:03:00.000Z',
     });
-    expect(resolvePaperExecutionSession(execution, [analysis]).status).toBe('ready');
+    expect(
+      resolvePaperExecutionSession(
+        execution,
+        [analysis],
+        historicalContentRegistry,
+        QA_HYPOTHETICAL,
+      ).status,
+    ).toBe('ready');
+    expect(resolvePaperExecutionSession(execution, [analysis]).status).toBe(
+      'hypothetical-mechanics-restricted',
+    );
     expect(
       resolvePaperExecutionSession(
         {
@@ -227,8 +270,13 @@ describe('paper execution source resolution', () => {
           source: { ...execution.source, scenarioVersion: 'different-version' },
         },
         [analysis],
+        historicalContentRegistry,
+        QA_HYPOTHETICAL,
       ).status,
     ).toBe('execution-identity-mismatch');
-    expect(resolvePaperExecutionSession(execution, []).status).toBe('execution-identity-mismatch');
+    expect(
+      resolvePaperExecutionSession(execution, [], historicalContentRegistry, QA_HYPOTHETICAL)
+        .status,
+    ).toBe('execution-identity-mismatch');
   });
 });

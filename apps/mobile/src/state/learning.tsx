@@ -13,7 +13,7 @@ import { generateChart } from '@chartpath/chart-engine';
 import {
   contentVersion,
   exercises,
-  historicalContentRegistry,
+  internalHistoricalContentRegistry,
   lessons,
   type HistoricalContentRegistry,
 } from '@chartpath/content';
@@ -62,6 +62,7 @@ import {
 import {
   resolvePaperExecutionAnalysisSession,
   resolvePaperExecutionSession,
+  type PaperExecutionAccessMode,
   type PaperExecutionReady,
 } from '@/data/paper-execution';
 
@@ -83,7 +84,12 @@ export interface AttemptSubmission {
 }
 
 export type AnalysisSessionRequest =
-  { readonly kind: 'synthetic' } | { readonly kind: 'historical'; readonly scenarioId: string };
+  | { readonly kind: 'synthetic' }
+  | {
+      readonly kind: 'historical';
+      readonly scenarioId: string;
+      readonly accessMode?: 'ordinary' | 'qa-internal';
+    };
 
 export interface LearningContextValue {
   readonly status: 'loading' | 'ready' | 'error';
@@ -102,23 +108,31 @@ export interface LearningContextValue {
   readonly createOrResumePaperExecutionSession: (
     analysisSessionId: string,
     plan: TradePlanInput,
+    accessMode?: PaperExecutionAccessMode,
   ) => Promise<PaperExecutionSession>;
   readonly savePaperExecutionPlan: (
     sessionId: string,
     plan: TradePlanInput,
+    accessMode?: PaperExecutionAccessMode,
   ) => Promise<PaperExecutionSession>;
   readonly submitPaperExecutionSession: (
     sessionId: string,
     confirmationId: string,
+    accessMode?: PaperExecutionAccessMode,
   ) => Promise<PaperExecutionSession>;
   readonly advancePaperExecutionSession: (
     sessionId: string,
     candleCount?: number,
+    accessMode?: PaperExecutionAccessMode,
   ) => Promise<PaperExecutionSession>;
-  readonly completePaperExecutionReplay: (sessionId: string) => Promise<PaperExecutionSession>;
+  readonly completePaperExecutionReplay: (
+    sessionId: string,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PaperExecutionSession>;
   readonly cancelPaperExecutionOrder: (
     sessionId: string,
     confirmationId: string,
+    accessMode?: PaperExecutionAccessMode,
   ) => Promise<PaperExecutionSession>;
   readonly abandonPaperExecutionSession: (
     sessionId: string,
@@ -293,7 +307,7 @@ function allocateHistoricalGuidedAnalysisSession(
     attemptId: `analysis-attempt-${token}`,
     finalizationIdempotencyKey: `analysis-finalization-${token}`,
     exerciseId: educationalExercise.id,
-    contentVersionId: contentVersion.id,
+    contentVersionId: educationalExercise.contentVersionId,
     exerciseSchemaVersion: educationalExercise.schemaVersion,
     chart: resolved.chartIdentity,
     createdAt,
@@ -393,7 +407,7 @@ export function LearningProvider({
   historicalRegistryOverride,
 }: LearningProviderProps) {
   const repositoryRef = useRef<LearningRepository | null>(repositoryOverride ?? null);
-  const historicalRegistry = historicalRegistryOverride ?? historicalContentRegistry;
+  const historicalRegistry = historicalRegistryOverride ?? internalHistoricalContentRegistry;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<PersistenceSnapshot | null>(null);
@@ -511,6 +525,15 @@ export function LearningProvider({
         } else {
           const resolved = resolveHistoricalReplayScenario(request.scenarioId, historicalRegistry);
           if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
+          const internalOnly =
+            resolved.content.learningCredit === 'none' ||
+            resolved.content.scenario.publicationStatus !== 'published' ||
+            resolved.content.scenario.editorial.status !== 'published';
+          if (internalOnly && (request.accessMode !== 'qa-internal' || !__DEV__)) {
+            throw new Error(
+              'התרחיש אינו זמין במסלול הלמידה הרגיל (internal-scenario-restricted). יש לפתוח אותו רק מגבול QA מפורש בגרסת פיתוח.',
+            );
+          }
           candidate = allocateHistoricalGuidedAnalysisSession(createdAt, resolved);
         }
         const created = await repository().createOrResumeAnalysisSession(candidate);
@@ -612,9 +635,12 @@ export function LearningProvider({
           const matchingLesson = lessons.find((candidate) =>
             candidate.exerciseIds.includes(exercise.id),
           );
-          if (!matchingLesson || matchingLesson.editorialStatus === 'draft')
+          if (
+            (!matchingLesson || matchingLesson.editorialStatus === 'draft') &&
+            resolved.content.learningCredit === 'course'
+          )
             throw new Error('שיעור המקור הבדוק של התרחיש ההיסטורי אינו זמין.');
-          lesson = matchingLesson;
+          lesson = matchingLesson ?? lessons.find(({ id }) => id === GUIDED_ANALYSIS_LESSON_ID)!;
           chartEvidence = resolved.chartEvidence;
         } else {
           const synthetic = syntheticGuidedAnalysisContent();
@@ -641,7 +667,7 @@ export function LearningProvider({
         }
         if (
           session.exerciseId !== exercise.id ||
-          session.contentVersionId !== contentVersion.id ||
+          session.contentVersionId !== exercise.contentVersionId ||
           session.exerciseSchemaVersion !== exercise.schemaVersion
         )
           throw new Error('טיוטת הניתוח אינה תואמת לתוכן הבדוק בגרסה זו.');
@@ -740,6 +766,8 @@ export function LearningProvider({
   const loadResolvedPaperExecution = useCallback(
     async (
       sessionId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+      proposedDirection?: TradePlanInput['direction'],
     ): Promise<{
       readonly session: PaperExecutionSession;
       readonly resolved: PaperExecutionReady;
@@ -754,6 +782,10 @@ export function LearningProvider({
         session,
         loaded.analysisSessions,
         historicalRegistry,
+        {
+          accessMode,
+          ...(proposedDirection === undefined ? {} : { proposedDirection }),
+        },
       );
       if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
       return { session, resolved, loaded };
@@ -762,14 +794,21 @@ export function LearningProvider({
   );
 
   const createOrResumePaperExecutionSession = useCallback(
-    async (analysisSessionId: string, plan: TradePlanInput): Promise<PaperExecutionSession> => {
+    async (
+      analysisSessionId: string,
+      plan: TradePlanInput,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
         const loaded = await repository().load();
         const analysis = loaded.analysisSessions.find(
           ({ sessionId }) => sessionId === analysisSessionId,
         );
         if (!analysis) throw new AnalysisSessionNotFoundError(analysisSessionId);
-        const resolved = resolvePaperExecutionAnalysisSession(analysis, historicalRegistry);
+        const resolved = resolvePaperExecutionAnalysisSession(analysis, historicalRegistry, {
+          accessMode,
+          proposedDirection: plan.direction,
+        });
         if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
         const createdAt = new Date().toISOString();
         const token = allocationToken(createdAt);
@@ -792,6 +831,7 @@ export function LearningProvider({
           created.session,
           created.snapshot.analysisSessions,
           historicalRegistry,
+          { accessMode },
         );
         if (rebound.status !== 'ready') throw unavailablePaperExecutionError(rebound);
         setSnapshot(created.snapshot);
@@ -804,9 +844,17 @@ export function LearningProvider({
   );
 
   const savePaperExecutionPlan = useCallback(
-    async (sessionId: string, plan: TradePlanInput): Promise<PaperExecutionSession> => {
+    async (
+      sessionId: string,
+      plan: TradePlanInput,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
-        const { session, resolved } = await loadResolvedPaperExecution(sessionId);
+        const { session, resolved } = await loadResolvedPaperExecution(
+          sessionId,
+          accessMode,
+          plan.direction,
+        );
         const updatedAt = new Date().toISOString();
         const revised = reducePaperExecutionSession(session, {
           type: 'replace-plan',
@@ -829,9 +877,13 @@ export function LearningProvider({
   );
 
   const submitPaperExecutionSession = useCallback(
-    async (sessionId: string, confirmationId: string): Promise<PaperExecutionSession> => {
+    async (
+      sessionId: string,
+      confirmationId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
-        const { session, loaded } = await loadResolvedPaperExecution(sessionId);
+        const { session, loaded } = await loadResolvedPaperExecution(sessionId, accessMode);
         if (
           session.events.some(
             (event) => event.type === 'order-submitted' && event.confirmationId === confirmationId,
@@ -857,11 +909,18 @@ export function LearningProvider({
   );
 
   const advancePaperExecutionSession = useCallback(
-    async (sessionId: string, candleCount = 1): Promise<PaperExecutionSession> => {
+    async (
+      sessionId: string,
+      candleCount = 1,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
         if (!Number.isInteger(candleCount) || candleCount <= 0)
           throw new RangeError('מספר הנרות להתקדמות חייב להיות מספר שלם וחיובי.');
-        const { session, resolved, loaded } = await loadResolvedPaperExecution(sessionId);
+        const { session, resolved, loaded } = await loadResolvedPaperExecution(
+          sessionId,
+          accessMode,
+        );
         if (!['working', 'open'].includes(session.status)) {
           setSnapshot(loaded);
           return session;
@@ -909,9 +968,15 @@ export function LearningProvider({
   );
 
   const completePaperExecutionReplay = useCallback(
-    async (sessionId: string): Promise<PaperExecutionSession> => {
+    async (
+      sessionId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
-        const { session, resolved, loaded } = await loadResolvedPaperExecution(sessionId);
+        const { session, resolved, loaded } = await loadResolvedPaperExecution(
+          sessionId,
+          accessMode,
+        );
         if (!['working', 'open'].includes(session.status)) {
           setSnapshot(loaded);
           return session;
@@ -953,9 +1018,13 @@ export function LearningProvider({
   );
 
   const cancelPaperExecutionOrder = useCallback(
-    async (sessionId: string, confirmationId: string): Promise<PaperExecutionSession> => {
+    async (
+      sessionId: string,
+      confirmationId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PaperExecutionSession> => {
       try {
-        const { session, loaded } = await loadResolvedPaperExecution(sessionId);
+        const { session, loaded } = await loadResolvedPaperExecution(sessionId, accessMode);
         if (
           session.events.some(
             (event) => event.type === 'order-cancelled' && event.confirmationId === confirmationId,

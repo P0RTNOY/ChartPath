@@ -129,11 +129,23 @@ const ready = {
   status: 'ready' as const,
   content: {
     dataset: { manifest: { displaySymbol: 'Generated fixture 001' } },
+    scenario: {
+      educationalSourceReferences: [
+        { sourceId: 'ta-he-v2', pageStart: 74, pageEnd: 75, section: 'מקרה ג׳' },
+      ],
+    },
   },
   source,
   candles,
   executionBoundary: { afterDecisionCandleIndex: 2, lastCandleIndex: 5 },
   learnerDisclosureHebrew: 'זהו מודל לימודי דטרמיניסטי בלבד ואינו ברוקר.',
+  mode: 'hypothetical-mechanics' as const,
+  application: {
+    expected: { kind: 'no-trade' as const, disposition: 'no-trade' as const },
+    learner: { kind: 'no-trade' as const, disposition: 'no-trade' as const },
+    alignment: 'matched' as const,
+    nextAction: 'no-trade-review' as const,
+  },
   analysisProcessEvidence: {
     analysisDecision: 'no-trade' as const,
     entryMatchesAnalysis: true,
@@ -227,12 +239,16 @@ describe('PaperExecutionScreen', () => {
     const api = mockLearning(draft());
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <PaperExecutionScreen analysisSessionId="analysis-final" />
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
       </ChartPathThemeProvider>,
     );
 
     expect(screen.getByTestId('paper-execution-ticket')).toBeTruthy();
     expect(screen.getByText('הניתוח קבע: אין עסקה')).toBeTruthy();
+    expect(screen.getByText(/מצב.*מכניקה היפותטית/)).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'הוראת שוק', selected: true })).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'הוראת לימיט' })).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'הוראת סטופ' })).toBeTruthy();
@@ -249,13 +265,21 @@ describe('PaperExecutionScreen', () => {
     await fireEvent.press(screen.getByTestId('paper-submit-order'));
     await waitFor(() => expect(api.savePaperExecutionPlan).toHaveBeenCalledTimes(1));
     expect(api.submitPaperExecutionSession).toHaveBeenCalledTimes(1);
+    expect(api.submitPaperExecutionSession).toHaveBeenCalledWith(
+      'paper-session',
+      expect.any(String),
+      'qa-hypothetical-mechanics',
+    );
   });
 
   it('renders only the current candle prefix and exposes a non-gesture next-candle action', async () => {
     const api = mockLearning(submitted());
     const screen = await render(
       <ChartPathThemeProvider mode="dark" reducedMotion textScale={1.3}>
-        <PaperExecutionScreen analysisSessionId="analysis-final" />
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
       </ChartPathThemeProvider>,
     );
 
@@ -264,7 +288,11 @@ describe('PaperExecutionScreen', () => {
     expect(screen.getAllByText('ההוראה ממתינה לביצוע').length).toBeGreaterThan(0);
     await fireEvent.press(screen.getByTestId('paper-advance-one'));
     await waitFor(() =>
-      expect(api.advancePaperExecutionSession).toHaveBeenCalledWith('paper-session', 1),
+      expect(api.advancePaperExecutionSession).toHaveBeenCalledWith(
+        'paper-session',
+        1,
+        'qa-hypothetical-mechanics',
+      ),
     );
   });
 
@@ -272,7 +300,10 @@ describe('PaperExecutionScreen', () => {
     const api = mockLearning(submitted());
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <PaperExecutionScreen analysisSessionId="analysis-final" />
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
       </ChartPathThemeProvider>,
     );
 
@@ -295,7 +326,10 @@ describe('PaperExecutionScreen', () => {
     mockLearning(execution);
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <PaperExecutionScreen analysisSessionId="analysis-final" />
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
       </ChartPathThemeProvider>,
     );
 
@@ -314,7 +348,10 @@ describe('PaperExecutionScreen', () => {
     });
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <PaperExecutionScreen analysisSessionId="analysis-final" />
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
       </ChartPathThemeProvider>,
     );
 

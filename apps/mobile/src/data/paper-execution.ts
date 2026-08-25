@@ -1,5 +1,5 @@
 import {
-  historicalContentRegistry,
+  internalHistoricalContentRegistry,
   type HistoricalContentRegistry,
   type ResolvedHistoricalContent,
 } from '@chartpath/content';
@@ -7,9 +7,12 @@ import {
   COST_MODEL_VERSION,
   EXECUTION_POLICY_VERSION,
   assertCompatibleExecutionIdentity,
+  resolveAnalysisApplication,
+  type AnalysisTradeDirection,
   type HistoricalExecutionIdentity,
   type OhlcvCandle,
   type PaperExecutionSession,
+  type ResolvedAnalysisApplication,
   type TradePlanProcessEvidence,
 } from '@chartpath/domain';
 
@@ -21,10 +24,40 @@ import {
 export type PaperExecutionResolutionStatus =
   | HistoricalSessionResolutionStatus
   | 'analysis-not-finalized'
+  | 'analysis-application-mismatch'
+  | 'analysis-application-unresolved'
   | 'execution-not-enabled'
+  | 'hypothetical-mechanics-restricted'
   | 'unsupported-execution-policy'
   | 'execution-boundary-mismatch'
+  | 'execution-direction-mismatch'
   | 'execution-identity-mismatch';
+
+export type PaperExecutionAccessMode = 'ordinary' | 'qa-hypothetical-mechanics';
+
+export interface PaperExecutionResolutionOptions {
+  /** Hypothetical mechanics are deliberately inaccessible to ordinary learner flows. */
+  readonly accessMode?: PaperExecutionAccessMode;
+  /** A proposed plan direction must agree with the completed analysis before allocation. */
+  readonly proposedDirection?: AnalysisTradeDirection;
+}
+
+export interface HistoricalAnalysisApplicationReady {
+  readonly status: 'ready';
+  readonly content: ResolvedHistoricalContent;
+  readonly application: ResolvedAnalysisApplication;
+}
+
+export type HistoricalAnalysisApplicationResolution =
+  | HistoricalAnalysisApplicationReady
+  | {
+      readonly status:
+        | Exclude<HistoricalSessionResolutionStatus, 'ready'>
+        | 'analysis-not-finalized'
+        | 'analysis-application-mismatch'
+        | 'analysis-application-unresolved';
+      readonly message: string;
+    };
 
 export interface PaperExecutionReady {
   readonly status: 'ready';
@@ -37,6 +70,8 @@ export interface PaperExecutionReady {
     readonly lastCandleIndex: number;
   };
   readonly learnerDisclosureHebrew: string;
+  readonly mode: 'aligned' | 'hypothetical-mechanics';
+  readonly application: ResolvedAnalysisApplication;
   readonly analysisProcessEvidence: TradePlanProcessEvidence;
 }
 
@@ -47,30 +82,27 @@ export type PaperExecutionResolution =
       readonly message: string;
     };
 
-function unavailable(
-  status: Exclude<PaperExecutionResolutionStatus, 'ready'>,
+function unavailable<Status extends Exclude<PaperExecutionResolutionStatus, 'ready'>>(
+  status: Status,
   message: string,
-): PaperExecutionResolution {
+): { readonly status: Status; readonly message: string } {
   return { status, message };
 }
 
 function analysisProcessEvidence(
   session: Parameters<typeof resolveHistoricalAnalysisSession>[0],
-  permittedDirections: HistoricalExecutionIdentity['permittedDirections'],
+  application: ResolvedAnalysisApplication,
 ): TradePlanProcessEvidence {
-  const management = session.steps.management.answer;
-  const recordedDecision = management?.kind === 'decision' ? management.decision : undefined;
+  const learner = application.learner;
   const analysisDecision =
-    recordedDecision === 'trade'
-      ? permittedDirections.length === 1
-        ? permittedDirections[0]
-        : 'insufficient-evidence'
-      : recordedDecision === 'reject'
-        ? 'no-trade'
-        : (recordedDecision ?? 'insufficient-evidence');
-  const analysisSupportsExecution =
-    (analysisDecision === 'long' || analysisDecision === 'short') &&
-    permittedDirections.includes(analysisDecision);
+    learner?.kind === 'trade'
+      ? learner.direction
+      : learner?.kind === 'no-trade'
+        ? learner.disposition === 'reject'
+          ? 'no-trade'
+          : learner.disposition
+        : 'insufficient-evidence';
+  const analysisSupportsExecution = learner?.kind === 'trade';
   return {
     analysisDecision,
     entryMatchesAnalysis: analysisSupportsExecution && session.steps.entry.result?.correct === true,
@@ -96,23 +128,65 @@ function domainCandles(content: ResolvedHistoricalContent): readonly OhlcvCandle
   }));
 }
 
+/** Resolves the finalized Guided answer against authored application metadata before any replay. */
+export function resolveHistoricalAnalysisApplication(
+  session: Parameters<typeof resolveHistoricalAnalysisSession>[0],
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+  proposedDirection?: AnalysisTradeDirection,
+): HistoricalAnalysisApplicationResolution {
+  if (session.status !== 'finalized' || session.finalizedAt === undefined) {
+    return unavailable(
+      'analysis-not-finalized',
+      'Application resolution requires an immutable finalized historical analysis.',
+    );
+  }
+  const historical = resolveHistoricalAnalysisSession(session, registry);
+  if (historical.status !== 'ready') return historical;
+  const management = session.steps.management.answer;
+  const learnerDecision = management?.kind === 'decision' ? management.decision : undefined;
+  const expected = historical.content.scenario.application.expectedDecision;
+  // Guided trade answers are scenario-directed. A concrete plan direction, when supplied, takes
+  // precedence and must match; no direction is inferred from candles or later market action.
+  const learnerTradeDirection =
+    proposedDirection ?? (expected.kind === 'trade' ? expected.direction : undefined);
+  const application = resolveAnalysisApplication({
+    expected,
+    learnerDecision,
+    ...(learnerTradeDirection === undefined ? {} : { learnerTradeDirection }),
+  });
+  if (application.alignment === 'unresolved') {
+    return unavailable(
+      'analysis-application-unresolved',
+      'The finalized analysis does not contain a resolvable application decision.',
+    );
+  }
+  if (application.alignment === 'mismatched') {
+    return unavailable(
+      'analysis-application-mismatch',
+      'The finalized analysis or proposed direction does not match the canonical application decision.',
+    );
+  }
+  return { status: 'ready', content: historical.content, application };
+}
+
 /**
  * Resolves a completed historical analysis into an execution identity. Every persisted field is
  * pinned from the verified registry; callers cannot supply or repair identity metadata.
  */
 export function resolvePaperExecutionAnalysisSession(
   session: Parameters<typeof resolveHistoricalAnalysisSession>[0],
-  registry: HistoricalContentRegistry = historicalContentRegistry,
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+  options: PaperExecutionResolutionOptions = {},
 ): PaperExecutionResolution {
-  if (session.status !== 'finalized' || session.finalizedAt === undefined) {
-    return unavailable(
-      'analysis-not-finalized',
-      'Paper execution requires an immutable finalized historical analysis.',
-    );
-  }
+  const applicationResolution = resolveHistoricalAnalysisApplication(
+    session,
+    registry,
+    options.proposedDirection,
+  );
+  if (applicationResolution.status !== 'ready') return applicationResolution;
   const historical = resolveHistoricalAnalysisSession(session, registry);
   if (historical.status !== 'ready') return historical;
-  const configuration = historical.content.scenario.paperExecution;
+  const configuration = applicationResolution.content.scenario.paperExecution;
   if (configuration?.enabled !== true) {
     return unavailable(
       'execution-not-enabled',
@@ -140,6 +214,26 @@ export function resolvePaperExecutionAnalysisSession(
     );
   }
 
+  const { application } = applicationResolution;
+  if (
+    options.proposedDirection !== undefined &&
+    !configuration.permittedDirections.includes(options.proposedDirection)
+  ) {
+    return unavailable(
+      'execution-direction-mismatch',
+      'The proposed paper direction is not permitted by the canonical scenario.',
+    );
+  }
+  if (
+    configuration.mode === 'hypothetical-mechanics' &&
+    (options.accessMode !== 'qa-hypothetical-mechanics' || !__DEV__)
+  ) {
+    return unavailable(
+      'hypothetical-mechanics-restricted',
+      'Hypothetical mechanics are available only inside the explicit development QA boundary.',
+    );
+  }
+
   return {
     status: 'ready',
     content: historical.content,
@@ -150,7 +244,7 @@ export function resolvePaperExecutionAnalysisSession(
       scenarioId: historical.chartIdentity.scenarioId,
       scenarioVersion: historical.chartIdentity.scenarioVersion,
       analysisSessionId: session.sessionId,
-      analysisFinalizedAt: session.finalizedAt,
+      analysisFinalizedAt: session.finalizedAt!,
       decisionCandleIndex: historical.chartIdentity.decisionCandleIndex,
       candleCount: historical.chartIdentity.candleCount,
       learningCredit: historical.chartIdentity.learningCredit,
@@ -160,7 +254,9 @@ export function resolvePaperExecutionAnalysisSession(
     candles: domainCandles(historical.content),
     executionBoundary: { ...configuration.executionBoundary },
     learnerDisclosureHebrew: configuration.learnerDisclosureHebrew,
-    analysisProcessEvidence: analysisProcessEvidence(session, configuration.permittedDirections),
+    mode: configuration.mode,
+    application,
+    analysisProcessEvidence: analysisProcessEvidence(session, application),
   };
 }
 
@@ -168,7 +264,8 @@ export function resolvePaperExecutionAnalysisSession(
 export function resolvePaperExecutionSession(
   execution: PaperExecutionSession,
   analysisSessions: readonly Parameters<typeof resolveHistoricalAnalysisSession>[0][],
-  registry: HistoricalContentRegistry = historicalContentRegistry,
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+  options: PaperExecutionResolutionOptions = {},
 ): PaperExecutionResolution {
   const analysis = analysisSessions.find(
     ({ sessionId }) => sessionId === execution.source.analysisSessionId,
@@ -179,7 +276,10 @@ export function resolvePaperExecutionSession(
       'The finalized source analysis for this paper execution is unavailable.',
     );
   }
-  const resolved = resolvePaperExecutionAnalysisSession(analysis, registry);
+  const resolved = resolvePaperExecutionAnalysisSession(analysis, registry, {
+    ...options,
+    proposedDirection: options.proposedDirection ?? execution.plan.direction,
+  });
   if (resolved.status !== 'ready') return resolved;
   try {
     assertCompatibleExecutionIdentity(execution.source, resolved.source);

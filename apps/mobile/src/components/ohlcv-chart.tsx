@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -642,9 +643,13 @@ export function OhlcvChart({
   const volumeHeight = 44;
   const body = (
     <Svg
-      accessibilityElementsHidden
+      {...(Platform.OS === 'web'
+        ? { 'aria-hidden': true, focusable: false }
+        : {
+            accessibilityElementsHidden: true,
+            importantForAccessibility: 'no-hide-descendants' as const,
+          })}
       height={CHART_HEIGHT}
-      importantForAccessibility="no-hide-descendants"
       width={width}
     >
       <Rect fill={theme.colors.surfaceRaised} height={CHART_HEIGHT} rx={16} width={width} />

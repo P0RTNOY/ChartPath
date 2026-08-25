@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, useWindowDimensions, View } from 'react-native';
 
 import {
@@ -44,6 +44,10 @@ import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 import { skillById } from '@/data/catalog';
 import { matchingAlternativeExplanation } from '@/data/feedback-answer-ids';
 import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
+import {
+  resolveHistoricalAnalysisApplication,
+  resolvePaperExecutionAnalysisSession,
+} from '@/data/paper-execution';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
@@ -57,6 +61,38 @@ function canonicalExercise(): CapstoneExercise {
     throw new Error('תוכן הניתוח המונחה אינו זמין.');
   }
   return exercise as CapstoneExercise;
+}
+
+function exerciseForSession(
+  session: GuidedAnalysisSession,
+  revealFinalizedContent = false,
+): CapstoneExercise {
+  if (session.chart.kind === 'historical') {
+    const resolved = resolveHistoricalAnalysisSession(session);
+    const exercise = resolved.status === 'ready' ? resolved.content.educationalExercise : undefined;
+    if (
+      exercise?.rubric.kind === 'capstone' &&
+      exercise.capstoneSteps?.length === ANALYSIS_WORKFLOW_STEP_IDS.length
+    ) {
+      const learnerExercise =
+        resolved.status === 'ready' ? resolved.content.learnerExercise : undefined;
+      if (!revealFinalizedContent && learnerExercise) {
+        return {
+          ...exercise,
+          promptHe:
+            'נתחו את חלון הראיות העיוור לפי 11 שלבי התהליך והסתמכו רק על המידע הגלוי בנקודת ההחלטה.',
+          safetyNoteHe: 'התרגיל הוא לימודי בלבד. זהות המקור ופרטיו ייחשפו רק לאחר סיום סופי.',
+          sourceReferences: [],
+          capstoneSteps: learnerExercise.steps.map((step) => ({
+            ...step,
+            rubric: session.steps[step.id].rubric,
+          })),
+        } as CapstoneExercise;
+      }
+      return exercise as CapstoneExercise;
+    }
+  }
+  return canonicalExercise();
 }
 
 function answerMap(session: GuidedAnalysisSession): CapstoneAnswerMap {
@@ -124,7 +160,7 @@ function sessionMatchesExercise(
   if (session.chart.kind === 'historical') {
     return (
       session.exerciseId === exercise.id &&
-      session.contentVersionId === contentVersion.id &&
+      session.contentVersionId === exercise.contentVersionId &&
       session.exerciseSchemaVersion === exercise.schemaVersion &&
       resolveHistoricalAnalysisSession(session).status === 'ready'
     );
@@ -159,7 +195,6 @@ function capstoneAnswer(session: GuidedAnalysisSession): CapstoneAnswer | null {
 function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession }) {
   const theme = useTheme();
   const learning = useLearning();
-  const exercise = useMemo(() => canonicalExercise(), []);
   const [starting, setStarting] = useState(false);
   const result = session.finalResult;
   if (!result) return null;
@@ -180,6 +215,7 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
     );
   }
   const historical = historicalResolution?.status === 'ready' ? historicalResolution : undefined;
+  const exercise = exerciseForSession(session, true);
   const noLearningCredit =
     session.chart.kind === 'historical' && session.chart.learningCredit === 'none';
   const hints = new Set(analysisSessionHintIdsUsed(session));
@@ -202,11 +238,15 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
     const state = learning.snapshot?.projections.reviewState[skillId];
     return state ? [state] : [];
   });
-  const management = session.steps.management;
+  const applicationResolution = historical
+    ? resolveHistoricalAnalysisApplication(session)
+    : undefined;
   const safeDecision =
-    management.result?.correct &&
-    management.answer?.kind === 'decision' &&
-    ['wait', 'reject', 'no-trade', 'insufficient-evidence'].includes(management.answer.decision);
+    applicationResolution?.status === 'ready' &&
+    applicationResolution.application.alignment === 'matched' &&
+    applicationResolution.application.expected.kind === 'no-trade';
+  const paperResolution = historical ? resolvePaperExecutionAnalysisSession(session) : undefined;
+  const paperReady = paperResolution?.status === 'ready' ? paperResolution : undefined;
   const paperExecution = learning.snapshot?.paperExecutionSessions.find(
     ({ source }) => source.analysisSessionId === session.sessionId,
   );
@@ -216,7 +256,13 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
     try {
       const created = await learning.createOrResumeAnalysisSession(
         session.chart.kind === 'historical'
-          ? { kind: 'historical', scenarioId: session.chart.scenarioId }
+          ? {
+              kind: 'historical',
+              scenarioId: session.chart.scenarioId,
+              ...(session.chart.learningCredit === 'none'
+                ? { accessMode: 'qa-internal' as const }
+                : {}),
+            }
           : { kind: 'synthetic' },
       );
       router.replace(`/analysis?sessionId=${encodeURIComponent(created.sessionId)}` as Href);
@@ -303,17 +349,19 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
         </Card>
       ) : undefined}
 
-      {historical ? (
+      {paperReady ? (
         <Card testID="paper-execution-launch-card" variant="outlined">
           <View style={{ gap: theme.spacing.sm }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              <Badge tone="warning">הניתוח קבע: אין עסקה</Badge>
-              <Badge tone="neutral">תרגול מכניקת ביצוע בלבד</Badge>
+              <Badge tone="success">
+                {`הניתוח קבע: ${paperReady.application.expected.kind === 'trade' && paperReady.application.expected.direction === 'long' ? 'לונג' : 'שורט'}`}
+              </Badge>
+              <Badge tone="neutral">ביצוע תואם לניתוח</Badge>
             </View>
             <Heading level={2}>תרגול ביצוע על נייר</Heading>
             <UiText>
-              אפשר לבנות תכנית שורט היפותטית ולראות כיצד מודל דטרמיניסטי מעבד שוק, לימיט או סטופ.
-              התרגול לא משנה את מסקנת הניתוח, אינו הוראת מסחר ואינו מקבל קרדיט למידה.
+              אפשר לתעד תכנית בכיוון שנקבע בניתוח ולראות כיצד מודל דטרמיניסטי מעבד שוק, לימיט או
+              סטופ. התרגול אינו הוראת מסחר ותוצאתו אינה משנה את ציון הניתוח.
             </UiText>
             <UiText color="textMuted" variant="caption">
               מרווח, החלקה, עלויות, מילויי פער וסדר אירועים הם הנחות סימולטור בגרסה — לא הבטחת ביצוע
@@ -495,7 +543,7 @@ export function GuidedAnalysisSessionView({
   const learning = useLearning();
   const { saveAnalysisSession } = learning;
   const { width } = useWindowDimensions();
-  const exercise = useMemo(() => canonicalExercise(), []);
+  const exercise = exerciseForSession(persistedSession);
   const [session, setSession] = useState(persistedSession);
   const sessionRef = useRef(session);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
@@ -528,7 +576,7 @@ export function GuidedAnalysisSessionView({
           setMessage('לא הצלחנו לשמור את השינוי. הטיוטה נשארה על המסך; נסו שוב לפני יציאה.');
         });
     },
-    [saveAnalysisSession],
+    [saveAnalysisSession, setMessage],
   );
 
   useEffect(() => {
@@ -699,7 +747,6 @@ export function GuidedAnalysisSessionView({
   const historicalResolution =
     session.chart.kind === 'historical' ? resolveHistoricalAnalysisSession(session) : undefined;
   const historical = historicalResolution?.status === 'ready' ? historicalResolution : undefined;
-  const historicalChartIdentity = session.chart.kind === 'historical' ? session.chart : undefined;
   const noLearningCredit =
     session.chart.kind === 'historical' && session.chart.learningCredit === 'none';
 
@@ -713,38 +760,24 @@ export function GuidedAnalysisSessionView({
       <TopBar
         back
         onBack={() => void exitAfterSave()}
-        subtitle={
-          historical
-            ? historical.content.scenario.publicationStatus === 'development-only'
-              ? 'Replay עיוור · נתונים שנוצרו לפיתוח בלבד'
-              : 'Replay היסטורי עיוור · מקור מוצמד'
-            : 'תרחיש סינתטי · תהליך מקור־מגובה'
-        }
+        subtitle={historical ? 'Replay עיוור · עותק קפוא אומת' : 'תרחיש סינתטי · תהליך מקור־מגובה'}
         title="ניתוח מונחה"
       />
 
-      {historical && historicalChartIdentity ? (
+      {historical ? (
         <Card testID="historical-session-disclosure" variant="outlined">
           <View style={{ gap: theme.spacing.sm }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <Badge tone="warning">הזהות והתאריכים מוסתרים עד הסיום</Badge>
-              <Badge tone="neutral">
-                {historical.content.scenario.publicationStatus === 'development-only'
-                  ? 'פיתוח פנימי · נתונים שנוצרו'
-                  : 'נתונים היסטוריים מקור־מגובים'}
-              </Badge>
+              <Badge tone="neutral">בדיקת שלמות עברה</Badge>
               {noLearningCredit ? <Badge tone="neutral">ללא XP רגיל</Badge> : undefined}
             </View>
             <LtrText color="textMuted" variant="caption">
-              {`${historicalChartIdentity.scenarioId} · ${historicalChartIdentity.datasetId}@${historicalChartIdentity.datasetVersion}`}
-            </LtrText>
-            <LtrText color="textMuted" variant="caption">
-              {`cursor ${session.replay.cursorCandleIndex + 1}/${session.replay.decisionCandleIndex + 1} · checksum ${historicalChartIdentity.canonicalChecksum}`}
+              {`cursor ${session.replay.cursorCandleIndex + 1}/${session.replay.decisionCandleIndex + 1}`}
             </LtrText>
             <UiText color="textMuted" variant="caption">
-              התאמה: {historical.content.dataset.manifest.adjustment.mode} · סשן:{' '}
-              {historical.content.dataset.manifest.sessionPolicy.includedSessions.join(', ')} · אין
-              מילוי מלאכותי של מרווחים חסרים.
+              לפני הסיום מוצג רק חלון הראיות המותר. זהות התרחיש, מקורו, הכיוון הצפוי ותוצאת העתיד
+              אינם זמינים למסך או לטכנולוגיות מסייעות.
             </UiText>
           </View>
         </Card>
@@ -835,9 +868,15 @@ export function GuidedAnalysisSessionView({
           <Card variant="accent">
             <View style={{ gap: 6 }}>
               <Heading level={2}>המשימה שנבדקה</Heading>
-              <UiText>{exercise.promptHe}</UiText>
+              <UiText>
+                {historical
+                  ? 'נתחו את חלון הראיות העיוור לפי 11 שלבי התהליך והסתמכו רק על המידע הגלוי בנקודת ההחלטה.'
+                  : exercise.promptHe}
+              </UiText>
               <UiText color="textMuted" variant="caption">
-                {exercise.safetyNoteHe}
+                {historical
+                  ? 'התרגיל הוא לימודי בלבד. זהות המקור ופרטיו ייחשפו רק לאחר סיום סופי.'
+                  : exercise.safetyNoteHe}
               </UiText>
             </View>
           </Card>
@@ -920,12 +959,20 @@ export function GuidedAnalysisSessionView({
           ) : undefined}
 
           <Card variant="subtle">
-            <UiText color="textMuted" variant="caption">
-              מקור כל שלבי המקרה:
-            </UiText>
-            <LtrText color="textMuted" variant="caption">
-              {sourceLabel(exercise)}
-            </LtrText>
+            {historical ? (
+              <UiText color="textMuted" variant="caption">
+                העותק הקפוא אומת · מקור ייחשף לאחר הסיום
+              </UiText>
+            ) : (
+              <>
+                <UiText color="textMuted" variant="caption">
+                  מקור כל שלבי המקרה:
+                </UiText>
+                <LtrText color="textMuted" variant="caption">
+                  {sourceLabel(exercise)}
+                </LtrText>
+              </>
+            )}
           </Card>
         </View>
       </View>

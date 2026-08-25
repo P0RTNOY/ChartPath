@@ -6,6 +6,7 @@ import {
   contentVersion,
   exercises,
   historicalContentRegistry,
+  scenarioCandidateRegistry,
   lessons,
   type HistoricalContentRegistry,
 } from '@chartpath/content';
@@ -36,6 +37,8 @@ type Mutable<T> = T extends readonly (infer Item)[]
   : T extends object
     ? { -readonly [Key in keyof T]: Mutable<T[Key]> }
     : T;
+
+const QA_HYPOTHETICAL = 'qa-hypothetical-mechanics' as const;
 
 async function renderLearning(
   repository: LearningRepository,
@@ -172,6 +175,7 @@ async function finalizeHistoricalAnalysis(current: () => LearningContextValue): 
   let session = await current().createOrResumeAnalysisSession({
     kind: 'historical',
     scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+    accessMode: 'qa-internal',
   });
   session = submitEveryStep(session);
   await current().saveAnalysisSession(session);
@@ -180,6 +184,98 @@ async function finalizeHistoricalAnalysis(current: () => LearningContextValue): 
 }
 
 describe('guided analysis learning integration', () => {
+  it('requires explicit QA access before allocating an internal historical scenario', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    const candidate = scenarioCandidateRegistry[0]!;
+    await expect(
+      harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: candidate.scenario.scenarioId,
+      }),
+    ).rejects.toThrow(/internal-scenario-restricted/);
+    expect((await repository.load()).analysisSessions).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it.each([
+    ['long', 'trade', 'long'],
+    ['short', 'trade', 'short'],
+    ['no-trade', 'no-trade', undefined],
+  ] as const)(
+    'creates and finalizes a no-credit internal %s candidate through QA',
+    async (_label, kind, direction) => {
+      const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+        contentVersion: contentVersion.id,
+      });
+      const harness = await renderLearning(repository);
+      const candidate = scenarioCandidateRegistry.find(({ manifest }) => {
+        const application = manifest.application;
+        return kind === 'no-trade'
+          ? application.kind === 'no-trade'
+          : application.kind === 'trade' && application.direction === direction;
+      })!;
+      let session!: GuidedAnalysisSession;
+      await act(async () => {
+        session = await harness.current().createOrResumeAnalysisSession({
+          kind: 'historical',
+          scenarioId: candidate.scenario.scenarioId,
+          accessMode: 'qa-internal',
+        });
+      });
+      expect(session).toMatchObject({
+        exerciseId: candidate.gradingExercise.id,
+        contentVersionId: candidate.gradingExercise.contentVersionId,
+        chart: {
+          kind: 'historical',
+          scenarioId: candidate.scenario.scenarioId,
+          learningCredit: 'none',
+        },
+      });
+      const completed = submitEveryStep(session);
+      await act(async () => {
+        await harness.current().saveAnalysisSession(completed);
+        await harness.current().finalizeAnalysisSession(completed);
+      });
+      expect(
+        harness
+          .current()
+          .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === session.sessionId)
+          ?.status,
+      ).toBe('finalized');
+      expect(harness.current().snapshot!.attempts).toEqual([]);
+      expect(harness.current().snapshot!.projections.totalXp).toBe(0);
+      if (kind === 'trade') {
+        let execution!: PaperExecutionSession;
+        await act(async () => {
+          execution = await harness
+            .current()
+            .createOrResumePaperExecutionSession(
+              session.sessionId,
+              candidate.manifest.expectedExecution!.plan,
+            );
+        });
+        expect(execution).toMatchObject({
+          status: 'draft',
+          plan: { direction },
+          source: {
+            analysisSessionId: session.sessionId,
+            learningCredit: 'none',
+            permittedDirections: [direction],
+          },
+        });
+      } else {
+        await expect(
+          harness.current().createOrResumePaperExecutionSession(session.sessionId, paperPlan()),
+        ).rejects.toThrow(/execution-not-enabled/);
+        expect(harness.current().snapshot!.paperExecutionSessions).toEqual([]);
+      }
+      await harness.view.unmount();
+    },
+  );
+
   it('builds immutable attempt records with bounded timing and unique hints', () => {
     const exercise = exercises.find(({ id }) => id === GUIDED_ANALYSIS_EXERCISE_ID)!;
     const result = gradeAnswer(exercise.rubric, {
@@ -309,6 +405,7 @@ describe('guided analysis learning integration', () => {
       session = await harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+        accessMode: 'qa-internal',
       });
     });
     expect(session.chart).toMatchObject({
@@ -343,6 +440,7 @@ describe('guided analysis learning integration', () => {
       const resumed = await harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+        accessMode: 'qa-internal',
       });
       expect(resumed).toEqual(saved);
     });
@@ -376,6 +474,7 @@ describe('guided analysis learning integration', () => {
       session = await harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+        accessMode: 'qa-internal',
       });
     });
     const completed = submitEveryStep(session);
@@ -455,6 +554,7 @@ describe('guided analysis learning integration', () => {
       session = await harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+        accessMode: 'qa-internal',
       });
     });
     const completed = submitEveryStep(session);
@@ -546,10 +646,17 @@ describe('guided analysis learning integration', () => {
       activeAnalysis = await harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: DEVELOPMENT_HISTORICAL_SCENARIO.scenarioId,
+        accessMode: 'qa-internal',
       });
     });
     await expect(
-      harness.current().createOrResumePaperExecutionSession(activeAnalysis.sessionId, paperPlan()),
+      harness
+        .current()
+        .createOrResumePaperExecutionSession(
+          activeAnalysis.sessionId,
+          paperPlan(),
+          QA_HYPOTHETICAL,
+        ),
     ).rejects.toThrow(/analysis-not-finalized/);
 
     let finalized!: GuidedAnalysisSession;
@@ -561,6 +668,19 @@ describe('guided analysis learning integration', () => {
     finalized = harness
       .current()
       .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === activeAnalysis.sessionId)!;
+    await expect(
+      harness.current().createOrResumePaperExecutionSession(finalized.sessionId, paperPlan()),
+    ).rejects.toThrow(/hypothetical-mechanics-restricted/);
+    await expect(
+      harness
+        .current()
+        .createOrResumePaperExecutionSession(
+          finalized.sessionId,
+          { ...paperPlan(), direction: 'long' },
+          QA_HYPOTHETICAL,
+        ),
+    ).rejects.toThrow(/execution-direction-mismatch/);
+    expect((await repository.load()).paperExecutionSessions).toEqual([]);
     const beforeLearning = JSON.stringify({
       attempts: harness.current().snapshot!.attempts,
       projections: harness.current().snapshot!.projections,
@@ -570,7 +690,7 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       execution = await harness
         .current()
-        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan(), QA_HYPOTHETICAL);
     });
     expect(execution).toMatchObject({
       status: 'draft',
@@ -596,12 +716,14 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       const resumed = await harness
         .current()
-        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan(), QA_HYPOTHETICAL);
       expect(resumed.sessionId).toBe(execution.sessionId);
       execution = await harness
         .current()
-        .submitPaperExecutionSession(execution.sessionId, 'confirm-market-submit');
-      execution = await harness.current().advancePaperExecutionSession(execution.sessionId, 13);
+        .submitPaperExecutionSession(execution.sessionId, 'confirm-market-submit', QA_HYPOTHETICAL);
+      execution = await harness
+        .current()
+        .advancePaperExecutionSession(execution.sessionId, 13, QA_HYPOTHETICAL);
     });
     expect(execution.status).toBe('closed');
     expect(execution.position?.status).toBe('closed-stop');
@@ -616,7 +738,7 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       const repeated = await harness
         .current()
-        .advancePaperExecutionSession(execution.sessionId, 13);
+        .advancePaperExecutionSession(execution.sessionId, 13, QA_HYPOTHETICAL);
       expect(JSON.stringify(repeated)).toBe(canonicalAfterClose);
       await harness.current().reload();
     });
@@ -660,10 +782,10 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       working = await first
         .current()
-        .createOrResumePaperExecutionSession(finalized.sessionId, workingPlan);
+        .createOrResumePaperExecutionSession(finalized.sessionId, workingPlan, QA_HYPOTHETICAL);
       working = await first
         .current()
-        .submitPaperExecutionSession(working.sessionId, 'confirm-working-submit');
+        .submitPaperExecutionSession(working.sessionId, 'confirm-working-submit', QA_HYPOTHETICAL);
     });
     expect(working.status).toBe('working');
     await first.view.unmount();
@@ -678,7 +800,7 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       cancelled = await resumed
         .current()
-        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel');
+        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel', QA_HYPOTHETICAL);
     });
     expect(cancelled.status).toBe('cancelled');
     expect(cancelled.workingOrder?.status).toBe('cancelled');
@@ -690,7 +812,7 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       cancelled = await resumed
         .current()
-        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel');
+        .cancelPaperExecutionOrder(working.sessionId, 'confirm-working-cancel', QA_HYPOTHETICAL);
     });
     expect(cancelled.revision).toBe(revision);
     expect((await repository.load()).attempts).toEqual([]);
@@ -717,11 +839,11 @@ describe('guided analysis learning integration', () => {
     await act(async () => {
       draft = await harness
         .current()
-        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan());
+        .createOrResumePaperExecutionSession(finalized.sessionId, paperPlan(), QA_HYPOTHETICAL);
     });
     registry.datasets[0]!.candles[0]!.close += 0.01;
     await expect(
-      harness.current().savePaperExecutionPlan(draft.sessionId, paperPlan()),
+      harness.current().savePaperExecutionPlan(draft.sessionId, paperPlan(), QA_HYPOTHETICAL),
     ).rejects.toThrow(/dataset-modified/);
 
     let abandoned!: PaperExecutionSession;

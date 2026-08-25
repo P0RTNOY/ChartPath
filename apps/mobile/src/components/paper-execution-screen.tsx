@@ -30,6 +30,7 @@ import { TopBar } from './top-bar';
 import {
   resolvePaperExecutionAnalysisSession,
   resolvePaperExecutionSession,
+  type PaperExecutionAccessMode,
   type PaperExecutionReady,
 } from '@/data/paper-execution';
 import { useLearning } from '@/state/learning';
@@ -116,11 +117,20 @@ function price(value: number): string {
 
 function defaultFields(resolution: PaperExecutionReady): TicketFields {
   const reference = resolution.candles[resolution.source.decisionCandleIndex]?.close ?? 100;
+  const direction = resolution.source.permittedDirections[0] ?? 'short';
   return {
     orderType: 'market',
     entry: price(reference),
-    stop: price(Math.ceil(reference * 1.02 * 100) / 100),
-    target: price(Math.floor(reference * 0.97 * 100) / 100),
+    stop: price(
+      direction === 'long'
+        ? Math.floor(reference * 0.98 * 100) / 100
+        : Math.ceil(reference * 1.02 * 100) / 100,
+    ),
+    target: price(
+      direction === 'long'
+        ? Math.ceil(reference * 1.03 * 100) / 100
+        : Math.floor(reference * 0.97 * 100) / 100,
+    ),
     account: '100000',
     risk: '600',
     quantity: '10',
@@ -404,8 +414,10 @@ function ExecutionDebriefCard({ session }: { readonly session: PaperExecutionSes
 
 export function PaperExecutionScreen({
   analysisSessionId,
+  accessMode = 'ordinary',
 }: {
   readonly analysisSessionId: string;
+  readonly accessMode?: PaperExecutionAccessMode;
 }) {
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
@@ -427,10 +439,14 @@ export function PaperExecutionScreen({
   const execution = learning.snapshot?.paperExecutionSessions.find(
     ({ source }) => source.analysisSessionId === analysisSessionId,
   );
-  const analysisResolution = analysis ? resolvePaperExecutionAnalysisSession(analysis) : undefined;
+  const analysisResolution = analysis
+    ? resolvePaperExecutionAnalysisSession(analysis, undefined, { accessMode })
+    : undefined;
   const resolution =
     execution && learning.snapshot
-      ? resolvePaperExecutionSession(execution, learning.snapshot.analysisSessions)
+      ? resolvePaperExecutionSession(execution, learning.snapshot.analysisSessions, undefined, {
+          accessMode,
+        })
       : analysisResolution;
 
   useEffect(() => {
@@ -455,13 +471,14 @@ export function PaperExecutionScreen({
       .createOrResumePaperExecutionSession(
         analysisSessionId,
         planFromFields(initialFields, resolution, `paper-plan:${analysisSessionId}`),
+        accessMode,
       )
       .catch((reason: unknown) => {
         createStarted.current = false;
         setMessage(reason instanceof Error ? reason.message : 'לא ניתן ליצור תרגול ביצוע.');
       })
       .finally(() => setWorking(false));
-  }, [analysisSessionId, execution, learning, resolution]);
+  }, [accessMode, analysisSessionId, execution, learning, resolution]);
 
   const preview = useMemo(() => {
     if (!fields || resolution?.status !== 'ready') return undefined;
@@ -516,13 +533,16 @@ export function PaperExecutionScreen({
   const canAdvance =
     ['working', 'open'].includes(execution.status) &&
     cursor < resolution.executionBoundary.lastCandleIndex;
+  const direction = resolution.source.permittedDirections[0] ?? 'short';
+  const directionHe = direction === 'long' ? 'לונג' : 'שורט';
+  const hypotheticalMechanics = resolution.mode === 'hypothetical-mechanics';
 
   const persistDraft = (nextFields: TicketFields) => {
     if (!editable) return;
     const nextPlan = planFromFields(nextFields, resolution, execution.plan.planId);
     draftSaveQueue.current = draftSaveQueue.current
       .catch(() => undefined)
-      .then(() => learning.savePaperExecutionPlan(execution.sessionId, nextPlan))
+      .then(() => learning.savePaperExecutionPlan(execution.sessionId, nextPlan, accessMode))
       .catch((reason: unknown) => {
         setMessage(reason instanceof Error ? reason.message : 'השמירה המקומית של התכנית נכשלה.');
       });
@@ -542,7 +562,7 @@ export function PaperExecutionScreen({
   };
   const savePlan = async (): Promise<PaperExecutionSession> => {
     const next = planFromFields(fields, resolution, execution.plan.planId);
-    return learning.savePaperExecutionPlan(execution.sessionId, next);
+    return learning.savePaperExecutionPlan(execution.sessionId, next, accessMode);
   };
   const submit = async () => {
     setWorking(true);
@@ -553,6 +573,7 @@ export function PaperExecutionScreen({
       await learning.submitPaperExecutionSession(
         saved.sessionId,
         `paper-submit:${saved.sessionId}:${saved.revision}`,
+        accessMode,
       );
       setConfirmed(false);
     } catch (reason) {
@@ -565,12 +586,16 @@ export function PaperExecutionScreen({
     setWorking(true);
     setMessage(null);
     try {
-      const advanced = await learning.advancePaperExecutionSession(execution.sessionId, 1);
+      const advanced = await learning.advancePaperExecutionSession(
+        execution.sessionId,
+        1,
+        accessMode,
+      );
       if (
         advanced.lastProcessedCandleIndex === resolution.executionBoundary.lastCandleIndex &&
         advanced.status === 'working'
       ) {
-        await learning.completePaperExecutionReplay(advanced.sessionId);
+        await learning.completePaperExecutionReplay(advanced.sessionId, accessMode);
       }
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'לא ניתן לחשוף את הנר הבא.');
@@ -584,6 +609,7 @@ export function PaperExecutionScreen({
       await learning.cancelPaperExecutionOrder(
         execution.sessionId,
         `paper-cancel:${execution.sessionId}:${execution.revision}`,
+        accessMode,
       );
       setConfirmCancel(false);
     } catch (reason) {
@@ -619,14 +645,19 @@ export function PaperExecutionScreen({
       <Card variant="accent">
         <View style={{ gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Badge tone="warning">הניתוח קבע: אין עסקה</Badge>
-            <Badge tone="neutral">תרגול מכניקת ביצוע בלבד</Badge>
+            <Badge tone={hypotheticalMechanics ? 'warning' : 'success'}>
+              {hypotheticalMechanics ? 'הניתוח קבע: אין עסקה' : `הניתוח קבע: ${directionHe}`}
+            </Badge>
+            <Badge tone="neutral">
+              {hypotheticalMechanics ? 'מצב QA — מכניקה היפותטית' : 'ביצוע תואם לניתוח'}
+            </Badge>
             <Badge tone="neutral">ללא XP או קרדיט</Badge>
           </View>
           <Heading level={1}>מהתכנית לאירועי ביצוע מדומים</Heading>
           <UiText>
-            אפשר לבנות תכנית שורט היפותטית כדי ללמוד את מנגנון הסימולטור. התכנית אינה משנה את מסקנת
-            הניתוח שנבדק, ותסומן בתחקיר כלא־תואמת ל״אין עסקה״.
+            {hypotheticalMechanics
+              ? `זהו כלי QA מפורש לבדיקת מכניקת ${directionHe} היפותטית. התכנית אינה משנה את מסקנת הניתוח שנבדק ותסומן כלא־תואמת ל״אין עסקה״.`
+              : `אפשר לתעד תכנית ${directionHe} התואמת למסקנת הניתוח. תוצאת הסימולטור אינה משנה את ציון הניתוח.`}
           </UiText>
           <UiText color="textMuted" variant="caption">
             {resolution.learnerDisclosureHebrew}
@@ -677,7 +708,7 @@ export function PaperExecutionScreen({
               <View style={{ gap: 8 }}>
                 <Heading level={2}>1. כוונת ההוראה</Heading>
                 <UiText color="textMuted" variant="bodySmall">
-                  הכיוון המותר בתרחיש הפיתוח הוא שורט בלבד. זו הרשאת סימולטור, לא המלצה.
+                  {`הכיוון המותר בתרחיש הוא ${directionHe} בלבד. זו הרשאת סימולטור, לא המלצה.`}
                 </UiText>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {resolution.source.permittedEntryOrderTypes.map((orderType) => {
@@ -836,7 +867,7 @@ export function PaperExecutionScreen({
               <View style={{ gap: theme.spacing.sm }}>
                 <Heading level={3}>4. בדיקה ואישור מפורש</Heading>
                 <UiText>
-                  הוראת {orderLabels[fields.orderType]} שורט, עצירה {fields.stop}, יעד{' '}
+                  הוראת {orderLabels[fields.orderType]} {directionHe}, עצירה {fields.stop}, יעד{' '}
                   {fields.target}, כמות {fields.quantity} יחידות דמיוניות.
                 </UiText>
                 <Pressable
@@ -1012,12 +1043,18 @@ export function PaperExecutionScreen({
 
       <Card variant="subtle">
         <UiText variant="label">מקור פדגוגי נפרד מהנחות הסימולטור</UiText>
-        <LtrText color="textMuted" variant="caption">
-          ta-he-v2 · PDF 64–67 / printed 51–54 · PDF 74–75 / printed 61–62
-        </LtrText>
+        {resolution.content.scenario.educationalSourceReferences.map((reference) => (
+          <LtrText
+            key={`${reference.sourceId}:${reference.pageStart}:${reference.pageEnd}:${reference.section}`}
+            color="textMuted"
+            variant="caption"
+          >
+            {`${reference.sourceId} · PDF ${reference.pageStart}–${reference.pageEnd} · ${reference.section}`}
+          </LtrText>
+        ))}
         <UiText color="textMuted" variant="caption">
-          פרק 16 — ביטול, עצירה, מילוי, יעד וסיכון; פרק 19 מקרה ג׳ — מסקנת ״אין עסקה״. כללי המילוי
-          המדויקים שלמעלה הם הנחות תוכנה, לא דוקטרינת הספר.
+          מסקנת היישום נבדקת מול רובריקה שנקבעה מראש. כללי המילוי המדויקים שלמעלה הם הנחות תוכנה, לא
+          דוקטרינת המקור.
         </UiText>
       </Card>
     </Screen>

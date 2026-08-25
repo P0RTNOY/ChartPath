@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { exercises } from '@chartpath/content';
+import { exercises, scenarioCandidateRegistry } from '@chartpath/content';
 import {
   ANALYSIS_WORKFLOW_STEP_IDS,
   createGuidedAnalysisSession,
@@ -154,19 +154,20 @@ function correctAnswer(rubric: AtomicAnswerRubric): AtomicExerciseAnswer {
 
 function finalizedSession(initial: GuidedAnalysisSession = session()): GuidedAnalysisSession {
   let current = initial;
-  exercise.capstoneSteps!.forEach((step, index) => {
+  ANALYSIS_WORKFLOW_STEP_IDS.forEach((stepId, index) => {
     const timestamp = `2026-08-24T10:${String(index + 1).padStart(2, '0')}:00.000Z`;
-    const answer = correctAnswer(step.rubric);
+    const rubric = current.steps[stepId].rubric;
+    const answer = correctAnswer(rubric);
     current = reduceGuidedAnalysisSession(current, {
       type: 'update-step-answer',
-      stepId: step.id,
+      stepId,
       answer,
       updatedAt: timestamp,
     });
     current = reduceGuidedAnalysisSession(current, {
       type: 'submit-step',
-      stepId: step.id,
-      result: gradeAnswer(step.rubric, answer),
+      stepId,
+      result: gradeAnswer(rubric, answer),
       submittedAt: timestamp,
     });
   });
@@ -177,6 +178,37 @@ function finalizedSession(initial: GuidedAnalysisSession = session()): GuidedAna
     finalResult: result(),
     finalizedAt: '2026-08-24T11:00:00.000Z',
   });
+}
+
+function candidateSession(application: 'long' | 'short' | 'no-trade'): {
+  readonly candidate: (typeof scenarioCandidateRegistry)[number];
+  readonly session: GuidedAnalysisSession;
+} {
+  const candidate = scenarioCandidateRegistry.find(({ manifest }) =>
+    application === 'no-trade'
+      ? manifest.application.kind === 'no-trade'
+      : manifest.application.kind === 'trade' && manifest.application.direction === application,
+  )!;
+  const resolved = resolveHistoricalReplayScenario(candidate.scenario.scenarioId);
+  if (resolved.status !== 'ready') throw new Error(resolved.message);
+  return {
+    candidate,
+    session: createGuidedAnalysisSession({
+      sessionId: `candidate-${application}-session`,
+      attemptId: `candidate-${application}-attempt`,
+      finalizationIdempotencyKey: `candidate-${application}-finalize`,
+      exerciseId: candidate.gradingExercise.id,
+      contentVersionId: candidate.gradingExercise.contentVersionId,
+      exerciseSchemaVersion: candidate.gradingExercise.schemaVersion,
+      chart: resolved.chartIdentity,
+      createdAt: '2026-08-24T10:00:00.000Z',
+      initialReplayCursorCandleIndex: candidate.scenario.initialVisibleRange.endCandleIndex,
+      workflowStepIds: ANALYSIS_WORKFLOW_STEP_IDS,
+      stepRubrics: Object.fromEntries(
+        candidate.gradingExercise.capstoneSteps!.map((step) => [step.id, step.rubric]),
+      ) as Readonly<Record<AnalysisWorkflowStepId, AtomicAnswerRubric>>,
+    }),
+  };
 }
 
 function historicalSession(): GuidedAnalysisSession {
@@ -323,7 +355,41 @@ describe('GuidedAnalysisSessionView', () => {
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/Generated fixture 001|2025-01-05/);
   });
 
-  it('reveals finalized provenance, explains no-credit behavior, and restarts the same source', async () => {
+  it.each(['long', 'short', 'no-trade'] as const)(
+    'keeps an internal %s candidate blind until finalization and then uses its own rubric',
+    async (application) => {
+      const candidate = candidateSession(application);
+      const active = await renderSession(candidate.session);
+      const hidden = JSON.stringify(active.toJSON());
+      expect(active.getByTestId('historical-session-disclosure')).toBeTruthy();
+      expect(hidden).not.toContain(candidate.candidate.manifest.titleHe);
+      expect(hidden).not.toContain(candidate.candidate.manifest.scenarioId);
+      expect(hidden).not.toContain(candidate.candidate.manifest.datasetId);
+      expect(hidden).not.toContain(candidate.candidate.dataset.manifest.canonicalChecksum);
+      expect(hidden).not.toContain(candidate.candidate.manifest.source.sourceId);
+      expect(hidden).not.toContain(candidate.candidate.manifest.source.section);
+      expect(hidden).not.toContain(candidate.candidate.exercise.safetyNoteHe);
+      expect(hidden).not.toMatch(/לונג|שורט/);
+      if (candidate.candidate.manifest.application.kind === 'trade') {
+        expect(hidden).not.toContain(candidate.candidate.manifest.application.direction);
+      }
+      await active.unmount();
+
+      const debrief = await renderSession(finalizedSession(candidate.session));
+      expect(debrief.getByText(candidate.candidate.scenario.revealedTitleHebrew)).toBeTruthy();
+      if (application === 'no-trade') {
+        expect(debrief.queryByTestId('paper-execution-launch-card')).toBeNull();
+      } else {
+        expect(debrief.getByTestId('paper-execution-launch-card')).toBeTruthy();
+        expect(
+          debrief.getByText(`הניתוח קבע: ${application === 'long' ? 'לונג' : 'שורט'}`),
+        ).toBeTruthy();
+      }
+      await debrief.unmount();
+    },
+  );
+
+  it('reveals finalized provenance, keeps no-trade out of paper execution, and restarts the source', async () => {
     const current = finalizedSession(historicalSession());
     const screen = await renderSession(current);
 
@@ -335,19 +401,17 @@ describe('GuidedAnalysisSessionView', () => {
     expect(screen.getByText('תוצאה היסטורית אינה מבטיחה תוצאה עתידית.')).toBeTruthy();
     expect(screen.getByText('אין כאן המלצה עדכנית לקנייה, מכירה או פעולה.')).toBeTruthy();
     expect(screen.getByTestId('historical-no-credit')).toBeTruthy();
-    expect(screen.getByTestId('paper-execution-launch-card')).toBeTruthy();
-    expect(screen.getByText(/תרגול מכניקת ביצוע בלבד/)).toBeTruthy();
+    expect(screen.queryByTestId('paper-execution-launch-card')).toBeNull();
+    expect(screen.queryByTestId('paper-execution-launch')).toBeNull();
+    expect(screen.getByText(/״אין עסקה״ היא תשובת תהליך מלאה/)).toBeTruthy();
     expect(screen.queryByText('מיומנויות שהודגמו')).toBeNull();
-
-    await fireEvent.press(screen.getByTestId('paper-execution-launch'));
-    expect(mockRouterPush).toHaveBeenCalledWith(
-      '/paper-execution?analysisSessionId=historical-ui-session',
-    );
+    expect(mockRouterPush).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByRole('button', { name: 'ניתוח חדש' }));
     expect(mockLearning.createOrResumeAnalysisSession).toHaveBeenCalledWith({
       kind: 'historical',
       scenarioId: 'blind-generated-development-scenario',
+      accessMode: 'qa-internal',
     });
   });
 });

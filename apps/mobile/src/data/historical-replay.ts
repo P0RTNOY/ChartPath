@@ -1,5 +1,5 @@
 import {
-  historicalContentRegistry,
+  internalHistoricalContentRegistry,
   resolveHistoricalContent,
   type HistoricalContentRegistry,
   type ResolvedHistoricalContent,
@@ -104,7 +104,7 @@ export function historicalChartEvidence(
 
 export function resolveHistoricalReplayScenario(
   scenarioId: string,
-  registry: HistoricalContentRegistry = historicalContentRegistry,
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
 ): HistoricalReplayResolution {
   const scenarios = registry.scenarios.filter((scenario) => scenario.scenarioId === scenarioId);
   if (scenarios.length === 0)
@@ -176,7 +176,7 @@ export function resolveHistoricalReplayScenario(
 /** Re-resolves every pinned field. It never repairs, substitutes, repins, or clamps a session. */
 export function resolveHistoricalAnalysisSession(
   session: GuidedAnalysisSession,
-  registry: HistoricalContentRegistry = historicalContentRegistry,
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
 ): HistoricalReplayResolution {
   if (session.chart.kind !== 'historical')
     return unavailable('metadata-mismatch', 'Analysis session is not historical.');
