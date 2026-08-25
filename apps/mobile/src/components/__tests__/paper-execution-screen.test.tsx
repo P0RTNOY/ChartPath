@@ -43,6 +43,19 @@ jest.mock('../ohlcv-chart', () => {
   };
 });
 
+jest.mock('../paper-position-management', () => {
+  const { View } = jest.requireActual('react-native') as typeof import('react-native');
+  return { PaperPositionManagement: () => <View testID="mock-position-management" /> };
+});
+
+const mockManagementAvailability = jest.fn();
+const mockManagementOverlays = jest.fn((..._args: unknown[]) => []);
+jest.mock('@/data/position-management', () => ({
+  resolvePositionManagementAvailability: (...args: unknown[]) =>
+    mockManagementAvailability(...args),
+  buildPositionManagementOverlays: (...args: unknown[]) => mockManagementOverlays(...args),
+}));
+
 const mockResolveAnalysis = jest.fn();
 const mockResolveExecution = jest.fn();
 jest.mock('@/data/paper-execution', () => ({
@@ -196,6 +209,14 @@ function ambiguous(): PaperExecutionSession {
   });
 }
 
+function openPosition(): PaperExecutionSession {
+  return reducePaperExecutionSession(submitted(), {
+    type: 'process-candles',
+    candles: [{ ...candles[3]!, high: 101, low: 98 }],
+    processedAt: '2026-08-24T09:00:00.000Z',
+  });
+}
+
 function analysis(): GuidedAnalysisSession {
   return { sessionId: 'analysis-final', status: 'finalized' } as GuidedAnalysisSession;
 }
@@ -209,7 +230,11 @@ function mockLearning(execution: PaperExecutionSession) {
   mockLearningContext = {
     status: 'ready',
     error: null,
-    snapshot: { analysisSessions: [analysis()], paperExecutionSessions: [execution] },
+    snapshot: {
+      analysisSessions: [analysis()],
+      paperExecutionSessions: [execution],
+      positionManagementSessions: [],
+    },
     reload: jest.fn(),
     createOrResumePaperExecutionSession: jest.fn(async () => execution),
     savePaperExecutionPlan,
@@ -218,6 +243,7 @@ function mockLearning(execution: PaperExecutionSession) {
     completePaperExecutionReplay: jest.fn(async () => execution),
     cancelPaperExecutionOrder,
     abandonPaperExecutionSession,
+    createOrResumePositionManagementSession: jest.fn(async () => undefined),
   };
   return {
     abandonPaperExecutionSession,
@@ -233,6 +259,11 @@ describe('PaperExecutionScreen', () => {
     jest.clearAllMocks();
     mockResolveAnalysis.mockReturnValue(ready);
     mockResolveExecution.mockReturnValue(ready);
+    mockManagementAvailability.mockReturnValue({
+      status: 'unavailable',
+      reason: 'scenario-disabled',
+      messageHe: 'ניהול אינו מופעל.',
+    });
   });
 
   it('renders a progressive Hebrew ticket and requires explicit simulator confirmation', async () => {
@@ -358,5 +389,59 @@ describe('PaperExecutionScreen', () => {
     expect(screen.getByTestId('paper-execution-recovery')).toBeTruthy();
     expect(screen.getByText('Pinned checksum mismatch')).toBeTruthy();
     expect(screen.queryByTestId('paper-submit-order')).toBeNull();
+  });
+
+  it('creates the separate management aggregate only for an enabled exact open position', async () => {
+    const execution = openPosition();
+    expect(execution.status).toBe('open');
+    mockManagementAvailability.mockReturnValue({ status: 'enabled', binding: {} });
+    mockLearning(execution);
+
+    await render(
+      <ChartPathThemeProvider mode="light">
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    await waitFor(() =>
+      expect(mockLearningContext.createOrResumePositionManagementSession).toHaveBeenCalledWith(
+        'paper-session',
+        'qa-hypothetical-mechanics',
+      ),
+    );
+  });
+
+  it('uses the management cursor and removes mutable paper controls after handoff', async () => {
+    const execution = openPosition();
+    const management = {
+      sessionId: 'management-session',
+      handoff: execution,
+      lastProcessedCandleIndex: 4,
+    };
+    mockManagementAvailability.mockReturnValue({ status: 'enabled', binding: {} });
+    mockLearning(execution);
+    (
+      mockLearningContext.snapshot as { positionManagementSessions: unknown[] }
+    ).positionManagementSessions = [management];
+
+    const screen = await render(
+      <ChartPathThemeProvider mode="dark" reducedMotion textScale={1.5}>
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByTestId('paper-management-screen')).toBeTruthy();
+    expect(screen.getByTestId('paper-management-responsive-layout')).toBeTruthy();
+    expect(screen.getByTestId('paper-management-chart')).toBeTruthy();
+    expect(screen.getByTestId('mock-position-management')).toBeTruthy();
+    expect(screen.getByLabelText('גרף ביצוע עם 5 נרות')).toBeTruthy();
+    expect(screen.queryByText('הפסקת סימולציה מפורשת')).toBeNull();
+    expect(mockManagementOverlays).toHaveBeenCalledWith(management, false);
   });
 });

@@ -21,11 +21,13 @@ import {
   Screen,
   UiText,
   useReducedMotion,
+  useTextScale,
   useTheme,
 } from '@chartpath/ui';
 
 import { ErrorState, LoadingState } from './app-state';
 import { OhlcvChart, type ExecutionChartOverlay } from './ohlcv-chart';
+import { PaperPositionManagement } from './paper-position-management';
 import { TopBar } from './top-bar';
 import {
   resolvePaperExecutionAnalysisSession,
@@ -34,6 +36,10 @@ import {
   type PaperExecutionReady,
 } from '@/data/paper-execution';
 import { useLearning } from '@/state/learning';
+import {
+  buildPositionManagementOverlays,
+  resolvePositionManagementAvailability,
+} from '@/data/position-management';
 
 type NumericField = 'entry' | 'stop' | 'target' | 'account' | 'risk' | 'quantity';
 
@@ -421,6 +427,7 @@ export function PaperExecutionScreen({
 }) {
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
+  const textScale = useTextScale();
   const { width } = useWindowDimensions();
   const learning = useLearning();
   const [fields, setFields] = useState<TicketFields | null>(null);
@@ -429,7 +436,9 @@ export function PaperExecutionScreen({
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showHistoricalManagement, setShowHistoricalManagement] = useState(false);
   const createStarted = useRef(false);
+  const managementCreateStartedForPaper = useRef<string | null>(null);
   const hydratedExecutionId = useRef<string | null>(null);
   const draftSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -439,6 +448,14 @@ export function PaperExecutionScreen({
   const execution = learning.snapshot?.paperExecutionSessions.find(
     ({ source }) => source.analysisSessionId === analysisSessionId,
   );
+  const management = execution
+    ? learning.snapshot?.positionManagementSessions.find(
+        ({ handoff }) => handoff.sessionId === execution.sessionId,
+      )
+    : undefined;
+  const managementAvailability = execution
+    ? resolvePositionManagementAvailability(execution)
+    : undefined;
   const analysisResolution = analysis
     ? resolvePaperExecutionAnalysisSession(analysis, undefined, { accessMode })
     : undefined;
@@ -479,6 +496,27 @@ export function PaperExecutionScreen({
       })
       .finally(() => setWorking(false));
   }, [accessMode, analysisSessionId, execution, learning, resolution]);
+
+  useEffect(() => {
+    if (
+      !execution ||
+      management ||
+      execution.status !== 'open' ||
+      execution.position?.status !== 'open' ||
+      managementAvailability?.status !== 'enabled' ||
+      managementCreateStartedForPaper.current === execution.sessionId
+    )
+      return;
+    managementCreateStartedForPaper.current = execution.sessionId;
+    setWorking(true);
+    void learning
+      .createOrResumePositionManagementSession(execution.sessionId, accessMode)
+      .catch((reason: unknown) => {
+        managementCreateStartedForPaper.current = null;
+        setMessage(reason instanceof Error ? reason.message : 'לא ניתן להעביר את הפוזיציה לניהול.');
+      })
+      .finally(() => setWorking(false));
+  }, [accessMode, execution, learning, management, managementAvailability]);
 
   const preview = useMemo(() => {
     if (!fields || resolution?.status !== 'ready') return undefined;
@@ -526,10 +564,17 @@ export function PaperExecutionScreen({
   const editable = execution.status === 'draft';
   const errors = preview.validationIssues.filter(({ severity }) => severity === 'error');
   const warnings = preview.validationIssues.filter(({ severity }) => severity === 'warning');
-  const cursor = execution.lastProcessedCandleIndex;
+  const cursor = management?.lastProcessedCandleIndex ?? execution.lastProcessedCandleIndex;
   const chart = chartAtCursor(resolution, cursor);
-  const overlays = overlaysFor(execution);
-  const wide = width >= 980;
+  const overlays = management
+    ? [
+        ...overlaysFor(management.handoff).filter(
+          ({ kind }) => kind !== 'protective-stop' && kind !== 'target',
+        ),
+        ...buildPositionManagementOverlays(management, showHistoricalManagement),
+      ]
+    : overlaysFor(execution);
+  const wide = width >= 980 && textScale < 1.3;
   const canAdvance =
     ['working', 'open'].includes(execution.status) &&
     cursor < resolution.executionBoundary.lastCandleIndex;
@@ -636,7 +681,7 @@ export function PaperExecutionScreen({
   return (
     <Screen
       accessibilityLabel="תרגול ביצוע על נייר"
-      contentContainerStyle={{ gap: theme.spacing.xl }}
+      contentContainerStyle={{ gap: theme.spacing.xl, ...(management ? { maxWidth: 1180 } : {}) }}
       scroll
       testID="paper-execution-screen"
     >
@@ -680,14 +725,29 @@ export function PaperExecutionScreen({
             width: wide ? undefined : '100%',
           }}
         >
-          <OhlcvChart
-            allowAccessibleDataTable
-            chart={chart}
-            cutoffCandleIndex={cursor}
-            executionOverlays={overlays}
-            testID="paper-execution-chart"
-            ticker={resolution.content.dataset.manifest.displaySymbol}
-          />
+          <View testID={management ? 'paper-management-chart' : undefined}>
+            <OhlcvChart
+              allowAccessibleDataTable
+              chart={chart}
+              cutoffCandleIndex={cursor}
+              executionOverlays={overlays}
+              testID="paper-execution-chart"
+              ticker={resolution.content.dataset.manifest.displaySymbol}
+            />
+          </View>
+          {management ? (
+            <Button
+              accessibilityLabel={
+                showHistoricalManagement
+                  ? 'הסתרת רמות ניהול קודמות, מוצגות כעת'
+                  : 'הצגת רמות ניהול קודמות, מוסתרות כעת'
+              }
+              onPress={() => setShowHistoricalManagement((current) => !current)}
+              variant="ghost"
+            >
+              {showHistoricalManagement ? 'הסתרת רמות ניהול קודמות' : 'הצגת רמות ניהול קודמות'}
+            </Button>
+          ) : undefined}
           <Card variant="subtle">
             <UiText color="textMuted" variant="caption">
               כרונולוגיית הגרף ומספריו מוצגים משמאל לימין. נחשפים רק נרות עד cursor {cursor + 1}.
@@ -913,7 +973,7 @@ export function PaperExecutionScreen({
             </UiText>
           ) : undefined}
 
-          {!editable ? (
+          {!editable && !management ? (
             <Card variant="outlined">
               <View style={{ gap: theme.spacing.sm }}>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -958,7 +1018,39 @@ export function PaperExecutionScreen({
         </View>
       </View>
 
-      {confirmCancel ? (
+      {management ? (
+        <View style={{ gap: theme.spacing.lg, width: '100%' }} testID="paper-management-screen">
+          <View
+            style={{
+              alignItems: 'stretch',
+              flexDirection: wide ? 'row' : 'column',
+              gap: theme.spacing.lg,
+              width: '100%',
+            }}
+            testID="paper-management-responsive-layout"
+          >
+            <View style={{ flex: 1, width: wide ? undefined : '100%' }}>
+              <PaperPositionManagement
+                accessMode={accessMode}
+                lastVisibleCandle={
+                  resolution.candles.find(({ index }) => index === cursor) ??
+                  resolution.candles[resolution.source.decisionCandleIndex]!
+                }
+                replayLastCandleIndex={resolution.executionBoundary.lastCandleIndex}
+                session={management}
+              />
+            </View>
+          </View>
+        </View>
+      ) : managementAvailability?.status === 'unavailable' && execution.status === 'open' ? (
+        <Card testID="paper-management-unavailable" variant="subtle">
+          <UiText color="textMuted" variant="caption">
+            {managementAvailability.messageHe}
+          </UiText>
+        </Card>
+      ) : undefined}
+
+      {confirmCancel && !management ? (
         <Card accessibilityLabel="אישור ביטול הוראת נייר" variant="outlined">
           <View style={{ gap: 8 }}>
             <Heading level={3}>לבטל את ההוראה הממתינה?</Heading>
@@ -975,7 +1067,7 @@ export function PaperExecutionScreen({
         </Card>
       ) : undefined}
 
-      {confirmAbandon ? (
+      {confirmAbandon && !management ? (
         <Card
           accessibilityLabel="אישור הפסקת סימולציית ביצוע"
           testID="paper-abandon-confirmation"

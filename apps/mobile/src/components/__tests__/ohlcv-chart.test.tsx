@@ -332,7 +332,7 @@ describe('OhlcvChart accessibility', () => {
       ).toBeTruthy();
     }
     expect(screen.getByTestId('ohlcv-chart-execution-legend')).toBeTruthy();
-    expect(screen.getByLabelText(/שכבת ביצוע נוכחית:.*כניסה מתוכננת/)).toBeTruthy();
+    expect(screen.getByLabelText(/שכבות ביצוע גלויות/)).toBeTruthy();
     expect(screen.getByText('סדר האירועים אינו ניתן לקביעה')).toBeTruthy();
   });
 

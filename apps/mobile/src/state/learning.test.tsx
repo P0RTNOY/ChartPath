@@ -7,6 +7,7 @@ import {
   exercises,
   historicalContentRegistry,
   scenarioCandidateRegistry,
+  scenarioPositionManagementVariantRegistry,
   lessons,
   type HistoricalContentRegistry,
 } from '@chartpath/content';
@@ -194,6 +195,7 @@ describe('guided analysis learning integration', () => {
       harness.current().createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: candidate.scenario.scenarioId,
+        scenarioVersion: candidate.scenario.scenarioVersion,
       }),
     ).rejects.toThrow(/internal-scenario-restricted/);
     expect((await repository.load()).analysisSessions).toEqual([]);
@@ -222,6 +224,7 @@ describe('guided analysis learning integration', () => {
         session = await harness.current().createOrResumeAnalysisSession({
           kind: 'historical',
           scenarioId: candidate.scenario.scenarioId,
+          scenarioVersion: candidate.scenario.scenarioVersion,
           accessMode: 'qa-internal',
         });
       });
@@ -275,6 +278,153 @@ describe('guided analysis learning integration', () => {
       await harness.view.unmount();
     },
   );
+
+  it('requires an exact version for duplicate immutable QA scenario identities', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    const variant = scenarioPositionManagementVariantRegistry[0]!;
+    await expect(
+      harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: variant.scenarioId,
+        accessMode: 'qa-internal',
+      }),
+    ).rejects.toThrow(/scenario-version-required/);
+    expect((await repository.load()).analysisSessions).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it.each(['2.0.0', '2.1.0'] as const)(
+    'allocates the exact long management QA identity at version %s',
+    async (scenarioVersion) => {
+      const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+        contentVersion: contentVersion.id,
+      });
+      const harness = await renderLearning(repository);
+      const variant = scenarioPositionManagementVariantRegistry.find(
+        (candidate) =>
+          candidate.scenarioId === 'internal-long-range-breakout' &&
+          candidate.scenarioVersion === scenarioVersion,
+      )!;
+      let session!: GuidedAnalysisSession;
+      await act(async () => {
+        session = await harness.current().createOrResumeAnalysisSession({
+          kind: 'historical',
+          scenarioId: variant.scenarioId,
+          scenarioVersion: variant.scenarioVersion,
+          accessMode: 'qa-internal',
+        });
+      });
+      expect(session.chart).toMatchObject({
+        kind: 'historical',
+        scenarioId: variant.scenarioId,
+        scenarioVersion,
+        datasetVersion: variant.datasetVersion,
+        canonicalChecksum: variant.datasetChecksum,
+        learningCredit: 'none',
+      });
+      await harness.view.unmount();
+    },
+  );
+
+  it('hands an exact open paper position to management and freezes paper mutation without credit', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository);
+    const variant = scenarioPositionManagementVariantRegistry.find(
+      ({ scenarioId, scenarioVersion }) =>
+        scenarioId === 'internal-long-range-breakout' && scenarioVersion === '2.0.0',
+    )!;
+    const base = scenarioCandidateRegistry.find(
+      ({ manifest }) => manifest.scenarioId === variant.scenarioId,
+    )!;
+    let analysis!: GuidedAnalysisSession;
+    let paper!: PaperExecutionSession;
+    await act(async () => {
+      analysis = await harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: variant.scenarioId,
+        scenarioVersion: variant.scenarioVersion,
+        accessMode: 'qa-internal',
+      });
+      const completed = submitEveryStep(analysis);
+      await harness.current().saveAnalysisSession(completed);
+      await harness.current().finalizeAnalysisSession(completed);
+      paper = await harness
+        .current()
+        .createOrResumePaperExecutionSession(
+          analysis.sessionId,
+          base.manifest.expectedExecution!.plan,
+        );
+      paper = await harness
+        .current()
+        .submitPaperExecutionSession(paper.sessionId, 'management-paper-submit');
+      paper = await harness.current().advancePaperExecutionSession(paper.sessionId, 1);
+    });
+    expect(paper.status).toBe('open');
+
+    const creditBefore = JSON.stringify({
+      attempts: harness.current().snapshot!.attempts,
+      projections: harness.current().snapshot!.projections,
+    });
+    let management!: Awaited<
+      ReturnType<LearningContextValue['createOrResumePositionManagementSession']>
+    >;
+    await act(async () => {
+      management = await harness.current().createOrResumePositionManagementSession(paper.sessionId);
+    });
+    expect(management).toMatchObject({
+      status: 'active',
+      handoff: { sessionId: paper.sessionId, status: 'open' },
+      source: {
+        scenarioId: variant.scenarioId,
+        scenarioVersion: variant.scenarioVersion,
+        learningCredit: 'none',
+      },
+      authority: { learningCredit: 'none' },
+    });
+    await expect(
+      harness.current().advancePaperExecutionSession(paper.sessionId, 1),
+    ).rejects.toThrow(/management|ניהול/i);
+
+    await act(async () => {
+      management = await harness
+        .current()
+        .savePositionManagementDraft(
+          management.sessionId,
+          { kind: 'partial-exit', quantityUnits: 1 },
+          'צמצום מתועד לפי התכנית והסיכון הגלויים.',
+          {
+            decisionBasis: 'predefined-plan',
+            riskReviewed: true,
+            evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
+          },
+        );
+      management = await harness
+        .current()
+        .submitPositionManagementDraft(
+          management.sessionId,
+          `management-submit:${management.sessionId}`,
+          management.draft!.riskAssessment.warningCodes,
+        );
+      management = await harness
+        .current()
+        .advancePositionManagementSession(management.sessionId, 1);
+    });
+    expect(management.events.filter(({ type }) => type === 'voluntary-exit-filled')).toHaveLength(
+      1,
+    );
+    expect(
+      JSON.stringify({
+        attempts: harness.current().snapshot!.attempts,
+        projections: harness.current().snapshot!.projections,
+      }),
+    ).toBe(creditBefore);
+    await harness.view.unmount();
+  });
 
   it('builds immutable attempt records with bounded timing and unique hints', () => {
     const exercise = exercises.find(({ id }) => id === GUIDED_ANALYSIS_EXERCISE_ID)!;

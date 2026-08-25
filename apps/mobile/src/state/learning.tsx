@@ -21,9 +21,11 @@ import {
   ANALYSIS_WORKFLOW_STEP_IDS,
   analysisSessionHintIdsUsed,
   createPaperExecutionSession,
+  createPositionManagementSession,
   createGuidedAnalysisSession,
   gradeAnswer,
   reducePaperExecutionSession,
+  reducePositionManagementSession,
   reduceGuidedAnalysisSession,
   type AnalysisWorkflowStepId,
   type AnalysisChartIdentity,
@@ -36,6 +38,11 @@ import {
   type GuidedAnalysisSession,
   type OhlcvCandle,
   type PaperExecutionSession,
+  type PositionManagementMaterialIntent,
+  type PositionManagementEvidenceTag,
+  type PositionManagementProcessEvidence,
+  type PositionManagementRiskCode,
+  type PositionManagementSession,
   type TradePlanInput,
 } from '@chartpath/domain';
 
@@ -48,6 +55,8 @@ import {
   PersistenceCorruptionError,
   PaperExecutionSessionConflictError,
   PaperExecutionSessionNotFoundError,
+  PositionManagementSessionConflictError,
+  PositionManagementSessionNotFoundError,
   UnsupportedPersistenceVersionError,
   type LearnerSettingsPatch,
   type NewAttemptRecord,
@@ -65,6 +74,7 @@ import {
   type PaperExecutionAccessMode,
   type PaperExecutionReady,
 } from '@/data/paper-execution';
+import { resolvePositionManagementAvailability } from '@/data/position-management';
 
 export const DISCLAIMER_VERSION = 'chartpath-education-he-2026-08';
 export const GUIDED_ANALYSIS_EXERCISE_ID = 'u10-capstone-e03';
@@ -88,6 +98,8 @@ export type AnalysisSessionRequest =
   | {
       readonly kind: 'historical';
       readonly scenarioId: string;
+      /** Required when QA exposes more than one immutable version for the same scenario ID. */
+      readonly scenarioVersion?: string;
       readonly accessMode?: 'ordinary' | 'qa-internal';
     };
 
@@ -138,6 +150,53 @@ export interface LearningContextValue {
     sessionId: string,
     confirmationId: string,
   ) => Promise<PaperExecutionSession>;
+  readonly createOrResumePositionManagementSession: (
+    paperExecutionSessionId: string,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly savePositionManagementDraft: (
+    sessionId: string,
+    intent: PositionManagementMaterialIntent,
+    rationale: string,
+    processEvidence: PositionManagementProcessEvidence,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly submitPositionManagementDraft: (
+    sessionId: string,
+    submissionId: string,
+    acknowledgedRiskWarningCodes: readonly PositionManagementRiskCode[],
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly cancelPendingPositionManagementAction: (
+    sessionId: string,
+    submissionId: string,
+    cancellationId: string,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly recordPositionManagementObservation: (
+    sessionId: string,
+    entryId: string,
+    text: string,
+    evidenceTags?: readonly PositionManagementEvidenceTag[],
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly correctPositionManagementJournal: (
+    sessionId: string,
+    entryId: string,
+    correctsEntryId: string,
+    text: string,
+    evidenceTags?: readonly PositionManagementEvidenceTag[],
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly advancePositionManagementSession: (
+    sessionId: string,
+    candleCount?: number,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
+  readonly completePositionManagementReplay: (
+    sessionId: string,
+    accessMode?: PaperExecutionAccessMode,
+  ) => Promise<PositionManagementSession>;
   /** Explicit recovery only removes selected quarantined drafts; attempt history is untouched. */
   readonly discardQuarantinedAnalysisSessions: (quarantineIds: readonly string[]) => Promise<void>;
   readonly resetData: () => Promise<void>;
@@ -161,6 +220,10 @@ function errorMessage(error: unknown): string {
     return 'תרגול ביצוע הנייר לא נמצא. חזרו לניתוח שהושלם ובחרו תרגול זמין.';
   if (error instanceof PaperExecutionSessionConflictError)
     return 'תרגול ביצוע הנייר השתנה מאז שנפתח. טענו אותו מחדש לפני המשך הפעולה.';
+  if (error instanceof PositionManagementSessionNotFoundError)
+    return 'סשן ניהול הפוזיציה לא נמצא. חזרו לתרגול הביצוע ופתחו את הפוזיציה השמורה.';
+  if (error instanceof PositionManagementSessionConflictError)
+    return 'ניהול הפוזיציה השתנה מאז שנפתח. טענו אותו מחדש לפני המשך הפעולה.';
   return error instanceof Error ? error.message : 'אירעה שגיאה לא צפויה.';
 }
 
@@ -523,7 +586,19 @@ export function LearningProvider({
         if (request.kind === 'synthetic') {
           candidate = allocateSyntheticGuidedAnalysisSession(createdAt);
         } else {
-          const resolved = resolveHistoricalReplayScenario(request.scenarioId, historicalRegistry);
+          const installedVersions = historicalRegistry.scenarios.filter(
+            ({ scenarioId }) => scenarioId === request.scenarioId,
+          );
+          if (request.scenarioVersion === undefined && installedVersions.length > 1) {
+            throw new Error(
+              `Historical scenario identity is ambiguous: ${request.scenarioId} (scenario-version-required).`,
+            );
+          }
+          const resolved = resolveHistoricalReplayScenario(
+            request.scenarioId,
+            historicalRegistry,
+            request.scenarioVersion,
+          );
           if (resolved.status !== 'ready') throw unavailableHistoricalDataError(resolved);
           const internalOnly =
             resolved.content.learningCredit === 'none' ||
@@ -778,6 +853,16 @@ export function LearningProvider({
         ({ sessionId: candidateId }) => candidateId === sessionId,
       );
       if (!session) throw new PaperExecutionSessionNotFoundError(sessionId);
+      if (
+        loaded.positionManagementSessions.some(
+          ({ handoff }) => handoff.sessionId === session.sessionId,
+        )
+      ) {
+        throw new PositionManagementSessionConflictError(
+          session.sessionId,
+          'The paper execution is frozen after its exact position-management handoff.',
+        );
+      }
       const resolved = resolvePaperExecutionSession(
         session,
         loaded.analysisSessions,
@@ -1057,6 +1142,16 @@ export function LearningProvider({
         );
         if (!session) throw new PaperExecutionSessionNotFoundError(sessionId);
         if (
+          loaded.positionManagementSessions.some(
+            ({ handoff }) => handoff.sessionId === session.sessionId,
+          )
+        ) {
+          throw new PositionManagementSessionConflictError(
+            session.sessionId,
+            'The paper execution is frozen after its exact position-management handoff.',
+          );
+        }
+        if (
           session.events.some(
             (event) =>
               event.type === 'execution-abandoned' && event.confirmationId === confirmationId,
@@ -1077,6 +1172,357 @@ export function LearningProvider({
       }
     },
     [repository],
+  );
+
+  const loadResolvedPositionManagement = useCallback(
+    async (
+      sessionId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<{
+      readonly session: PositionManagementSession;
+      readonly resolved: PaperExecutionReady;
+      readonly loaded: PersistenceSnapshot;
+    }> => {
+      const loaded = await repository().load();
+      const session = loaded.positionManagementSessions.find(
+        ({ sessionId: candidateId }) => candidateId === sessionId,
+      );
+      if (!session) throw new PositionManagementSessionNotFoundError(sessionId);
+      const paper = loaded.paperExecutionSessions.find(
+        ({ sessionId: candidateId }) => candidateId === session.handoff.sessionId,
+      );
+      if (!paper) throw new PaperExecutionSessionNotFoundError(session.handoff.sessionId);
+      const resolved = resolvePaperExecutionSession(
+        session.handoff,
+        loaded.analysisSessions,
+        historicalRegistry,
+        { accessMode },
+      );
+      if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
+      return { session, resolved, loaded };
+    },
+    [historicalRegistry, repository],
+  );
+
+  const createOrResumePositionManagementSession = useCallback(
+    async (
+      paperExecutionSessionId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const loaded = await repository().load();
+        const existing = loaded.positionManagementSessions.find(
+          ({ handoff }) => handoff.sessionId === paperExecutionSessionId,
+        );
+        if (existing) {
+          const rebound = resolvePaperExecutionSession(
+            existing.handoff,
+            loaded.analysisSessions,
+            historicalRegistry,
+            { accessMode },
+          );
+          if (rebound.status !== 'ready') throw unavailablePaperExecutionError(rebound);
+          const availability = resolvePositionManagementAvailability(existing.handoff);
+          if (availability.status !== 'enabled') {
+            throw new PositionManagementSessionConflictError(
+              existing.sessionId,
+              availability.messageHe,
+            );
+          }
+          if (
+            JSON.stringify(existing.authority) !== JSON.stringify(availability.binding.authority) ||
+            JSON.stringify(existing.policy) !== JSON.stringify(availability.binding.policy)
+          ) {
+            throw new PositionManagementSessionConflictError(
+              existing.sessionId,
+              'Position management authority differs from its exact scenario binding.',
+            );
+          }
+          setSnapshot(loaded);
+          return existing;
+        }
+        const paper = loaded.paperExecutionSessions.find(
+          ({ sessionId }) => sessionId === paperExecutionSessionId,
+        );
+        if (!paper) throw new PaperExecutionSessionNotFoundError(paperExecutionSessionId);
+        const resolved = resolvePaperExecutionSession(
+          paper,
+          loaded.analysisSessions,
+          historicalRegistry,
+          { accessMode },
+        );
+        if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
+        if (paper.status !== 'open' || paper.position?.status !== 'open') {
+          throw new PositionManagementSessionConflictError(
+            paper.sessionId,
+            'Position management is available only after the exact paper position opens.',
+          );
+        }
+        const availability = resolvePositionManagementAvailability(paper);
+        if (availability.status !== 'enabled') {
+          throw new PositionManagementSessionConflictError(paper.sessionId, availability.messageHe);
+        }
+        const createdAt = new Date().toISOString();
+        const token = allocationToken(createdAt);
+        const candidate = createPositionManagementSession({
+          sessionId: `position-management-${token}`,
+          debriefId: `position-management-debrief-${token}`,
+          openPaperExecutionSession: paper,
+          authority: availability.binding.authority,
+          policy: availability.binding.policy,
+          createdAt,
+        });
+        const stored = await repository().createOrResumePositionManagementSession(candidate);
+        setSnapshot(stored.snapshot);
+        return stored.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [historicalRegistry, repository],
+  );
+
+  const savePositionManagementDraft = useCallback(
+    async (
+      sessionId: string,
+      intent: PositionManagementMaterialIntent,
+      rationale: string,
+      processEvidence: PositionManagementProcessEvidence,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const { session, loaded } = await loadResolvedPositionManagement(sessionId, accessMode);
+        if (
+          session.draft &&
+          JSON.stringify(session.draft.intent) === JSON.stringify(intent) &&
+          session.draft.rationale === rationale &&
+          JSON.stringify(session.draft.processEvidence) === JSON.stringify(processEvidence)
+        ) {
+          setSnapshot(loaded);
+          return session;
+        }
+        const updatedAt = new Date().toISOString();
+        const revised = reducePositionManagementSession(session, {
+          type: 'edit-draft',
+          editId: `management-edit:${session.sessionId}:${session.revision + 1}`,
+          draftId: session.draft?.draftId ?? `management-draft:${session.sessionId}`,
+          intent,
+          rationale,
+          processEvidence,
+          authoredAtCandleIndex: session.lastProcessedCandleIndex,
+          updatedAt,
+        });
+        const saved = await repository().savePositionManagementSession(revised);
+        setSnapshot(saved.snapshot);
+        return saved.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const submitPositionManagementDraft = useCallback(
+    async (
+      sessionId: string,
+      submissionId: string,
+      acknowledgedRiskWarningCodes: readonly PositionManagementRiskCode[],
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const { session, loaded } = await loadResolvedPositionManagement(sessionId, accessMode);
+        if (session.pendingAction?.submissionId === submissionId) {
+          setSnapshot(loaded);
+          return session;
+        }
+        if (!session.draft) throw new Error('אין טיוטת פעולת ניהול להגשה.');
+        const revised = reducePositionManagementSession(session, {
+          type: 'submit-draft',
+          submissionId,
+          draftId: session.draft.draftId,
+          acknowledgedRiskWarningCodes,
+          submittedAt: new Date().toISOString(),
+        });
+        const saved = await repository().savePositionManagementSession(revised);
+        setSnapshot(saved.snapshot);
+        return saved.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const cancelPendingPositionManagementAction = useCallback(
+    async (
+      sessionId: string,
+      submissionId: string,
+      cancellationId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const { session, loaded } = await loadResolvedPositionManagement(sessionId, accessMode);
+        if (
+          session.events.some(
+            (event) =>
+              event.type === 'management-action-cancelled' &&
+              event.cancellationId === cancellationId &&
+              event.submissionId === submissionId,
+          )
+        ) {
+          setSnapshot(loaded);
+          return session;
+        }
+        const revised = reducePositionManagementSession(session, {
+          type: 'cancel-pending',
+          cancellationId,
+          submissionId,
+          cancelledAt: new Date().toISOString(),
+        });
+        const saved = await repository().savePositionManagementSession(revised);
+        setSnapshot(saved.snapshot);
+        return saved.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const recordPositionManagementObservation = useCallback(
+    async (
+      sessionId: string,
+      entryId: string,
+      text: string,
+      evidenceTags: readonly PositionManagementEvidenceTag[] = [],
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const { session, loaded } = await loadResolvedPositionManagement(sessionId, accessMode);
+        if (session.journal.some((entry) => entry.entryId === entryId)) {
+          setSnapshot(loaded);
+          return session;
+        }
+        const revised = reducePositionManagementSession(session, {
+          type: 'record-observation',
+          entryId,
+          candleIndex: session.lastProcessedCandleIndex,
+          text,
+          evidenceTags,
+          recordedAt: new Date().toISOString(),
+        });
+        const saved = await repository().savePositionManagementSession(revised);
+        setSnapshot(saved.snapshot);
+        return saved.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const correctPositionManagementJournal = useCallback(
+    async (
+      sessionId: string,
+      entryId: string,
+      correctsEntryId: string,
+      text: string,
+      evidenceTags: readonly PositionManagementEvidenceTag[] = [],
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        const { session, loaded } = await loadResolvedPositionManagement(sessionId, accessMode);
+        if (session.journal.some((entry) => entry.entryId === entryId)) {
+          setSnapshot(loaded);
+          return session;
+        }
+        const revised = reducePositionManagementSession(session, {
+          type: 'correct-journal',
+          entryId,
+          correctsEntryId,
+          text,
+          evidenceTags,
+          recordedAt: new Date().toISOString(),
+        });
+        const saved = await repository().savePositionManagementSession(revised);
+        setSnapshot(saved.snapshot);
+        return saved.session;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const advancePositionManagementSession = useCallback(
+    async (
+      sessionId: string,
+      candleCount = 1,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      try {
+        if (!Number.isInteger(candleCount) || candleCount <= 0)
+          throw new RangeError('מספר הנרות להתקדמות חייב להיות מספר שלם וחיובי.');
+        const { session, resolved, loaded } = await loadResolvedPositionManagement(
+          sessionId,
+          accessMode,
+        );
+        if (session.status !== 'active') {
+          setSnapshot(loaded);
+          return session;
+        }
+        const destination = Math.min(
+          session.lastProcessedCandleIndex + candleCount,
+          resolved.executionBoundary.lastCandleIndex,
+        );
+        const candles = resolved.candles.filter(
+          ({ index }) => index > session.lastProcessedCandleIndex && index <= destination,
+        );
+        let current = session;
+        let currentSnapshot = loaded;
+        if (candles.length) {
+          current = reducePositionManagementSession(current, {
+            type: 'process-candles',
+            candles,
+            processedAt: new Date().toISOString(),
+          });
+          const stored = await repository().savePositionManagementSession(current);
+          current = stored.session;
+          currentSnapshot = stored.snapshot;
+        }
+        if (
+          current.status === 'active' &&
+          current.lastProcessedCandleIndex === resolved.executionBoundary.lastCandleIndex
+        ) {
+          const completed = reducePositionManagementSession(current, {
+            type: 'complete-replay',
+            completedAt: new Date().toISOString(),
+          });
+          const stored = await repository().savePositionManagementSession(completed);
+          current = stored.session;
+          currentSnapshot = stored.snapshot;
+        }
+        setSnapshot(currentSnapshot);
+        return current;
+      } catch (reason) {
+        throw localizedPaperExecutionError(reason);
+      }
+    },
+    [loadResolvedPositionManagement, repository],
+  );
+
+  const completePositionManagementReplay = useCallback(
+    async (
+      sessionId: string,
+      accessMode: PaperExecutionAccessMode = 'ordinary',
+    ): Promise<PositionManagementSession> => {
+      const { session, resolved } = await loadResolvedPositionManagement(sessionId, accessMode);
+      if (session.status !== 'active') return session;
+      const remaining =
+        resolved.executionBoundary.lastCandleIndex - session.lastProcessedCandleIndex;
+      return advancePositionManagementSession(sessionId, Math.max(1, remaining), accessMode);
+    },
+    [advancePositionManagementSession, loadResolvedPositionManagement],
   );
 
   const discardQuarantinedAnalysisSessions = useCallback(
@@ -1122,6 +1568,14 @@ export function LearningProvider({
       completePaperExecutionReplay,
       cancelPaperExecutionOrder,
       abandonPaperExecutionSession,
+      createOrResumePositionManagementSession,
+      savePositionManagementDraft,
+      submitPositionManagementDraft,
+      cancelPendingPositionManagementAction,
+      recordPositionManagementObservation,
+      correctPositionManagementJournal,
+      advancePositionManagementSession,
+      completePositionManagementReplay,
       discardQuarantinedAnalysisSessions,
       resetData,
       reload,
@@ -1130,23 +1584,31 @@ export function LearningProvider({
       abandonPaperExecutionSession,
       abandonAnalysisSession,
       acceptDisclaimer,
+      advancePositionManagementSession,
       advancePaperExecutionSession,
+      cancelPendingPositionManagementAction,
       cancelPaperExecutionOrder,
+      completePositionManagementReplay,
       completePaperExecutionReplay,
       createOrResumeAnalysisSession,
       createOrResumePaperExecutionSession,
+      createOrResumePositionManagementSession,
+      correctPositionManagementJournal,
       discardQuarantinedAnalysisSessions,
       error,
       finalizeAnalysisSession,
       reload,
+      recordPositionManagementObservation,
       resetData,
       restartAnalysisSession,
       savePaperExecutionPlan,
+      savePositionManagementDraft,
       saveAnalysisSession,
       snapshot,
       status,
       submitAttempt,
       submitPaperExecutionSession,
+      submitPositionManagementDraft,
       updateSettings,
     ],
   );

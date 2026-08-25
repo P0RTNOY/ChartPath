@@ -160,7 +160,10 @@ export function HistoricalScenarioQa({
                 disabled={startingKey !== undefined}
                 loading={startingKey === selectedKey}
                 onPress={() => onStart(selectedKey)}
-                testID={`scenario-qa-start-${selectedKey}`}
+                testID={
+                  cards.find(({ qaKey }) => qaKey === selectedKey)?.startTestID ??
+                  `scenario-qa-start-${selectedKey}`
+                }
               >
                 פתיחה עיוורת ללא קרדיט
               </Button>

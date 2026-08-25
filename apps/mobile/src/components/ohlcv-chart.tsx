@@ -66,14 +66,28 @@ export interface OhlcvChartProps {
 export type ExecutionChartOverlay =
   | {
       readonly id: string;
-      readonly kind: 'planned-entry' | 'working-order' | 'protective-stop' | 'target';
+      readonly kind:
+        | 'planned-entry'
+        | 'working-order'
+        | 'protective-stop'
+        | 'target'
+        | 'original-stop'
+        | 'current-stop'
+        | 'pending-stop'
+        | 'replaced-stop'
+        | 'original-target'
+        | 'current-target'
+        | 'pending-target'
+        | 'replaced-target';
       readonly labelHe: string;
       readonly price: number;
       readonly visibleFromCandleIndex: number;
+      readonly visibleUntilCandleIndex?: number;
     }
   | {
       readonly id: string;
-      readonly kind: 'fill' | 'exit';
+      readonly kind:
+        'fill' | 'exit' | 'added-fill' | 'partial-exit' | 'full-exit' | 'journal-marker';
       readonly labelHe: string;
       readonly price: number;
       readonly candleIndex: number;
@@ -477,29 +491,75 @@ export function OhlcvChart({
         </G>
       );
     }
-    if (overlay.kind === 'fill' || overlay.kind === 'exit') {
+    if (
+      overlay.kind === 'fill' ||
+      overlay.kind === 'exit' ||
+      overlay.kind === 'added-fill' ||
+      overlay.kind === 'partial-exit' ||
+      overlay.kind === 'full-exit' ||
+      overlay.kind === 'journal-marker'
+    ) {
       const x = xForIndex(overlay.candleIndex);
       const y = yForPrice(overlay.price);
-      return overlay.kind === 'fill' ? (
-        <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
-          <Line
-            stroke={theme.colors.info}
-            strokeWidth={3}
-            x1={AXIS_LEFT}
-            x2={right}
-            y1={y}
-            y2={y}
-          />
-          <Circle
-            cx={x}
-            cy={y}
-            fill={theme.colors.info}
-            r={6}
-            stroke={theme.colors.surfaceRaised}
-            strokeWidth={2}
-          />
-        </G>
-      ) : (
+      if (overlay.kind === 'fill' || overlay.kind === 'added-fill') {
+        return (
+          <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+            <Line
+              stroke={theme.colors.info}
+              strokeWidth={3}
+              x1={AXIS_LEFT}
+              x2={right}
+              y1={y}
+              y2={y}
+            />
+            <Circle
+              cx={x}
+              cy={y}
+              fill={theme.colors.info}
+              r={6}
+              stroke={theme.colors.surfaceRaised}
+              strokeWidth={2}
+            />
+            {overlay.kind === 'added-fill' ? (
+              <Circle
+                cx={x}
+                cy={y}
+                fill="none"
+                r={10}
+                stroke={theme.colors.info}
+                strokeDasharray="2 2"
+                strokeWidth={2}
+              />
+            ) : undefined}
+          </G>
+        );
+      }
+      if (overlay.kind === 'journal-marker') {
+        return (
+          <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
+            <Rect
+              fill={theme.colors.surfaceRaised}
+              height={16}
+              stroke={theme.colors.warning}
+              strokeWidth={2}
+              width={16}
+              x={x - 8}
+              y={y - 8}
+            />
+            <SvgText
+              fill={theme.colors.warning}
+              fontSize="10"
+              fontWeight="700"
+              textAnchor="middle"
+              x={x}
+              y={y + 4}
+            >
+              J
+            </SvgText>
+          </G>
+        );
+      }
+      return (
         <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
           <Line
             stroke={theme.colors.chartNeutral}
@@ -517,6 +577,16 @@ export function OhlcvChart({
             y1={y + 7}
             y2={y - 7}
           />
+          {overlay.kind === 'partial-exit' ? (
+            <Circle
+              cx={x}
+              cy={y}
+              fill={theme.colors.surfaceRaised}
+              r={4}
+              stroke={theme.colors.chartNeutral}
+              strokeWidth={2}
+            />
+          ) : undefined}
         </G>
       );
     }
@@ -552,15 +622,33 @@ export function OhlcvChart({
       'working-order': { dash: '8 3 2 3', width: 3, color: theme.colors.info },
       'protective-stop': { dash: '4 3', width: 3, color: theme.colors.danger },
       target: { dash: '10 5', width: 3, color: theme.colors.success },
+      'original-stop': { dash: '2 5', width: 2, color: theme.colors.danger },
+      'current-stop': { dash: '7 3', width: 4, color: theme.colors.danger },
+      'pending-stop': { dash: '1 3', width: 4, color: theme.colors.warning },
+      'replaced-stop': { dash: '2 7', width: 2, color: theme.colors.chartNeutral },
+      'original-target': { dash: '2 5', width: 2, color: theme.colors.success },
+      'current-target': { dash: '10 4', width: 4, color: theme.colors.success },
+      'pending-target': { dash: '1 3', width: 4, color: theme.colors.warning },
+      'replaced-target': { dash: '2 7', width: 2, color: theme.colors.chartNeutral },
     }[overlay.kind];
+    const startX =
+      overlay.visibleFromCandleIndex <= firstIndex
+        ? AXIS_LEFT
+        : xForIndex(overlay.visibleFromCandleIndex);
+    const visibleUntilCandleIndex =
+      'visibleUntilCandleIndex' in overlay ? overlay.visibleUntilCandleIndex : undefined;
+    const endX =
+      visibleUntilCandleIndex === undefined
+        ? right
+        : Math.min(right, xForIndex(visibleUntilCandleIndex));
     return (
       <G key={overlay.id} testID={`${testID}-execution-${overlay.kind}-${overlay.id}`}>
         <Line
           stroke={style.color}
           strokeDasharray={style.dash}
           strokeWidth={style.width}
-          x1={AXIS_LEFT}
-          x2={right}
+          x1={startX}
+          x2={endX}
           y1={y}
           y2={y}
         />
@@ -593,7 +681,7 @@ export function OhlcvChart({
             x={right - 8}
             y={y - 5}
           >
-            {overlay.kind === 'protective-stop' ? 'S' : 'T'}
+            {overlay.kind.includes('stop') ? 'S' : 'T'}
           </SvgText>
         )}
       </G>
@@ -606,7 +694,7 @@ export function OhlcvChart({
       : (accessibilityLabel ?? chartDescription(candles, ticker, chart.spec.timeframe));
   const executionDescription = safeExecutionOverlays.length
     ? `. ${isolateLtrRunsInHebrew(
-        `שכבת ביצוע נוכחית: ${safeExecutionOverlays.map(({ labelHe }) => labelHe).join(', ')}`,
+        `${safeExecutionOverlays.length} שכבות ביצוע גלויות מפורטות ברשימה הנגישה`,
       )}`
     : '';
   const description = `${
@@ -962,6 +1050,8 @@ export function OhlcvChart({
         >
           {safeExecutionOverlays.map((overlay) => (
             <View
+              accessible
+              accessibilityLabel={`שכבת ביצוע: ${isolateLtrRunsInHebrew(overlay.labelHe)}`}
               key={overlay.id}
               style={{
                 alignItems: 'center',
@@ -970,24 +1060,30 @@ export function OhlcvChart({
                 borderWidth: 1,
                 flexDirection: 'row',
                 gap: 6,
-                minHeight: 36,
+                minHeight: 44,
                 paddingHorizontal: 8,
               }}
             >
               <LtrText color="primary" variant="label">
                 {overlay.kind === 'fill'
                   ? '●'
-                  : overlay.kind === 'exit'
-                    ? '×'
-                    : overlay.kind === 'ambiguous'
-                      ? '?'
-                      : overlay.kind === 'protective-stop'
-                        ? 'S'
-                        : overlay.kind === 'target'
-                          ? 'T'
-                          : overlay.kind === 'working-order'
-                            ? '○'
-                            : '◇'}
+                  : overlay.kind === 'added-fill'
+                    ? '⊕'
+                    : overlay.kind === 'partial-exit'
+                      ? '⊖'
+                      : overlay.kind === 'exit' || overlay.kind === 'full-exit'
+                        ? '×'
+                        : overlay.kind === 'journal-marker'
+                          ? 'J'
+                          : overlay.kind === 'ambiguous'
+                            ? '?'
+                            : overlay.kind.includes('stop')
+                              ? 'S'
+                              : overlay.kind.includes('target')
+                                ? 'T'
+                                : overlay.kind === 'working-order'
+                                  ? '○'
+                                  : '◇'}
               </LtrText>
               <UiText variant="caption">{overlay.labelHe}</UiText>
             </View>

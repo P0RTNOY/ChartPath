@@ -105,8 +105,13 @@ export function historicalChartEvidence(
 export function resolveHistoricalReplayScenario(
   scenarioId: string,
   registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+  scenarioVersion?: string,
 ): HistoricalReplayResolution {
-  const scenarios = registry.scenarios.filter((scenario) => scenario.scenarioId === scenarioId);
+  const scenarios = registry.scenarios.filter(
+    (scenario) =>
+      scenario.scenarioId === scenarioId &&
+      (scenarioVersion === undefined || scenario.scenarioVersion === scenarioVersion),
+  );
   if (scenarios.length === 0)
     return unavailable('scenario-missing', `Historical scenario is unavailable: ${scenarioId}.`);
   if (scenarios.length !== 1)
@@ -145,7 +150,7 @@ export function resolveHistoricalReplayScenario(
     );
   }
 
-  const resolved = resolveHistoricalContent(scenarioId, registry);
+  const resolved = resolveHistoricalContent(scenarioId, { ...registry, scenarios });
   if (!resolved.ok)
     return unavailable(
       'metadata-mismatch',
@@ -180,7 +185,11 @@ export function resolveHistoricalAnalysisSession(
 ): HistoricalReplayResolution {
   if (session.chart.kind !== 'historical')
     return unavailable('metadata-mismatch', 'Analysis session is not historical.');
-  const resolved = resolveHistoricalReplayScenario(session.chart.scenarioId, registry);
+  const resolved = resolveHistoricalReplayScenario(
+    session.chart.scenarioId,
+    registry,
+    session.chart.scenarioVersion,
+  );
   if (resolved.status !== 'ready') return resolved;
   if (session.chart.canonicalChecksum !== resolved.chartIdentity.canonicalChecksum)
     return unavailable(

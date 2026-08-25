@@ -105,6 +105,8 @@ function snapshot(analysisSessions: readonly GuidedAnalysisSession[]): Persisten
     quarantinedAnalysisSessions: [],
     paperExecutionSessions: [],
     quarantinedPaperExecutionSessions: [],
+    positionManagementSessions: [],
+    quarantinedPositionManagementSessions: [],
     projections: {
       projectorVersion: 1,
       lastAppliedAttemptId: null,
@@ -189,7 +191,11 @@ function candidateSession(application: 'long' | 'short' | 'no-trade'): {
       ? manifest.application.kind === 'no-trade'
       : manifest.application.kind === 'trade' && manifest.application.direction === application,
   )!;
-  const resolved = resolveHistoricalReplayScenario(candidate.scenario.scenarioId);
+  const resolved = resolveHistoricalReplayScenario(
+    candidate.scenario.scenarioId,
+    undefined,
+    candidate.scenario.scenarioVersion,
+  );
   if (resolved.status !== 'ready') throw new Error(resolved.message);
   return {
     candidate,
@@ -251,6 +257,14 @@ function learningValue(current: GuidedAnalysisSession): LearningContextValue {
     completePaperExecutionReplay: jest.fn(),
     cancelPaperExecutionOrder: jest.fn(),
     abandonPaperExecutionSession: jest.fn(),
+    createOrResumePositionManagementSession: jest.fn(),
+    savePositionManagementDraft: jest.fn(),
+    submitPositionManagementDraft: jest.fn(),
+    cancelPendingPositionManagementAction: jest.fn(),
+    recordPositionManagementObservation: jest.fn(),
+    correctPositionManagementJournal: jest.fn(),
+    advancePositionManagementSession: jest.fn(),
+    completePositionManagementReplay: jest.fn(),
     discardQuarantinedAnalysisSessions: jest.fn(),
     resetData: jest.fn(),
     reload: jest.fn(),
