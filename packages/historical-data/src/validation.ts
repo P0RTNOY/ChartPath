@@ -6,6 +6,7 @@ import {
   isValidUtcTimestamp,
 } from './time.js';
 import {
+  HISTORICAL_APPLICATION_SCHEMA_VERSION,
   PAPER_EXECUTION_COST_MODEL_VERSION,
   PAPER_EXECUTION_POLICY_VERSION,
   PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION,
@@ -29,13 +30,8 @@ const HEBREW = /[\u0590-\u05ff]/;
 const CLOCK = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const PAPER_EXECUTION_DIRECTIONS = new Set(['long', 'short']);
 const PAPER_EXECUTION_ORDER_TYPES = new Set(['market', 'limit', 'stop']);
-const PAPER_EXECUTION_ANALYSIS_CONCLUSIONS = new Set([
-  'long',
-  'short',
-  'wait',
-  'no-trade',
-  'insufficient-evidence',
-]);
+const NO_TRADE_DISPOSITIONS = new Set(['wait', 'reject', 'no-trade', 'insufficient-evidence']);
+const PAPER_EXECUTION_MODES = new Set(['aligned', 'hypothetical-mechanics']);
 const PUBLICATION_STATUSES = new Set(['development-only', 'internal', 'publishable', 'published']);
 
 function add(
@@ -104,6 +100,53 @@ function isUniquePermittedStringArray(value: unknown, permitted: ReadonlySet<str
   );
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidApplicationDecision(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'trade') {
+    return (
+      PAPER_EXECUTION_DIRECTIONS.has(String(value.direction)) && value.disposition === undefined
+    );
+  }
+  if (value.kind === 'no-trade') {
+    return NO_TRADE_DISPOSITIONS.has(String(value.disposition)) && value.direction === undefined;
+  }
+  return false;
+}
+
+function validateApplicationConfiguration(
+  scenario: HistoricalReplayScenario,
+  issues: HistoricalValidationIssue[],
+): void {
+  const application = scenario.application as unknown;
+  if (!isRecord(application)) {
+    add(
+      issues,
+      'missing-historical-application',
+      'scenario.application',
+      'Historical scenarios require an explicit application conclusion.',
+    );
+    return;
+  }
+  if (application.schemaVersion !== HISTORICAL_APPLICATION_SCHEMA_VERSION)
+    add(
+      issues,
+      'unsupported-historical-application-schema',
+      'scenario.application.schemaVersion',
+      `Only historical application schema ${HISTORICAL_APPLICATION_SCHEMA_VERSION} is supported.`,
+    );
+  if (!isValidApplicationDecision(application.expectedDecision))
+    add(
+      issues,
+      'invalid-historical-application-decision',
+      'scenario.application.expectedDecision',
+      'Expected application must be a directed trade or a recognized no-trade disposition.',
+    );
+}
+
 function validatePaperExecutionConfiguration(
   scenario: HistoricalReplayScenario,
   datasetLastCandleIndex: number,
@@ -125,6 +168,13 @@ function validatePaperExecutionConfiguration(
       'unsupported-paper-execution-schema',
       'scenario.paperExecution.schemaVersion',
       `Only paper-execution scenario schema ${PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION} is supported.`,
+    );
+  if (!PAPER_EXECUTION_MODES.has(configuration.mode))
+    add(
+      issues,
+      'invalid-paper-execution-mode',
+      'scenario.paperExecution.mode',
+      'Paper execution must explicitly be aligned or hypothetical mechanics.',
     );
   if (configuration.executionPolicyVersion !== PAPER_EXECUTION_POLICY_VERSION)
     add(
@@ -175,13 +225,30 @@ function validatePaperExecutionConfiguration(
       'scenario.paperExecution.executionBoundary',
       'Paper execution must begin after the pinned decision candle and end at a later dataset candle.',
     );
-  if (!PAPER_EXECUTION_ANALYSIS_CONCLUSIONS.has(configuration.analysisAlignmentConclusion))
+  const expected = scenario.application?.expectedDecision;
+  const permittedDirections = Array.isArray(configuration.permittedDirections)
+    ? configuration.permittedDirections
+    : [];
+  if (configuration.mode === 'aligned') {
+    if (
+      expected?.kind !== 'trade' ||
+      permittedDirections.length !== 1 ||
+      permittedDirections[0] !== expected.direction
+    )
+      add(
+        issues,
+        'paper-execution-application-mode-mismatch',
+        'scenario.paperExecution.mode',
+        'Aligned paper execution requires one direction matching the canonical trade conclusion.',
+      );
+  } else if (configuration.mode === 'hypothetical-mechanics' && expected?.kind !== 'no-trade') {
     add(
       issues,
-      'invalid-paper-execution-analysis-conclusion',
-      'scenario.paperExecution.analysisAlignmentConclusion',
-      'Paper execution requires a recognized, deterministic analysis conclusion.',
+      'paper-execution-application-mode-mismatch',
+      'scenario.paperExecution.mode',
+      'Hypothetical mechanics are permitted only after a canonical no-trade conclusion.',
     );
+  }
   if (!HEBREW.test(configuration.learnerDisclosureHebrew))
     add(
       issues,
@@ -1094,6 +1161,7 @@ export function validateHistoricalScenario(
       'scenario.futureLeakValidation.validatedAt',
       'Future-leak validation timestamp must be UTC.',
     );
+  validateApplicationConfiguration(scenario, issues);
   validatePaperExecutionConfiguration(scenario, last, issues);
   const annotationIds = new Set<string>();
   for (const [index, annotation] of scenario.annotations.entries()) {

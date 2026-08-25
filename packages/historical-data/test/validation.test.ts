@@ -342,13 +342,17 @@ describe('scenario schema and publication gate', () => {
     expect(DEVELOPMENT_HISTORICAL_SCENARIO.paperExecution).toMatchObject({
       enabled: true,
       schemaVersion: 1,
+      mode: 'hypothetical-mechanics',
       executionPolicyVersion: 'paper-execution-policy-v1',
       costModelVersion: 'paper-cost-model-v1',
       permittedDirections: ['short'],
       permittedEntryOrderTypes: ['market', 'limit', 'stop'],
       executionBoundary: { afterDecisionCandleIndex: 72, lastCandleIndex: 95 },
-      analysisAlignmentConclusion: 'no-trade',
       publicationStatus: 'development-only',
+    });
+    expect(DEVELOPMENT_HISTORICAL_SCENARIO.application).toEqual({
+      schemaVersion: 1,
+      expectedDecision: { kind: 'no-trade', disposition: 'no-trade' },
     });
   });
 
@@ -438,6 +442,23 @@ describe('scenario schema and publication gate', () => {
       'invalid-future-leak-state',
     ],
     [
+      'historical application schema',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.application.schemaVersion = 2 as 1;
+      },
+      'unsupported-historical-application-schema',
+    ],
+    [
+      'historical application decision',
+      (scenario: Mutable<HistoricalReplayScenario>): void => {
+        scenario.application.expectedDecision = {
+          kind: 'trade',
+          direction: 'sideways',
+        } as unknown as Mutable<HistoricalReplayScenario['application']['expectedDecision']>;
+      },
+      'invalid-historical-application-decision',
+    ],
+    [
       'paper execution schema',
       (scenario: Mutable<HistoricalReplayScenario>): void => {
         scenario.paperExecution!.schemaVersion = 2 as 1;
@@ -485,11 +506,11 @@ describe('scenario schema and publication gate', () => {
       'invalid-paper-execution-boundary',
     ],
     [
-      'paper execution analysis conclusion',
+      'paper execution mode',
       (scenario: Mutable<HistoricalReplayScenario>): void => {
-        scenario.paperExecution!.analysisAlignmentConclusion = 'reject' as 'no-trade';
+        scenario.paperExecution!.mode = 'automatic' as 'aligned';
       },
-      'invalid-paper-execution-analysis-conclusion',
+      'invalid-paper-execution-mode',
     ],
     [
       'paper execution disclosure',
@@ -530,7 +551,7 @@ describe('scenario schema and publication gate', () => {
         'invalid-paper-execution-directions',
         'invalid-paper-execution-order-types',
         'invalid-paper-execution-boundary',
-        'invalid-paper-execution-analysis-conclusion',
+        'invalid-paper-execution-mode',
         'missing-paper-execution-hebrew-disclosure',
         'invalid-paper-execution-publication-status',
       ]),
@@ -538,6 +559,82 @@ describe('scenario schema and publication gate', () => {
     expect(
       evaluatePublicationGate(DEVELOPMENT_HISTORICAL_DATASET, scenario).map(({ code }) => code),
     ).toContain('publication-paper-execution-configuration-required');
+  });
+
+  it('requires application metadata even when paper execution is omitted', () => {
+    const scenario = cloneScenario();
+    scenario.application = undefined as unknown as Mutable<HistoricalReplayScenario['application']>;
+    scenario.paperExecution = undefined;
+    expect(
+      validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET).issues.map(
+        ({ code }) => code,
+      ),
+    ).toContain('missing-historical-application');
+  });
+
+  it.each([
+    { kind: 'trade' },
+    { kind: 'trade', direction: 'sideways' },
+    { kind: 'trade', direction: 'long', disposition: 'wait' },
+    { kind: 'no-trade' },
+    { kind: 'no-trade', disposition: 'later' },
+    { kind: 'no-trade', disposition: 'wait', direction: 'short' },
+    { kind: 'unknown', disposition: 'no-trade' },
+  ])('rejects malformed application decision %#', (expectedDecision) => {
+    const scenario = cloneScenario();
+    scenario.application.expectedDecision = expectedDecision as unknown as Mutable<
+      HistoricalReplayScenario['application']['expectedDecision']
+    >;
+    expect(
+      validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET).issues.map(
+        ({ code }) => code,
+      ),
+    ).toContain('invalid-historical-application-decision');
+  });
+
+  it.each(['long', 'short'] as const)(
+    'accepts aligned paper execution only for the canonical %s direction',
+    (direction) => {
+      const scenario = cloneScenario();
+      scenario.application.expectedDecision = { kind: 'trade', direction };
+      scenario.paperExecution!.mode = 'aligned';
+      scenario.paperExecution!.permittedDirections = [direction];
+      expect(validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET).valid).toBe(true);
+
+      scenario.paperExecution!.permittedDirections = [direction === 'long' ? 'short' : 'long'];
+      expect(
+        validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET).issues.map(
+          ({ code }) => code,
+        ),
+      ).toContain('paper-execution-application-mode-mismatch');
+    },
+  );
+
+  it.each(['wait', 'reject', 'no-trade', 'insufficient-evidence'] as const)(
+    'accepts explicitly disclosed hypothetical mechanics after %s',
+    (disposition) => {
+      const scenario = cloneScenario();
+      scenario.application.expectedDecision = { kind: 'no-trade', disposition };
+      expect(validateHistoricalScenario(scenario, DEVELOPMENT_HISTORICAL_DATASET).valid).toBe(true);
+    },
+  );
+
+  it('rejects aligned execution after no-trade and hypothetical mechanics after trade', () => {
+    const alignedNoTrade = cloneScenario();
+    alignedNoTrade.paperExecution!.mode = 'aligned';
+    expect(
+      validateHistoricalScenario(alignedNoTrade, DEVELOPMENT_HISTORICAL_DATASET).issues.map(
+        ({ code }) => code,
+      ),
+    ).toContain('paper-execution-application-mode-mismatch');
+
+    const hypotheticalTrade = cloneScenario();
+    hypotheticalTrade.application.expectedDecision = { kind: 'trade', direction: 'short' };
+    expect(
+      validateHistoricalScenario(hypotheticalTrade, DEVELOPMENT_HISTORICAL_DATASET).issues.map(
+        ({ code }) => code,
+      ),
+    ).toContain('paper-execution-application-mode-mismatch');
   });
 
   it('permits publication only with verified redistribution and human-reviewed published state', () => {

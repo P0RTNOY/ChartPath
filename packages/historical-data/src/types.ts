@@ -1,5 +1,6 @@
 export const HISTORICAL_DATA_SCHEMA_VERSION = 1 as const;
 export const HISTORICAL_SCENARIO_SCHEMA_VERSION = 1 as const;
+export const HISTORICAL_APPLICATION_SCHEMA_VERSION = 1 as const;
 export const PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION = 1 as const;
 export const PAPER_EXECUTION_POLICY_VERSION = 'paper-execution-policy-v1' as const;
 export const PAPER_EXECUTION_COST_MODEL_VERSION = 'paper-cost-model-v1' as const;
@@ -179,8 +180,21 @@ export interface ScenarioAnnotation {
 
 export type PaperExecutionDirection = 'long' | 'short';
 export type PaperExecutionOrderType = 'market' | 'limit' | 'stop';
-export type PaperExecutionAnalysisConclusion =
-  PaperExecutionDirection | 'wait' | 'no-trade' | 'insufficient-evidence';
+export type HistoricalNoTradeDisposition = 'wait' | 'reject' | 'no-trade' | 'insufficient-evidence';
+export type HistoricalApplicationDecision =
+  | {
+      readonly kind: 'trade';
+      readonly direction: PaperExecutionDirection;
+    }
+  | {
+      readonly kind: 'no-trade';
+      readonly disposition: HistoricalNoTradeDisposition;
+    };
+
+export interface HistoricalApplicationConfiguration {
+  readonly schemaVersion: typeof HISTORICAL_APPLICATION_SCHEMA_VERSION;
+  readonly expectedDecision: HistoricalApplicationDecision;
+}
 
 /**
  * Versioned authoring metadata that opts a historical scenario into paper execution.
@@ -190,6 +204,7 @@ export type PaperExecutionAnalysisConclusion =
 export interface PaperExecutionScenarioConfiguration {
   readonly enabled: true;
   readonly schemaVersion: typeof PAPER_EXECUTION_SCENARIO_SCHEMA_VERSION;
+  readonly mode: 'aligned' | 'hypothetical-mechanics';
   readonly executionPolicyVersion: typeof PAPER_EXECUTION_POLICY_VERSION;
   readonly costModelVersion: typeof PAPER_EXECUTION_COST_MODEL_VERSION;
   readonly permittedDirections: readonly PaperExecutionDirection[];
@@ -198,7 +213,6 @@ export interface PaperExecutionScenarioConfiguration {
     readonly afterDecisionCandleIndex: number;
     readonly lastCandleIndex: number;
   };
-  readonly analysisAlignmentConclusion: PaperExecutionAnalysisConclusion;
   readonly learnerDisclosureHebrew: string;
   readonly publicationStatus: DatasetPublicationStatus;
 }
@@ -249,6 +263,8 @@ export interface HistoricalReplayScenario {
     readonly validatedAt?: string;
     readonly validatorVersion: string;
   };
+  /** Canonical application conclusion, independent of whether paper execution is offered. */
+  readonly application: HistoricalApplicationConfiguration;
   /** Omission means this historical scenario does not offer paper execution. */
   readonly paperExecution?: PaperExecutionScenarioConfiguration;
 }

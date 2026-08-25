@@ -1,4 +1,5 @@
 export * from './analysis-session.js';
+export * from './analysis-application.js';
 export * from './daily-path.js';
 export * from './grading.js';
 export * from './mastery.js';
