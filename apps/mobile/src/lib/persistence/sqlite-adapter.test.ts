@@ -219,6 +219,9 @@ describe('SQLitePersistenceAdapter recovery', () => {
     const mirrored = executed.find(
       (entry) => entry.parameters.length > 0 && entry.sql.includes('INSERT INTO analysis_sessions'),
     );
+    expect(mirrored).toBeDefined();
+    expect(mirrored?.parameters).toHaveLength(19);
+    expect(mirrored?.sql.match(/\?/g)).toHaveLength(19);
     expect(mirrored?.parameters[5]).toBe('historical');
     expect(mirrored?.parameters[6]).toBe(null);
     expect(mirrored?.parameters[7]).toBe('scenario-1');

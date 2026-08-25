@@ -44,9 +44,16 @@ const syntheticSession = {
   chart: { kind: 'synthetic' },
 } as GuidedAnalysisSession;
 
+const originalDevelopmentMode = __DEV__;
+
 describe('production persisted QA route boundary', () => {
   beforeEach(() => {
+    (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = false;
     mockPaperProps.mockClear();
+  });
+
+  afterEach(() => {
+    (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = originalDevelopmentMode;
   });
 
   it('keeps a valid persisted internal analysis hidden for ordinary and qa=1 production URLs', async () => {
@@ -54,7 +61,7 @@ describe('production persisted QA route boundary', () => {
     mockParams = { sessionId: internalSession.sessionId };
     const ordinary = await render(
       <ChartPathThemeProvider mode="light">
-        <AnalysisScreen developmentMode={false} />
+        <AnalysisScreen />
       </ChartPathThemeProvider>,
     );
     expect(ordinary.queryByTestId('authorized-analysis')).toBeNull();
@@ -64,7 +71,7 @@ describe('production persisted QA route boundary', () => {
     mockParams = { sessionId: internalSession.sessionId, qa: '1' };
     const qa = await render(
       <ChartPathThemeProvider mode="light">
-        <AnalysisScreen developmentMode={false} />
+        <AnalysisScreen />
       </ChartPathThemeProvider>,
     );
     expect(qa.queryByTestId('authorized-analysis')).toBeNull();
@@ -76,7 +83,7 @@ describe('production persisted QA route boundary', () => {
     mockParams = { sessionId: syntheticSession.sessionId };
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <AnalysisScreen developmentMode={false} />
+        <AnalysisScreen />
       </ChartPathThemeProvider>,
     );
     expect(screen.getByTestId('authorized-analysis')).toBeTruthy();
@@ -86,7 +93,7 @@ describe('production persisted QA route boundary', () => {
     mockParams = { analysisSessionId: internalSession.sessionId, qa: '1' };
     const screen = await render(
       <ChartPathThemeProvider mode="light">
-        <PaperExecutionRoute developmentMode={false} />
+        <PaperExecutionRoute />
       </ChartPathThemeProvider>,
     );
     expect(screen.queryByTestId('authorized-paper')).toBeNull();

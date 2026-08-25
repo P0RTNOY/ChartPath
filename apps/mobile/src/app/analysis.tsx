@@ -5,11 +5,7 @@ import { ErrorState, LoadingState } from '@/components/app-state';
 import { useLearning } from '@/state/learning';
 import { historicalSessionRouteAccessAllowed } from '@/data/historical-replay';
 
-export default function AnalysisScreen({
-  developmentMode = __DEV__,
-}: {
-  readonly developmentMode?: boolean;
-} = {}) {
+export default function AnalysisScreen() {
   const { sessionId, qa } = useLocalSearchParams<{
     sessionId?: string | string[];
     qa?: string | string[];
@@ -41,13 +37,13 @@ export default function AnalysisScreen({
   if (
     !historicalSessionRouteAccessAllowed(session, {
       qaRequested,
-      developmentMode,
+      developmentMode: __DEV__,
     })
   ) {
     return (
       <ErrorState
         message={
-          qaRequested && !developmentMode
+          qaRequested && !__DEV__
             ? 'גישה לסשן QA פנימי אינה זמינה בגרסת ייצור.'
             : 'סשן פנימי, לא־מפורסם או ללא קרדיט זמין רק מגבול QA מפורש בגרסת פיתוח.'
         }

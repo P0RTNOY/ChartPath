@@ -3,11 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ErrorState } from '@/components/app-state';
 import { PaperExecutionScreen } from '@/components/paper-execution-screen';
 
-export default function PaperExecutionRoute({
-  developmentMode = __DEV__,
-}: {
-  readonly developmentMode?: boolean;
-} = {}) {
+export default function PaperExecutionRoute() {
   const { analysisSessionId, qa } = useLocalSearchParams<{
     analysisSessionId?: string | string[];
     qa?: string | string[];
@@ -22,7 +18,7 @@ export default function PaperExecutionRoute({
       />
     );
   }
-  if (qaValue === '1' && !developmentMode) {
+  if (qaValue === '1' && !__DEV__) {
     return (
       <ErrorState
         message="סשן ביצוע או ניהול QA פנימי אינו זמין בגרסת ייצור."

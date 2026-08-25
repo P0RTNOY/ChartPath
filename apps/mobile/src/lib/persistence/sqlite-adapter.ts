@@ -635,7 +635,7 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
         historical_dataset_id, historical_dataset_version, historical_dataset_checksum,
         historical_learning_credit, status, created_at, updated_at, attempt_id, schema_version,
         payload_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         status = excluded.status,
         updated_at = excluded.updated_at,
