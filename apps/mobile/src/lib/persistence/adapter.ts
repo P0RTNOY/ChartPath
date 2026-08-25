@@ -17,6 +17,14 @@ export interface PersistenceMutation<T> {
   readonly allowPaperExecutionSessionDeletion?: boolean;
   /** Reserved for a forward schema migration of physical paper-session mirrors. */
   readonly allowPaperExecutionSessionMigration?: boolean;
+  /** Reserved for explicit erasure/recovery; ordinary management sessions are append-preserving. */
+  readonly allowPositionManagementSessionDeletion?: boolean;
+  /** Reserved for a forward schema migration of physical management-session mirrors. */
+  readonly allowPositionManagementSessionMigration?: boolean;
+  /** Reserved for explicit erasure/recovery of immutable journal mirrors. */
+  readonly allowManagementJournalDeletion?: boolean;
+  /** Reserved for a forward schema migration of immutable journal mirrors. */
+  readonly allowManagementJournalMigration?: boolean;
 }
 
 export interface PersistenceAdapter {
@@ -79,5 +87,29 @@ export class PaperExecutionSessionNotFoundError extends Error {
   public constructor(public readonly sessionId: string) {
     super(`Paper execution session ${sessionId} does not exist.`);
     this.name = 'PaperExecutionSessionNotFoundError';
+  }
+}
+
+export class PositionManagementSessionConflictError extends Error {
+  public constructor(
+    public readonly sessionId: string,
+    message?: string,
+  ) {
+    super(message ?? `Position management session ${sessionId} conflicts with persisted state.`);
+    this.name = 'PositionManagementSessionConflictError';
+  }
+}
+
+export class PositionManagementSessionNotFoundError extends Error {
+  public constructor(public readonly sessionId: string) {
+    super(`Position management session ${sessionId} does not exist.`);
+    this.name = 'PositionManagementSessionNotFoundError';
+  }
+}
+
+export class ManagementJournalConflictError extends Error {
+  public constructor(public readonly entryId: string) {
+    super(`Management journal entry ${entryId} already exists with different immutable data.`);
+    this.name = 'ManagementJournalConflictError';
   }
 }

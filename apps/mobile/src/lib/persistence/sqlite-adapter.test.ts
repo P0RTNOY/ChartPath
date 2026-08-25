@@ -1,5 +1,6 @@
 import { openDatabaseAsync } from 'expo-sqlite';
 
+import { PersistenceCorruptionError } from './adapter';
 import { LearningRepository } from './repository';
 import { SQLitePersistenceAdapter } from './sqlite-adapter';
 
@@ -57,6 +58,12 @@ describe('SQLitePersistenceAdapter recovery', () => {
     ).toBe(true);
     expect(executed.some((sql) => sql.includes('DELETE FROM analysis_sessions'))).toBe(true);
     expect(executed.some((sql) => sql.includes('DELETE FROM paper_execution_sessions'))).toBe(true);
+    expect(executed.some((sql) => sql.includes('DELETE FROM position_management_sessions'))).toBe(
+      true,
+    );
+    expect(executed.some((sql) => sql.includes('DELETE FROM management_journal_entries'))).toBe(
+      true,
+    );
   });
 
   it('mirrors a canonical active session through the versioned SQLite table', async () => {
@@ -328,6 +335,193 @@ describe('SQLitePersistenceAdapter recovery', () => {
     ).rejects.toThrow('Terminal paper execution session is immutable.');
   });
 
+  it('creates protected position-management and append-only journal mirrors', async () => {
+    let repositoryPayload: string | null = null;
+    const executed: { readonly sql: string; readonly parameters: readonly unknown[] }[] = [];
+    const database: FakeDatabase = {
+      execAsync: jest.fn(async (sql: string) => {
+        executed.push({ sql, parameters: [] });
+      }),
+      getFirstAsync: jest.fn(async (sql: string) => {
+        if (sql.includes('schema_migrations')) return null;
+        if (sql.includes('repository_state')) {
+          return repositoryPayload === null ? null : { payload_json: repositoryPayload };
+        }
+        return null;
+      }),
+      runAsync: jest.fn(async (sql: string, ...parameters: unknown[]) => {
+        executed.push({ sql, parameters });
+        if (sql.includes('INSERT INTO repository_state')) {
+          repositoryPayload = String(parameters[0]);
+        }
+        return {};
+      }),
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (transaction: FakeDatabase) => Promise<void>): Promise<void> =>
+          operation(database),
+      ),
+    };
+    jest.mocked(openDatabaseAsync).mockResolvedValue(database as never);
+    const adapter = new SQLitePersistenceAdapter({ databaseName: 'position-management-test.db' });
+    const checksum = `sha256:${'d'.repeat(64)}`;
+    const session = {
+      schemaVersion: 1,
+      revision: 2,
+      sessionId: 'management-session-1',
+      handoff: {
+        sessionId: 'paper-session-1',
+        revision: 3,
+        lastProcessedCandleIndex: 64,
+        executionPolicy: { version: 'paper-execution-policy-v1' },
+      },
+      source: {
+        analysisSessionId: 'analysis-session-1',
+        scenarioId: 'scenario-1',
+        scenarioVersion: '1.0.0',
+        datasetId: 'dataset-1',
+        datasetVersion: '1.0.0',
+        canonicalChecksum: checksum,
+        decisionCandleIndex: 63,
+        learningCredit: 'none',
+      },
+      authority: {
+        permissionVersion: 'management-permissions-v1',
+        permittedActionKinds: ['full-exit'],
+        riskLimits: {
+          maxOpenQuantityUnits: 10,
+          maxScaleInInitialQuantityBps: 10_000,
+          softRiskLimitOriginalRBps: 10_000,
+          hardRiskLimitOriginalRBps: 20_000,
+        },
+        rubricId: 'management-rubric-1',
+        rubricVersion: '1.0.0',
+        rubricChecksum: `sha256:${'e'.repeat(64)}`,
+        rubric: { schemaVersion: 1, criteria: [] },
+      },
+      policy: { version: 'position-management-policy-v1' },
+      costModel: { version: 'paper-cost-model-v1' },
+      status: 'active',
+      originalRiskMinor: 5_000,
+      initialQuantityUnits: 5,
+      openQuantityUnits: 5,
+      lastProcessedCandleIndex: 64,
+      createdAt: '2026-08-25T09:00:00.000Z',
+      updatedAt: '2026-08-25T09:02:00.000Z',
+      journal: [
+        {
+          kind: 'observation',
+          entryId: 'journal-entry-1',
+          sessionId: 'management-session-1',
+          entryOrder: 0,
+          candleIndex: 64,
+          candleTimestamp: '2026-08-25T09:00:00.000Z',
+          text: 'Evidence remains mixed.',
+          evidenceTags: [],
+          recordedAt: '2026-08-25T09:02:00.000Z',
+        },
+        {
+          kind: 'action-rationale',
+          entryId: 'journal-entry-2',
+          sessionId: 'management-session-1',
+          entryOrder: 1,
+          candleIndex: 64,
+          candleTimestamp: '2026-08-25T09:00:00.000Z',
+          relatedActionId: 'management-submission-1',
+          submissionOrder: 1,
+          text: 'Reduce risk at the next eligible open.',
+          evidenceTags: ['risk-budget'],
+          recordedAt: '2026-08-25T09:03:00.000Z',
+        },
+      ],
+    };
+    const nextValue = JSON.stringify({
+      metadata: { schemaVersion: 6, updatedAt: session.updatedAt },
+      attempts: [],
+      analysisSessions: [],
+      paperExecutionSessions: [],
+      positionManagementSessions: [session],
+    });
+
+    await adapter.transact(() => ({ nextValue, result: undefined }));
+
+    const migration = executed.find((entry) =>
+      entry.sql.includes('CREATE TABLE IF NOT EXISTS position_management_sessions'),
+    );
+    expect(migration?.sql).toContain('paper_execution_revision INTEGER NOT NULL');
+    expect(migration?.sql).toContain('handoff_candle_index INTEGER NOT NULL');
+    expect(migration?.sql).toContain('permitted_action_kinds_json TEXT NOT NULL');
+    expect(migration?.sql).toContain('risk_limits_json TEXT NOT NULL');
+    expect(migration?.sql).toContain('rubric_checksum TEXT NOT NULL');
+    expect(migration?.sql).toContain('management_journal_entries_reject_update');
+    expect(migration?.sql).toContain('management_journal_entries_reject_delete');
+    expect(migration?.sql).toContain('position_management_sessions_reject_terminal_update');
+    expect(migration?.sql).toContain("'completed-open'\n  ) BEGIN");
+    expect(migration?.sql).not.toContain(') AND OLD.payload_json <> NEW.payload_json BEGIN');
+    const mirroredSession = executed.find(
+      (entry) =>
+        entry.parameters.length > 0 &&
+        entry.sql.includes('INSERT INTO position_management_sessions'),
+    );
+    expect(mirroredSession?.parameters.slice(0, 23)).toEqual([
+      'management-session-1',
+      'paper-session-1',
+      'analysis-session-1',
+      'scenario-1',
+      '1.0.0',
+      'dataset-1',
+      '1.0.0',
+      checksum,
+      63,
+      64,
+      3,
+      'paper-execution-policy-v1',
+      'paper-cost-model-v1',
+      'position-management-policy-v1',
+      'management-permissions-v1',
+      '["full-exit"]',
+      '{"hardRiskLimitOriginalRBps":20000,"maxOpenQuantityUnits":10,"maxScaleInInitialQuantityBps":10000,"softRiskLimitOriginalRBps":10000}',
+      'management-rubric-1',
+      '1.0.0',
+      `sha256:${'e'.repeat(64)}`,
+      '{"criteria":[],"schemaVersion":1}',
+      'none',
+      'active',
+    ]);
+    const mirroredJournals = executed.filter(
+      (entry) =>
+        entry.parameters.length > 0 && entry.sql.includes('INSERT INTO management_journal_entries'),
+    );
+    expect(mirroredJournals).toHaveLength(2);
+    expect(mirroredJournals[0]?.parameters.slice(0, 12)).toEqual([
+      'journal-entry-1',
+      'management-session-1',
+      0,
+      'observation',
+      null,
+      null,
+      null,
+      64,
+      '2026-08-25T09:00:00.000Z',
+      '[]',
+      '2026-08-25T09:02:00.000Z',
+      1,
+    ]);
+    expect(mirroredJournals[1]?.parameters.slice(0, 12)).toEqual([
+      'journal-entry-2',
+      'management-session-1',
+      1,
+      'action-rationale',
+      null,
+      'management-submission-1',
+      1,
+      64,
+      '2026-08-25T09:00:00.000Z',
+      '["risk-budget"]',
+      '2026-08-25T09:03:00.000Z',
+      1,
+    ]);
+  });
+
   it('narrowly permits the v3-to-v4 rewrite of a finalized session mirror', async () => {
     const legacySession = {
       sessionId: 'legacy-finalized-session',
@@ -395,5 +589,54 @@ describe('SQLitePersistenceAdapter recovery', () => {
 
     expect(executed.some((sql) => sql.includes('DELETE FROM analysis_sessions'))).toBe(true);
     expect(executed.some((sql) => sql.includes('INSERT INTO analysis_sessions'))).toBe(true);
+  });
+
+  it('fails closed when a legacy payload conflicts with Milestone 6 SQLite mirrors', async () => {
+    const currentValue = JSON.stringify({
+      metadata: {
+        schemaVersion: 5,
+        updatedAt: '2026-08-25T08:00:00.000Z',
+      },
+      attempts: [],
+      analysisSessions: [],
+      paperExecutionSessions: [],
+    });
+    const executed: string[] = [];
+    const database: FakeDatabase = {
+      execAsync: jest.fn(async (sql: string) => {
+        executed.push(sql);
+      }),
+      getFirstAsync: jest.fn(async (sql: string) => {
+        if (sql.includes('schema_migrations')) return null;
+        if (sql.includes('repository_state')) return { payload_json: currentValue };
+        if (
+          sql.includes('SELECT COUNT(*) FROM position_management_sessions') &&
+          sql.includes('SELECT COUNT(*) FROM management_journal_entries')
+        ) {
+          return { management_count: 1, journal_count: 1 };
+        }
+        return null;
+      }),
+      runAsync: jest.fn(async (sql: string) => {
+        executed.push(sql);
+        return {};
+      }),
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (transaction: FakeDatabase) => Promise<void>): Promise<void> =>
+          operation(database),
+      ),
+    };
+    jest.mocked(openDatabaseAsync).mockResolvedValue(database as never);
+    const adapter = new SQLitePersistenceAdapter({ databaseName: 'legacy-mirror-conflict.db' });
+
+    await expect(
+      adapter.transact(() => ({
+        nextValue: currentValue,
+        result: undefined,
+        // Management deletion alone must not authorize orphan journal mirrors.
+        allowPositionManagementSessionDeletion: true,
+      })),
+    ).rejects.toBeInstanceOf(PersistenceCorruptionError);
+    expect(executed.some((sql) => sql.includes('INSERT INTO repository_state'))).toBe(false);
   });
 });

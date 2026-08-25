@@ -2,11 +2,13 @@ import {
   analysisChartIdentitiesEqual,
   assertValidGuidedAnalysisSession,
   assertValidPaperExecutionSession,
+  assertValidPositionManagementSession,
   executionIdentitiesEqual,
   reduceGuidedAnalysisSession,
   reducePaperExecutionSession,
   type GuidedAnalysisSession,
   type PaperExecutionSession,
+  type PositionManagementSession,
   type ReviewState,
 } from '@chartpath/domain';
 
@@ -16,6 +18,8 @@ import {
   AttemptConflictError,
   PaperExecutionSessionConflictError,
   PaperExecutionSessionNotFoundError,
+  PositionManagementSessionConflictError,
+  PositionManagementSessionNotFoundError,
   type PersistenceAdapter,
 } from './adapter';
 import { createEmptySnapshot, migratePersistence } from './migrations';
@@ -23,6 +27,7 @@ import { localDateForTimestamp, replayAttempts } from './projections';
 import type {
   AppendAttemptResult,
   CreateOrResumePaperExecutionSessionResult,
+  CreateOrResumePositionManagementSessionResult,
   CreateOrResumeAnalysisSessionResult,
   FinalizeAnalysisSessionInput,
   FinalizeAnalysisSessionResult,
@@ -34,6 +39,7 @@ import type {
   RepositoryOptions,
   SaveAnalysisSessionResult,
   SavePaperExecutionSessionResult,
+  SavePositionManagementSessionResult,
 } from './types';
 import {
   assertNonEmptyString,
@@ -65,6 +71,12 @@ function cloneSession(session: GuidedAnalysisSession): GuidedAnalysisSession {
 
 function clonePaperExecutionSession(session: PaperExecutionSession): PaperExecutionSession {
   return JSON.parse(canonicalStringify(session)) as PaperExecutionSession;
+}
+
+function clonePositionManagementSession(
+  session: PositionManagementSession,
+): PositionManagementSession {
+  return JSON.parse(canonicalStringify(session)) as PositionManagementSession;
 }
 
 function paperExecutionLogicalIdentity(session: PaperExecutionSession): string {
@@ -163,6 +175,116 @@ function assertPaperExecutionHistoryPrefix(
       'Paper execution replay cannot move backwards.',
     );
   }
+}
+
+function managementLogicalIdentity(session: PositionManagementSession): string {
+  return session.handoff.sessionId;
+}
+
+function isTerminalManagementSession(session: PositionManagementSession): boolean {
+  return session.status !== 'active';
+}
+
+function assertManagementSourceBound(
+  snapshot: PersistenceSnapshot,
+  candidate: PositionManagementSession,
+): void {
+  assertPaperExecutionSourceBound(snapshot.analysisSessions, candidate.handoff);
+  const paper = snapshot.paperExecutionSessions.find(
+    ({ sessionId }) => sessionId === candidate.handoff.sessionId,
+  );
+  if (!paper || canonicalStringify(paper) !== canonicalStringify(candidate.handoff)) {
+    throw new PositionManagementSessionConflictError(
+      candidate.sessionId,
+      'Position management requires its exact persisted open paper execution handoff.',
+    );
+  }
+  if (paper.status !== 'open' || paper.position?.status !== 'open') {
+    throw new PositionManagementSessionConflictError(
+      candidate.sessionId,
+      'Position management requires an open simulated position.',
+    );
+  }
+}
+
+function assertSameManagementIdentity(
+  persisted: PositionManagementSession,
+  candidate: PositionManagementSession,
+): void {
+  if (
+    persisted.sessionId !== candidate.sessionId ||
+    persisted.debriefId !== candidate.debriefId ||
+    persisted.createdAt !== candidate.createdAt ||
+    canonicalStringify(persisted.handoff) !== canonicalStringify(candidate.handoff) ||
+    canonicalStringify(persisted.source) !== canonicalStringify(candidate.source) ||
+    canonicalStringify(persisted.authority) !== canonicalStringify(candidate.authority) ||
+    canonicalStringify(persisted.policy) !== canonicalStringify(candidate.policy) ||
+    canonicalStringify(persisted.costModel) !== canonicalStringify(candidate.costModel) ||
+    persisted.originalRiskMinor !== candidate.originalRiskMinor ||
+    persisted.initialQuantityUnits !== candidate.initialQuantityUnits
+  ) {
+    throw new PositionManagementSessionConflictError(
+      candidate.sessionId,
+      'Position management identity, handoff, or versioned assumptions changed.',
+    );
+  }
+}
+
+function assertCanonicalPrefix(
+  persisted: readonly unknown[],
+  candidate: readonly unknown[],
+  sessionId: string,
+  label: string,
+): void {
+  if (candidate.length < persisted.length) {
+    throw new PositionManagementSessionConflictError(
+      sessionId,
+      `Position management ${label} is append-only.`,
+    );
+  }
+  for (const [index, entry] of persisted.entries()) {
+    if (canonicalStringify(entry) !== canonicalStringify(candidate[index])) {
+      throw new PositionManagementSessionConflictError(
+        sessionId,
+        `Position management ${label} is append-only.`,
+      );
+    }
+  }
+}
+
+function assertManagementHistoryPrefix(
+  persisted: PositionManagementSession,
+  candidate: PositionManagementSession,
+): void {
+  assertCanonicalPrefix(persisted.events, candidate.events, candidate.sessionId, 'event history');
+  assertCanonicalPrefix(
+    persisted.processedCandles,
+    candidate.processedCandles,
+    candidate.sessionId,
+    'processed candle history',
+  );
+  assertCanonicalPrefix(persisted.fills, candidate.fills, candidate.sessionId, 'fill history');
+  assertCanonicalPrefix(persisted.journal, candidate.journal, candidate.sessionId, 'journal');
+  if (candidate.lastProcessedCandleIndex < persisted.lastProcessedCandleIndex) {
+    throw new PositionManagementSessionConflictError(
+      candidate.sessionId,
+      'Position management replay cannot move backwards.',
+    );
+  }
+}
+
+function paperExecutionHasManagementClaim(
+  snapshot: PersistenceSnapshot,
+  paperExecutionSessionId: string,
+): boolean {
+  return (
+    snapshot.positionManagementSessions.some(
+      ({ handoff }) => handoff.sessionId === paperExecutionSessionId,
+    ) ||
+    snapshot.quarantinedPositionManagementSessions.some(
+      (record) => record.paperExecutionSessionId === paperExecutionSessionId,
+    )
+  );
 }
 
 function analysisSessionIdentity(session: GuidedAnalysisSession): string {
@@ -313,14 +435,22 @@ export class LearningRepository {
         nextValue: serialized,
         result: cloneSnapshot(migration.snapshot),
         allowAnalysisSessionDeletion:
-          (migration.fromSchemaVersion === 4 || migration.fromSchemaVersion === 5) &&
+          [4, 5, 6].includes(migration.fromSchemaVersion ?? -1) &&
           migration.migrated &&
           migration.snapshot.quarantinedAnalysisSessions.length > 0,
         allowAnalysisSessionMigration: migration.fromSchemaVersion === 3 && migration.migrated,
         allowPaperExecutionSessionDeletion:
-          migration.fromSchemaVersion === 5 &&
+          [5, 6].includes(migration.fromSchemaVersion ?? -1) &&
           migration.migrated &&
           migration.snapshot.quarantinedPaperExecutionSessions.length > 0,
+        allowPositionManagementSessionDeletion:
+          migration.fromSchemaVersion === 6 &&
+          migration.migrated &&
+          migration.snapshot.quarantinedPositionManagementSessions.length > 0,
+        allowManagementJournalDeletion:
+          migration.fromSchemaVersion === 6 &&
+          migration.migrated &&
+          migration.snapshot.quarantinedPositionManagementSessions.length > 0,
       };
     });
   }
@@ -467,6 +597,15 @@ export class LearningRepository {
       assertSamePaperExecutionIdentity(persisted, candidate);
       const canonicalPersisted = canonicalStringify(persisted);
       const canonicalCandidate = canonicalStringify(candidate);
+      if (
+        paperExecutionHasManagementClaim(current, persisted.sessionId) &&
+        canonicalPersisted !== canonicalCandidate
+      ) {
+        throw new PaperExecutionSessionConflictError(
+          candidate.sessionId,
+          'Paper execution is frozen after its open position enters management.',
+        );
+      }
       if (persisted.revision === candidate.revision) {
         if (canonicalPersisted !== canonicalCandidate) {
           throw new PaperExecutionSessionConflictError(
@@ -554,6 +693,12 @@ export class LearningRepository {
       const persisted = current.paperExecutionSessions[index];
       if (!persisted) throw new PaperExecutionSessionNotFoundError(sessionId);
       assertPaperExecutionSourceBound(current.analysisSessions, persisted);
+      if (paperExecutionHasManagementClaim(current, persisted.sessionId)) {
+        throw new PaperExecutionSessionConflictError(
+          sessionId,
+          'Paper execution is frozen after its open position enters management.',
+        );
+      }
       let abandoned: PaperExecutionSession;
       try {
         abandoned = reducePaperExecutionSession(persisted, {
@@ -594,6 +739,173 @@ export class LearningRepository {
         },
       };
     });
+  }
+
+  public async createOrResumePositionManagementSession(
+    candidate: PositionManagementSession,
+  ): Promise<CreateOrResumePositionManagementSessionResult> {
+    assertValidPositionManagementSession(candidate);
+    if (candidate.status !== 'active' || candidate.revision !== 0) {
+      throw new PositionManagementSessionConflictError(
+        candidate.sessionId,
+        'A new position management session must be an active revision-zero handoff.',
+      );
+    }
+    await this.initializeAdapter();
+    const migrationAt = this.now();
+    return this.adapter.transact<CreateOrResumePositionManagementSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, migrationAt).snapshot;
+      assertManagementSourceBound(current, candidate);
+      const byId = current.positionManagementSessions.find(
+        ({ sessionId }) => sessionId === candidate.sessionId,
+      );
+      if (byId) {
+        if (canonicalStringify(byId) !== canonicalStringify(candidate)) {
+          throw new PositionManagementSessionConflictError(candidate.sessionId);
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePositionManagementSession(byId),
+            created: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      const logical = current.positionManagementSessions.find(
+        (session) => managementLogicalIdentity(session) === managementLogicalIdentity(candidate),
+      );
+      if (logical) {
+        if (
+          canonicalStringify(logical.handoff) !== canonicalStringify(candidate.handoff) ||
+          canonicalStringify(logical.authority) !== canonicalStringify(candidate.authority) ||
+          canonicalStringify(logical.policy) !== canonicalStringify(candidate.policy)
+        ) {
+          throw new PositionManagementSessionConflictError(
+            candidate.sessionId,
+            'A management session for this paper execution pins different evidence or policy.',
+          );
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePositionManagementSession(logical),
+            created: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      const session = clonePositionManagementSession(candidate);
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, session.updatedAt),
+        positionManagementSessions: [...current.positionManagementSessions, session],
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: { session, created: true, snapshot: cloneSnapshot(snapshot) },
+      };
+    });
+  }
+
+  public async savePositionManagementSession(
+    candidate: PositionManagementSession,
+  ): Promise<SavePositionManagementSessionResult> {
+    assertValidPositionManagementSession(candidate);
+    await this.initializeAdapter();
+    const migrationAt = this.now();
+    return this.adapter.transact<SavePositionManagementSessionResult>((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, migrationAt).snapshot;
+      assertManagementSourceBound(current, candidate);
+      const index = current.positionManagementSessions.findIndex(
+        ({ sessionId }) => sessionId === candidate.sessionId,
+      );
+      const persisted = current.positionManagementSessions[index];
+      if (!persisted) throw new PositionManagementSessionNotFoundError(candidate.sessionId);
+      assertSameManagementIdentity(persisted, candidate);
+      const canonicalPersisted = canonicalStringify(persisted);
+      const canonicalCandidate = canonicalStringify(candidate);
+      if (persisted.revision === candidate.revision) {
+        if (canonicalPersisted !== canonicalCandidate) {
+          throw new PositionManagementSessionConflictError(
+            candidate.sessionId,
+            'Equal position management revisions contain different data.',
+          );
+        }
+        return {
+          nextValue: canonicalStringify(current),
+          result: {
+            session: clonePositionManagementSession(persisted),
+            saved: false,
+            snapshot: cloneSnapshot(current),
+          },
+        };
+      }
+      if (candidate.revision !== persisted.revision + 1) {
+        throw new PositionManagementSessionConflictError(
+          candidate.sessionId,
+          'Position management saves must apply exactly one deterministic revision.',
+        );
+      }
+      if (Date.parse(candidate.updatedAt) < Date.parse(persisted.updatedAt)) {
+        throw new PositionManagementSessionConflictError(
+          candidate.sessionId,
+          'Position management timestamps cannot move backwards.',
+        );
+      }
+      if (isTerminalManagementSession(persisted)) {
+        throw new PositionManagementSessionConflictError(
+          candidate.sessionId,
+          'Terminal position management sessions are immutable.',
+        );
+      }
+      assertManagementHistoryPrefix(persisted, candidate);
+      const sessions = [...current.positionManagementSessions];
+      const session = clonePositionManagementSession(candidate);
+      sessions[index] = session;
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata: withSessionUpdatedAt(current, session.updatedAt),
+        positionManagementSessions: sessions,
+      };
+      return {
+        nextValue: canonicalStringify(snapshot),
+        result: { session, saved: true, snapshot: cloneSnapshot(snapshot) },
+      };
+    });
+  }
+
+  public async getPositionManagementSession(
+    sessionId: string,
+  ): Promise<PositionManagementSession | null> {
+    assertNonEmptyString(sessionId, 'sessionId');
+    const snapshot = await this.load();
+    const session = snapshot.positionManagementSessions.find(
+      (candidate) => candidate.sessionId === sessionId,
+    );
+    return session ? clonePositionManagementSession(session) : null;
+  }
+
+  public async getPositionManagementSessionForPaperExecution(
+    paperExecutionSessionId: string,
+  ): Promise<PositionManagementSession | null> {
+    assertNonEmptyString(paperExecutionSessionId, 'paperExecutionSessionId');
+    const snapshot = await this.load();
+    const session = snapshot.positionManagementSessions.find(
+      ({ handoff }) => handoff.sessionId === paperExecutionSessionId,
+    );
+    return session ? clonePositionManagementSession(session) : null;
+  }
+
+  public async listPositionManagementSessions(): Promise<readonly PositionManagementSession[]> {
+    const snapshot = await this.load();
+    return [...snapshot.positionManagementSessions]
+      .sort(
+        (left, right) =>
+          Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+          compareStrings(left.sessionId, right.sessionId),
+      )
+      .map(clonePositionManagementSession);
   }
 
   public async createOrResumeAnalysisSession(
@@ -1044,6 +1356,33 @@ export class LearningRepository {
     });
   }
 
+  public async discardQuarantinedPositionManagementSessions(
+    quarantineIds: readonly string[],
+    recoveredAt: string = this.now(),
+  ): Promise<PersistenceSnapshot> {
+    assertUtcTimestamp(recoveredAt, 'recoveredAt');
+    quarantineIds.forEach((id, index) => assertNonEmptyString(id, `quarantineIds[${index}]`));
+    const ids = new Set(quarantineIds);
+    await this.initializeAdapter();
+    return this.adapter.transact((raw) => {
+      const current = migratePersistence(raw, this.contentVersion, recoveredAt).snapshot;
+      const quarantinedPositionManagementSessions =
+        current.quarantinedPositionManagementSessions.filter(
+          ({ quarantineId }) => !ids.has(quarantineId),
+        );
+      const snapshot: PersistenceSnapshot = {
+        ...current,
+        metadata:
+          quarantinedPositionManagementSessions.length ===
+          current.quarantinedPositionManagementSessions.length
+            ? current.metadata
+            : withSessionUpdatedAt(current, recoveredAt),
+        quarantinedPositionManagementSessions,
+      };
+      return { nextValue: canonicalStringify(snapshot), result: cloneSnapshot(snapshot) };
+    });
+  }
+
   public async updateSettings(
     patch: LearnerSettingsPatch,
     updatedAt: string = this.now(),
@@ -1136,6 +1475,8 @@ export class LearningRepository {
       allowAttemptDeletion: true,
       allowAnalysisSessionDeletion: true,
       allowPaperExecutionSessionDeletion: true,
+      allowPositionManagementSessionDeletion: true,
+      allowManagementJournalDeletion: true,
     }));
   }
 
