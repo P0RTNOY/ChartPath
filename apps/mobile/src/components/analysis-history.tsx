@@ -8,7 +8,10 @@ import { Badge, Button, Card, Heading, LtrText, Screen, UiText, useTheme } from 
 import { ErrorState, LoadingState } from './app-state';
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { TopBar } from './top-bar';
-import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
+import {
+  historicalSessionRequiresQa,
+  resolveHistoricalAnalysisSession,
+} from '@/data/historical-replay';
 import { useLearning } from '@/state/learning';
 
 function statusLabel(session: GuidedAnalysisSession): string {
@@ -33,7 +36,11 @@ function displayDate(timestamp: string): string {
   );
 }
 
-export function AnalysisHistory() {
+export function AnalysisHistory({
+  developmentMode = __DEV__,
+}: {
+  readonly developmentMode?: boolean;
+} = {}) {
   const theme = useTheme();
   const learning = useLearning();
   const [confirmAbandonId, setConfirmAbandonId] = useState<string | null>(null);
@@ -48,9 +55,9 @@ export function AnalysisHistory() {
       />
     );
   }
-  const sessions = [...learning.snapshot.analysisSessions].sort(
-    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
-  );
+  const sessions = learning.snapshot.analysisSessions
+    .filter((session) => developmentMode || !historicalSessionRequiresQa(session))
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 
   const abandon = async () => {
     if (!confirmAbandonId) return;
@@ -149,7 +156,7 @@ export function AnalysisHistory() {
                   <Button
                     onPress={() =>
                       router.push(
-                        `/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href,
+                        `/analysis?sessionId=${encodeURIComponent(session.sessionId)}${historicalSessionRequiresQa(session) ? '&qa=1' : ''}` as Href,
                       )
                     }
                     variant={session.status === 'finalized' ? 'secondary' : 'primary'}

@@ -226,6 +226,7 @@ export function positionManagementDraftView(
 export function parsePositionManagementIntent(
   draft: PositionManagementDraftView,
   lastVisibleClose: number,
+  priceGrid: Pick<PositionManagementSession, 'currencyDecimals' | 'priceTickMinor'>,
 ): PositionManagementIntentParseResult {
   if (draft.kind === 'journal-only')
     return { ok: false, messageHe: 'תצפית ביומן אינה פעולת מחיר.' };
@@ -234,16 +235,23 @@ export function parsePositionManagementIntent(
     const quantity = Number(draft.quantity?.trim());
     if (!Number.isSafeInteger(quantity) || quantity <= 0)
       return { ok: false, messageHe: 'הכמות חייבת להיות מספר שלם וחיובי.' };
-    return draft.kind === 'partial-exit'
-      ? { ok: true, intent: { kind: 'partial-exit', quantityUnits: quantity } }
-      : {
-          ok: true,
-          intent: {
-            kind: 'scale-in',
-            quantityUnits: quantity,
-            estimatedEntryPrice: lastVisibleClose,
-          },
-        };
+    if (draft.kind === 'partial-exit') {
+      return { ok: true, intent: { kind: 'partial-exit', quantityUnits: quantity } };
+    }
+    let normalizedVisibleClose: number;
+    try {
+      normalizedVisibleClose = normalizeVisibleCandlePrice(lastVisibleClose, priceGrid);
+    } catch {
+      return { ok: false, messageHe: 'מחיר הסגירה הגלוי אינו תואם לרשת המחיר המוצמדת.' };
+    }
+    return {
+      ok: true,
+      intent: {
+        kind: 'scale-in',
+        quantityUnits: quantity,
+        estimatedEntryPrice: normalizedVisibleClose,
+      },
+    };
   }
   const level = Number(draft.price?.trim().replace(',', '.'));
   if (!Number.isFinite(level) || level <= 0)
@@ -255,6 +263,23 @@ export function parsePositionManagementIntent(
         ? { kind: 'replace-stop', price: level }
         : { kind: 'replace-target', price: level },
   };
+}
+
+/** Mirrors the domain's neutral historical-candle conversion before any adverse fill model. */
+export function normalizeVisibleCandlePrice(
+  value: number,
+  priceGrid: Pick<PositionManagementSession, 'currencyDecimals' | 'priceTickMinor'>,
+): number {
+  if (!Number.isFinite(value) || value <= 0)
+    throw new RangeError('Visible candle price must be finite and positive.');
+  const scale = 10 ** priceGrid.currencyDecimals;
+  const ticks = Math.round((value * scale) / priceGrid.priceTickMinor);
+  if (!Number.isSafeInteger(ticks) || ticks <= 0)
+    throw new RangeError('Visible candle price exceeds the pinned tick grid.');
+  const minor = ticks * priceGrid.priceTickMinor;
+  if (!Number.isSafeInteger(minor))
+    throw new RangeError('Visible candle price exceeds safe minor units.');
+  return minor / scale;
 }
 
 const riskLabels: Readonly<Record<PositionManagementRiskCode, string>> = {

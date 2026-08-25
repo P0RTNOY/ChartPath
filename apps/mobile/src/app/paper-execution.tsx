@@ -3,7 +3,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ErrorState } from '@/components/app-state';
 import { PaperExecutionScreen } from '@/components/paper-execution-screen';
 
-export default function PaperExecutionRoute() {
+export default function PaperExecutionRoute({
+  developmentMode = __DEV__,
+}: {
+  readonly developmentMode?: boolean;
+} = {}) {
   const { analysisSessionId, qa } = useLocalSearchParams<{
     analysisSessionId?: string | string[];
     qa?: string | string[];
@@ -18,17 +22,17 @@ export default function PaperExecutionRoute() {
       />
     );
   }
-  if (qaValue === '1' && !__DEV__) {
+  if (qaValue === '1' && !developmentMode) {
     return (
       <ErrorState
-        message="מכניקת ביצוע היפותטית זמינה רק בגבול QA מפורש של גרסת פיתוח."
+        message="סשן ביצוע או ניהול QA פנימי אינו זמין בגרסת ייצור."
         onRetry={() => router.back()}
       />
     );
   }
   return (
     <PaperExecutionScreen
-      accessMode={qaValue === '1' ? 'qa-hypothetical-mechanics' : 'ordinary'}
+      accessMode={qaValue === '1' ? 'qa-internal' : 'ordinary'}
       analysisSessionId={id}
     />
   );

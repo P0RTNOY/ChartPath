@@ -275,7 +275,14 @@ function renderSession(current: GuidedAnalysisSession) {
   mockLearning = learningValue(current);
   return render(
     <ChartPathThemeProvider direction="rtl" mode="light">
-      <GuidedAnalysisSessionView persistedSession={current} />
+      <GuidedAnalysisSessionView
+        accessMode={
+          current.chart.kind === 'historical' && current.chart.learningCredit === 'none'
+            ? 'qa-internal'
+            : 'ordinary'
+        }
+        persistedSession={current}
+      />
     </ChartPathThemeProvider>,
   );
 }
@@ -425,6 +432,7 @@ describe('GuidedAnalysisSessionView', () => {
     expect(mockLearning.createOrResumeAnalysisSession).toHaveBeenCalledWith({
       kind: 'historical',
       scenarioId: 'blind-generated-development-scenario',
+      scenarioVersion: '1.0.0-dev',
       accessMode: 'qa-internal',
     });
   });

@@ -83,8 +83,8 @@ export function PaperPositionManagement({
   }, [session]);
 
   const parsed = useMemo(
-    () => parsePositionManagementIntent(draft, lastVisibleCandle.close),
-    [draft, lastVisibleCandle.close],
+    () => parsePositionManagementIntent(draft, lastVisibleCandle.close, session),
+    [draft, lastVisibleCandle.close, session],
   );
   const preview = useMemo<PositionManagementPreviewView | undefined>(() => {
     if (draft.kind === 'journal-only') {

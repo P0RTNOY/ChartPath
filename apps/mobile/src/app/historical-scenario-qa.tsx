@@ -60,26 +60,28 @@ export default function HistoricalScenarioQaRoute() {
         let paper = await learning.createOrResumePaperExecutionSession(
           session.sessionId,
           managementJourney.plan,
+          'qa-internal',
         );
         if (paper.status === 'draft') {
           paper = await learning.submitPaperExecutionSession(
             paper.sessionId,
             `management-qa-submit:${paper.sessionId}`,
+            'qa-internal',
           );
         }
         if (paper.status === 'working') {
-          paper = await learning.advancePaperExecutionSession(paper.sessionId, 1);
+          paper = await learning.advancePaperExecutionSession(paper.sessionId, 1, 'qa-internal');
         }
         if (paper.status !== 'open' || paper.position?.status !== 'open') {
           throw new Error('מסע ה־QA לא יצר פוזיציית נייר פתוחה ומדויקת לניהול.');
         }
-        await learning.createOrResumePositionManagementSession(paper.sessionId);
+        await learning.createOrResumePositionManagementSession(paper.sessionId, 'qa-internal');
         router.push(
-          `/paper-execution?analysisSessionId=${encodeURIComponent(session.sessionId)}` as Href,
+          `/paper-execution?analysisSessionId=${encodeURIComponent(session.sessionId)}&qa=1` as Href,
         );
         return;
       }
-      router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href);
+      router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}&qa=1` as Href);
     } catch (reason) {
       setStartError(reason instanceof Error ? reason.message : 'לא הצלחנו לפתוח את מועמד ה־QA.');
     } finally {

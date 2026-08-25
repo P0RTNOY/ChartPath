@@ -24,6 +24,7 @@ import {
 } from '@chartpath/domain';
 
 import { InMemoryPersistenceAdapter, LearningRepository } from '@/lib/persistence';
+import { parsePositionManagementIntent } from '@/data/position-management';
 
 import {
   createAttemptRecord,
@@ -251,6 +252,15 @@ describe('guided analysis learning integration', () => {
       expect(harness.current().snapshot!.attempts).toEqual([]);
       expect(harness.current().snapshot!.projections.totalXp).toBe(0);
       if (kind === 'trade') {
+        await expect(
+          harness
+            .current()
+            .createOrResumePaperExecutionSession(
+              session.sessionId,
+              candidate.manifest.expectedExecution!.plan,
+            ),
+        ).rejects.toThrow(/internal-scenario-restricted/);
+        expect(harness.current().snapshot!.paperExecutionSessions).toEqual([]);
         let execution!: PaperExecutionSession;
         await act(async () => {
           execution = await harness
@@ -258,6 +268,7 @@ describe('guided analysis learning integration', () => {
             .createOrResumePaperExecutionSession(
               session.sessionId,
               candidate.manifest.expectedExecution!.plan,
+              'qa-internal',
             );
         });
         expect(execution).toMatchObject({
@@ -271,7 +282,9 @@ describe('guided analysis learning integration', () => {
         });
       } else {
         await expect(
-          harness.current().createOrResumePaperExecutionSession(session.sessionId, paperPlan()),
+          harness
+            .current()
+            .createOrResumePaperExecutionSession(session.sessionId, paperPlan(), 'qa-internal'),
         ).rejects.toThrow(/execution-not-enabled/);
         expect(harness.current().snapshot!.paperExecutionSessions).toEqual([]);
       }
@@ -358,11 +371,14 @@ describe('guided analysis learning integration', () => {
         .createOrResumePaperExecutionSession(
           analysis.sessionId,
           base.manifest.expectedExecution!.plan,
+          'qa-internal',
         );
       paper = await harness
         .current()
-        .submitPaperExecutionSession(paper.sessionId, 'management-paper-submit');
-      paper = await harness.current().advancePaperExecutionSession(paper.sessionId, 1);
+        .submitPaperExecutionSession(paper.sessionId, 'management-paper-submit', 'qa-internal');
+      paper = await harness
+        .current()
+        .advancePaperExecutionSession(paper.sessionId, 1, 'qa-internal');
     });
     expect(paper.status).toBe('open');
 
@@ -374,7 +390,9 @@ describe('guided analysis learning integration', () => {
       ReturnType<LearningContextValue['createOrResumePositionManagementSession']>
     >;
     await act(async () => {
-      management = await harness.current().createOrResumePositionManagementSession(paper.sessionId);
+      management = await harness
+        .current()
+        .createOrResumePositionManagementSession(paper.sessionId, 'qa-internal');
     });
     expect(management).toMatchObject({
       status: 'active',
@@ -386,37 +404,87 @@ describe('guided analysis learning integration', () => {
       },
       authority: { learningCredit: 'none' },
     });
+    const persistedInternalBefore = JSON.stringify(harness.current().snapshot);
     await expect(
-      harness.current().advancePaperExecutionSession(paper.sessionId, 1),
+      harness.current().createOrResumePositionManagementSession(paper.sessionId),
+    ).rejects.toThrow(/internal-scenario-restricted/);
+    expect(JSON.stringify(harness.current().snapshot)).toBe(persistedInternalBefore);
+    await expect(
+      harness.current().advancePaperExecutionSession(paper.sessionId, 1, 'qa-internal'),
     ).rejects.toThrow(/management|ניהול/i);
 
+    const rawVisibleClose = variant.dataset.candles[management.lastProcessedCandleIndex]!.close;
+    const overRisk = parsePositionManagementIntent(
+      {
+        draftId: 'scale-over-risk',
+        kind: 'scale-in',
+        quantity: '11',
+        rationale: 'בדיקת גבול הכמות המוצמד.',
+        decisionBasis: 'predefined-plan',
+        riskReviewed: true,
+        evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
+      },
+      rawVisibleClose,
+      management,
+    );
+    const validScaleIn = parsePositionManagementIntent(
+      {
+        draftId: 'scale-valid-2',
+        kind: 'scale-in',
+        quantity: '2',
+        rationale: 'הוספה מתועדת לפי הראיה והסיכון הגלויים.',
+        decisionBasis: 'predefined-plan',
+        riskReviewed: true,
+        evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
+      },
+      rawVisibleClose,
+      management,
+    );
+    if (!overRisk.ok || !validScaleIn.ok) throw new Error('Scale-in fixture did not parse');
+
     await act(async () => {
-      management = await harness
-        .current()
-        .savePositionManagementDraft(
-          management.sessionId,
-          { kind: 'partial-exit', quantityUnits: 1 },
-          'צמצום מתועד לפי התכנית והסיכון הגלויים.',
-          {
-            decisionBasis: 'predefined-plan',
-            riskReviewed: true,
-            evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
-          },
-        );
+      management = await harness.current().savePositionManagementDraft(
+        management.sessionId,
+        overRisk.intent,
+        'בדיקת גבול הכמות המוצמד.',
+        {
+          decisionBasis: 'predefined-plan',
+          riskReviewed: true,
+          evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
+        },
+        'qa-internal',
+      );
+    });
+    expect(management.draft?.riskAssessment.hardRejectionCodes).toContain(
+      'SCALE_IN_EXCEEDS_QUANTITY_LIMIT',
+    );
+
+    await act(async () => {
+      management = await harness.current().savePositionManagementDraft(
+        management.sessionId,
+        validScaleIn.intent,
+        'הוספה מתועדת לפי הראיה והסיכון הגלויים.',
+        {
+          decisionBasis: 'predefined-plan',
+          riskReviewed: true,
+          evidenceTags: ['predefined-plan', 'risk-budget', 'uncertainty-recorded'],
+        },
+        'qa-internal',
+      );
+      expect(management.draft?.riskAssessment.hardRejectionCodes).toEqual([]);
       management = await harness
         .current()
         .submitPositionManagementDraft(
           management.sessionId,
           `management-submit:${management.sessionId}`,
           management.draft!.riskAssessment.warningCodes,
+          'qa-internal',
         );
       management = await harness
         .current()
-        .advancePositionManagementSession(management.sessionId, 1);
+        .advancePositionManagementSession(management.sessionId, 1, 'qa-internal');
     });
-    expect(management.events.filter(({ type }) => type === 'voluntary-exit-filled')).toHaveLength(
-      1,
-    );
+    expect(management.events.filter(({ type }) => type === 'scale-in-filled')).toHaveLength(1);
     expect(
       JSON.stringify({
         attempts: harness.current().snapshot!.attempts,
@@ -820,7 +888,7 @@ describe('guided analysis learning integration', () => {
       .snapshot!.analysisSessions.find(({ sessionId }) => sessionId === activeAnalysis.sessionId)!;
     await expect(
       harness.current().createOrResumePaperExecutionSession(finalized.sessionId, paperPlan()),
-    ).rejects.toThrow(/hypothetical-mechanics-restricted/);
+    ).rejects.toThrow(/internal-scenario-restricted/);
     await expect(
       harness
         .current()

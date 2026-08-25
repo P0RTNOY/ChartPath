@@ -92,11 +92,11 @@ function learning(sessions: readonly GuidedAnalysisSession[]): LearningContextVa
   } as LearningContextValue;
 }
 
-function renderHub(sessions: readonly GuidedAnalysisSession[] = []) {
+function renderHub(sessions: readonly GuidedAnalysisSession[] = [], developmentMode = true) {
   mockLearning = learning(sessions);
   return render(
     <ChartPathThemeProvider direction="rtl" mode="light">
-      <AnalysisLabHub />
+      <AnalysisLabHub developmentMode={developmentMode} />
     </ChartPathThemeProvider>,
   );
 }
@@ -125,6 +125,14 @@ describe('AnalysisLabHub historical replay', () => {
     expect(screen.getByRole('button', { name: /המשך.*Replay.*עיוור/ })).toBeTruthy();
     expect(serialized).not.toMatch(/DEV-BLIND-001|Generated fixture 001|2025-01-05/);
     fireEvent.press(screen.getByRole('button', { name: /המשך.*Replay.*עיוור/ }));
-    expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=historical-active-session');
+    expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=historical-active-session&qa=1');
+  });
+
+  it('preserves but does not advertise persisted internal QA analysis in production Lab', async () => {
+    const persisted = historicalSession();
+    const screen = await renderHub([persisted], false);
+    expect(screen.queryByTestId('historical-analysis-resume-card')).toBeNull();
+    expect(screen.queryByRole('button', { name: /המשך.*Replay/ })).toBeNull();
+    expect(mockLearning.snapshot?.analysisSessions).toEqual([persisted]);
   });
 });

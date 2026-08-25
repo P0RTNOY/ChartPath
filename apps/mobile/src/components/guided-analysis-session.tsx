@@ -47,6 +47,7 @@ import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 import {
   resolveHistoricalAnalysisApplication,
   resolvePaperExecutionAnalysisSession,
+  type PaperExecutionAccessMode,
 } from '@/data/paper-execution';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
@@ -192,7 +193,13 @@ function capstoneAnswer(session: GuidedAnalysisSession): CapstoneAnswer | null {
     : null;
 }
 
-function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession }) {
+function GuidedDebrief({
+  accessMode,
+  session,
+}: {
+  readonly accessMode: PaperExecutionAccessMode;
+  readonly session: GuidedAnalysisSession;
+}) {
   const theme = useTheme();
   const learning = useLearning();
   const [starting, setStarting] = useState(false);
@@ -245,7 +252,9 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
     applicationResolution?.status === 'ready' &&
     applicationResolution.application.alignment === 'matched' &&
     applicationResolution.application.expected.kind === 'no-trade';
-  const paperResolution = historical ? resolvePaperExecutionAnalysisSession(session) : undefined;
+  const paperResolution = historical
+    ? resolvePaperExecutionAnalysisSession(session, undefined, { accessMode })
+    : undefined;
   const paperReady = paperResolution?.status === 'ready' ? paperResolution : undefined;
   const paperExecution = learning.snapshot?.paperExecutionSessions.find(
     ({ source }) => source.analysisSessionId === session.sessionId,
@@ -259,13 +268,16 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
           ? {
               kind: 'historical',
               scenarioId: session.chart.scenarioId,
+              scenarioVersion: session.chart.scenarioVersion,
               ...(session.chart.learningCredit === 'none'
                 ? { accessMode: 'qa-internal' as const }
                 : {}),
             }
           : { kind: 'synthetic' },
       );
-      router.replace(`/analysis?sessionId=${encodeURIComponent(created.sessionId)}` as Href);
+      router.replace(
+        `/analysis?sessionId=${encodeURIComponent(created.sessionId)}${accessMode === 'ordinary' ? '' : '&qa=1'}` as Href,
+      );
     } finally {
       setStarting(false);
     }
@@ -371,7 +383,7 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
               fullWidth
               onPress={() =>
                 router.push(
-                  `/paper-execution?analysisSessionId=${encodeURIComponent(session.sessionId)}` as Href,
+                  `/paper-execution?analysisSessionId=${encodeURIComponent(session.sessionId)}${accessMode === 'ordinary' ? '' : '&qa=1'}` as Href,
                 )
               }
               testID="paper-execution-launch"
@@ -535,8 +547,10 @@ function GuidedDebrief({ session }: { readonly session: GuidedAnalysisSession })
 }
 
 export function GuidedAnalysisSessionView({
+  accessMode = 'ordinary',
   persistedSession,
 }: {
+  readonly accessMode?: PaperExecutionAccessMode;
   readonly persistedSession: GuidedAnalysisSession;
 }) {
   const theme = useTheme();
@@ -595,7 +609,8 @@ export function GuidedAnalysisSessionView({
     return () => subscription?.remove();
   }, [enqueue]);
 
-  if (persistedSession.status === 'finalized') return <GuidedDebrief session={persistedSession} />;
+  if (persistedSession.status === 'finalized')
+    return <GuidedDebrief accessMode={accessMode} session={persistedSession} />;
   if (persistedSession.status === 'abandoned') {
     return (
       <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
@@ -626,7 +641,9 @@ export function GuidedAnalysisSessionView({
       setMessage(null);
       try {
         const replacement = await learning.restartAnalysisSession(persistedSession.sessionId);
-        router.replace(`/analysis?sessionId=${encodeURIComponent(replacement.sessionId)}` as Href);
+        router.replace(
+          `/analysis?sessionId=${encodeURIComponent(replacement.sessionId)}${accessMode === 'ordinary' ? '' : '&qa=1'}` as Href,
+        );
       } catch (reason) {
         setMessage(reason instanceof Error ? reason.message : 'לא הצלחנו ליצור טיוטה תואמת.');
       } finally {

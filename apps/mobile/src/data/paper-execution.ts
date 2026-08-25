@@ -26,6 +26,7 @@ export type PaperExecutionResolutionStatus =
   | 'analysis-not-finalized'
   | 'analysis-application-mismatch'
   | 'analysis-application-unresolved'
+  | 'internal-scenario-restricted'
   | 'execution-not-enabled'
   | 'hypothetical-mechanics-restricted'
   | 'unsupported-execution-policy'
@@ -33,13 +34,22 @@ export type PaperExecutionResolutionStatus =
   | 'execution-direction-mismatch'
   | 'execution-identity-mismatch';
 
-export type PaperExecutionAccessMode = 'ordinary' | 'qa-hypothetical-mechanics';
+export type PaperExecutionAccessMode = 'ordinary' | 'qa-internal' | 'qa-hypothetical-mechanics';
 
 export interface PaperExecutionResolutionOptions {
   /** Hypothetical mechanics are deliberately inaccessible to ordinary learner flows. */
   readonly accessMode?: PaperExecutionAccessMode;
   /** A proposed plan direction must agree with the completed analysis before allocation. */
   readonly proposedDirection?: AnalysisTradeDirection;
+}
+
+export function internalPaperExecutionAccessAllowed(input: {
+  readonly internalOnly: boolean;
+  readonly accessMode?: PaperExecutionAccessMode;
+  readonly developmentMode: boolean;
+}): boolean {
+  if (!input.internalOnly) return input.accessMode === undefined || input.accessMode === 'ordinary';
+  return input.developmentMode && input.accessMode !== undefined && input.accessMode !== 'ordinary';
 }
 
 export interface HistoricalAnalysisApplicationReady {
@@ -186,6 +196,22 @@ export function resolvePaperExecutionAnalysisSession(
   if (applicationResolution.status !== 'ready') return applicationResolution;
   const historical = resolveHistoricalAnalysisSession(session, registry);
   if (historical.status !== 'ready') return historical;
+  const internalOnly =
+    historical.content.learningCredit === 'none' ||
+    historical.content.scenario.publicationStatus !== 'published' ||
+    historical.content.scenario.editorial.status !== 'published';
+  if (
+    !internalPaperExecutionAccessAllowed({
+      internalOnly,
+      accessMode: options.accessMode,
+      developmentMode: __DEV__,
+    })
+  ) {
+    return unavailable(
+      'internal-scenario-restricted',
+      'Internal, unpublished, or no-credit paper execution requires the explicit development QA boundary.',
+    );
+  }
   const configuration = applicationResolution.content.scenario.paperExecution;
   if (configuration?.enabled !== true) {
     return unavailable(

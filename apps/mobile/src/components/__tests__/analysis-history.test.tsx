@@ -47,7 +47,7 @@ function historicalSession(
   return { ...created, status };
 }
 
-function renderHistory(sessions: readonly GuidedAnalysisSession[]) {
+function renderHistory(sessions: readonly GuidedAnalysisSession[], developmentMode = true) {
   mockLearning = {
     status: 'ready',
     error: null,
@@ -60,7 +60,7 @@ function renderHistory(sessions: readonly GuidedAnalysisSession[]) {
   } as unknown as LearningContextValue;
   return render(
     <ChartPathThemeProvider direction="rtl" mode="light">
-      <AnalysisHistory />
+      <AnalysisHistory developmentMode={developmentMode} />
     </ChartPathThemeProvider>,
   );
 }
@@ -81,7 +81,16 @@ describe('AnalysisHistory historical replay', () => {
     expect(screen.getAllByText(/ללא.*XP.*שליטה.*חזרה/)).toHaveLength(2);
 
     fireEvent.press(screen.getByRole('button', { name: 'פתיחת התחקיר' }));
-    expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=historical-finalized');
+    expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=historical-finalized&qa=1');
     expect(screen.queryByRole('button', { name: /עריכה/ })).toBeNull();
+  });
+
+  it('preserves but hides persisted internal QA sessions in production history', async () => {
+    const persisted = historicalSession('persisted-production-hidden', 'finalized');
+    const screen = await renderHistory([persisted], false);
+    expect(screen.queryByTestId('historical-history-reveal')).toBeNull();
+    expect(screen.queryByText(/Generated fixture 001/)).toBeNull();
+    expect(screen.getByText('עדיין אין ניתוחים')).toBeTruthy();
+    expect(mockLearning.snapshot?.analysisSessions).toEqual([persisted]);
   });
 });

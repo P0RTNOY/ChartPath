@@ -43,6 +43,31 @@ export type HistoricalReplayResolution =
       readonly message: string;
     };
 
+/** Classifies persisted identities without mutating or deleting their audit records. */
+export function historicalSessionRequiresQa(
+  session: GuidedAnalysisSession,
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+): boolean {
+  if (session.chart.kind !== 'historical') return false;
+  if (session.chart.learningCredit === 'none') return true;
+  const resolved = resolveHistoricalAnalysisSession(session, registry);
+  return (
+    resolved.status === 'ready' &&
+    (resolved.content.learningCredit === 'none' ||
+      resolved.content.scenario.publicationStatus !== 'published' ||
+      resolved.content.scenario.editorial.status !== 'published')
+  );
+}
+
+export function historicalSessionRouteAccessAllowed(
+  session: GuidedAnalysisSession,
+  input: { readonly qaRequested: boolean; readonly developmentMode: boolean },
+  registry: HistoricalContentRegistry = internalHistoricalContentRegistry,
+): boolean {
+  if (!historicalSessionRequiresQa(session, registry)) return !input.qaRequested;
+  return input.qaRequested && input.developmentMode;
+}
+
 function unavailable(
   status: Exclude<HistoricalSessionResolutionStatus, 'ready'>,
   message: string,

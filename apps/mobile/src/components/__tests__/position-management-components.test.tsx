@@ -10,10 +10,32 @@ import { PositionManagementSummary } from '../position-management-summary';
 import { TradeManagementJournal } from '../trade-management-journal';
 import {
   buildPositionManagementOverlays,
+  parsePositionManagementIntent,
   type PositionManagementDraftView,
 } from '@/data/position-management';
 
 describe('position management presentation', () => {
+  it('normalizes a raw historical close to the pinned tick grid for scale-in intent', () => {
+    expect(
+      parsePositionManagementIntent(
+        {
+          draftId: 'scale-in-2',
+          kind: 'scale-in',
+          quantity: '2',
+          rationale: 'ראיה גלויה',
+          decisionBasis: 'new-visible-evidence',
+          riskReviewed: true,
+          evidenceTags: ['visible-price-evidence', 'risk-budget'],
+        },
+        106.136,
+        { currencyDecimals: 2, priceTickMinor: 1 },
+      ),
+    ).toEqual({
+      ok: true,
+      intent: { kind: 'scale-in', quantityUnits: 2, estimatedEntryPrice: 106.14 },
+    });
+  });
+
   it('renders authoritative position values in explicit LTR containers', async () => {
     const screen = await render(
       <ChartPathThemeProvider direction="rtl" mode="dark" reducedMotion textScale={1.3}>
@@ -38,7 +60,7 @@ describe('position management presentation', () => {
     expect(screen.getByText('80.00')).toHaveStyle({ writingDirection: 'ltr' });
   });
 
-  it('requires rationale, risk-warning acknowledgement, and final confirmation before submit', async () => {
+  it('enables authored scale-in quantity 2 after rationale and confirmations', async () => {
     let draft: PositionManagementDraftView = {
       draftId: 'draft-1',
       kind: 'scale-in',

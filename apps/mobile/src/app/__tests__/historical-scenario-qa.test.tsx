@@ -99,14 +99,20 @@ describe('HistoricalScenarioQaRoute', () => {
     await waitFor(() => {
       expect(mockSaveAnalysisSession).toHaveBeenCalledWith(completed);
       expect(mockFinalizeAnalysisSession).toHaveBeenCalledWith(saved);
-      expect(mockCreatePaper).toHaveBeenCalledWith('qa-management-analysis', {
-        planId: 'authored-plan',
-      });
-      expect(mockSubmitPaper).toHaveBeenCalledWith('qa-paper', 'management-qa-submit:qa-paper');
-      expect(mockAdvancePaper).toHaveBeenCalledWith('qa-paper', 1);
-      expect(mockCreateManagement).toHaveBeenCalledWith('qa-paper');
+      expect(mockCreatePaper).toHaveBeenCalledWith(
+        'qa-management-analysis',
+        { planId: 'authored-plan' },
+        'qa-internal',
+      );
+      expect(mockSubmitPaper).toHaveBeenCalledWith(
+        'qa-paper',
+        'management-qa-submit:qa-paper',
+        'qa-internal',
+      );
+      expect(mockAdvancePaper).toHaveBeenCalledWith('qa-paper', 1, 'qa-internal');
+      expect(mockCreateManagement).toHaveBeenCalledWith('qa-paper', 'qa-internal');
       expect(mockPush).toHaveBeenCalledWith(
-        '/paper-execution?analysisSessionId=qa-management-analysis',
+        '/paper-execution?analysisSessionId=qa-management-analysis&qa=1',
       );
     });
   });
@@ -163,7 +169,7 @@ describe('HistoricalScenarioQaRoute', () => {
         scenarioVersion: '2.1.0',
         accessMode: 'qa-internal',
       });
-      expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=qa-session-1');
+      expect(mockPush).toHaveBeenCalledWith('/analysis?sessionId=qa-session-1&qa=1');
     });
   });
 });

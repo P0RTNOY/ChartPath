@@ -391,6 +391,35 @@ describe('PaperExecutionScreen', () => {
     expect(screen.queryByTestId('paper-submit-order')).toBeNull();
   });
 
+  it('keeps persisted internal paper and management records hidden on ordinary access', async () => {
+    const execution = openPosition();
+    mockLearning(execution);
+    const management = {
+      sessionId: 'persisted-internal-management',
+      handoff: execution,
+      lastProcessedCandleIndex: execution.lastProcessedCandleIndex,
+    };
+    (
+      mockLearningContext.snapshot as { positionManagementSessions: unknown[] }
+    ).positionManagementSessions = [management];
+    const persistedBefore = JSON.stringify(mockLearningContext.snapshot);
+    mockResolveExecution.mockReturnValue({
+      status: 'internal-scenario-restricted',
+      message: 'Internal QA identity requires explicit development access.',
+    });
+
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <PaperExecutionScreen accessMode="ordinary" analysisSessionId="analysis-final" />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByTestId('paper-execution-recovery')).toBeTruthy();
+    expect(screen.queryByTestId('paper-management-screen')).toBeNull();
+    expect(screen.queryByTestId('paper-execution-ticket')).toBeNull();
+    expect(JSON.stringify(mockLearningContext.snapshot)).toBe(persistedBefore);
+  });
+
   it('creates the separate management aggregate only for an enabled exact open position', async () => {
     const execution = openPosition();
     expect(execution.status).toBe('open');

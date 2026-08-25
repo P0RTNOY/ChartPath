@@ -17,6 +17,7 @@ import {
 
 import { resolveHistoricalReplayScenario } from './historical-replay';
 import {
+  internalPaperExecutionAccessAllowed,
   resolvePaperExecutionAnalysisSession,
   resolvePaperExecutionSession,
 } from './paper-execution';
@@ -134,6 +135,19 @@ function validPlan(): TradePlanInput {
 }
 
 describe('paper execution source resolution', () => {
+  it.each(['qa-internal', 'qa-hypothetical-mechanics'] as const)(
+    'rejects persisted internal execution through %s outside a development build',
+    (accessMode) => {
+      expect(
+        internalPaperExecutionAccessAllowed({
+          internalOnly: true,
+          accessMode,
+          developmentMode: false,
+        }),
+      ).toBe(false);
+    },
+  );
+
   it('pins the exact finalized analysis, dataset, policy permissions, and boundary', () => {
     const analysis = finalizedAnalysis();
     const resolved = resolvePaperExecutionAnalysisSession(
@@ -182,7 +196,7 @@ describe('paper execution source resolution', () => {
 
   it('keeps hypothetical mechanics unavailable to the ordinary no-trade path', () => {
     expect(resolvePaperExecutionAnalysisSession(finalizedAnalysis()).status).toBe(
-      'hypothetical-mechanics-restricted',
+      'internal-scenario-restricted',
     );
   });
 
@@ -230,9 +244,9 @@ describe('paper execution source resolution', () => {
       historicalContentRegistry,
     ) as Mutable<HistoricalContentRegistry>;
     boundaryRegistry.scenarios[0]!.paperExecution!.executionBoundary.lastCandleIndex = 94;
-    expect(resolvePaperExecutionAnalysisSession(analysis, boundaryRegistry).status).toBe(
-      'execution-boundary-mismatch',
-    );
+    expect(
+      resolvePaperExecutionAnalysisSession(analysis, boundaryRegistry, QA_HYPOTHETICAL).status,
+    ).toBe('execution-boundary-mismatch');
   });
 
   it('refuses to reattach a persisted execution to a different analysis identity', () => {
@@ -261,7 +275,7 @@ describe('paper execution source resolution', () => {
       ).status,
     ).toBe('ready');
     expect(resolvePaperExecutionSession(execution, [analysis]).status).toBe(
-      'hypothetical-mechanics-restricted',
+      'internal-scenario-restricted',
     );
     expect(
       resolvePaperExecutionSession(

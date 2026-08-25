@@ -18,7 +18,10 @@ import {
 import { ErrorState, LoadingState } from './app-state';
 import { CAPSTONE_STEP_LABELS } from './capstone-interaction';
 import { TopBar } from './top-bar';
-import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
+import {
+  historicalSessionRequiresQa,
+  resolveHistoricalAnalysisSession,
+} from '@/data/historical-replay';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 
 function progress(session: GuidedAnalysisSession): number {
@@ -31,7 +34,11 @@ function sessionDate(value: string): string {
   );
 }
 
-export function AnalysisLabHub() {
+export function AnalysisLabHub({
+  developmentMode = __DEV__,
+}: {
+  readonly developmentMode?: boolean;
+} = {}) {
   const theme = useTheme();
   const learning = useLearning();
   const [working, setWorking] = useState(false);
@@ -47,7 +54,10 @@ export function AnalysisLabHub() {
     );
   }
 
-  const activeSynthetic = [...learning.snapshot.analysisSessions]
+  const visibleSessions = learning.snapshot.analysisSessions.filter(
+    (session) => developmentMode || !historicalSessionRequiresQa(session),
+  );
+  const activeSynthetic = [...visibleSessions]
     .filter(
       (session) =>
         session.status === 'active' &&
@@ -55,7 +65,7 @@ export function AnalysisLabHub() {
         session.chart.kind === 'synthetic',
     )
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
-  const activeHistorical = [...learning.snapshot.analysisSessions]
+  const activeHistorical = [...visibleSessions]
     .filter(
       (session) =>
         session.status === 'active' &&
@@ -66,12 +76,12 @@ export function AnalysisLabHub() {
   const activeHistoricalResolution = activeHistorical
     ? resolveHistoricalAnalysisSession(activeHistorical)
     : undefined;
-  const finalizedCount = learning.snapshot.analysisSessions.filter(
-    (session) => session.status === 'finalized',
-  ).length;
+  const finalizedCount = visibleSessions.filter((session) => session.status === 'finalized').length;
 
   const openSession = (session: GuidedAnalysisSession) => {
-    router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}` as Href);
+    router.push(
+      `/analysis?sessionId=${encodeURIComponent(session.sessionId)}${historicalSessionRequiresQa(session) ? '&qa=1' : ''}` as Href,
+    );
   };
 
   const start = async () => {
