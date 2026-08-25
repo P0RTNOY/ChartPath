@@ -4,6 +4,7 @@ export * from './daily-path.js';
 export * from './grading.js';
 export * from './mastery.js';
 export * from './paper-execution.js';
+export * from './position-management.js';
 export * from './review.js';
 export * from './risk.js';
 export * from './tutor.js';
