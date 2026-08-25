@@ -734,6 +734,7 @@ export function assertValidPositionManagementSession(
     assertText(session.draft.rationale, 'Management draft rationale');
     assertTimestamp(session.draft.updatedAt, 'Management draft timestamp');
     assertProcessEvidence(session.draft.processEvidence);
+    assertRiskAssessment(session.draft.riskAssessment);
   }
   if (session.pendingAction) {
     assertId(session.pendingAction.submissionId, 'Management submission ID');
@@ -741,6 +742,11 @@ export function assertValidPositionManagementSession(
     assertText(session.pendingAction.rationale, 'Submitted management rationale');
     assertTimestamp(session.pendingAction.submittedAt, 'Management submission timestamp');
     assertProcessEvidence(session.pendingAction.processEvidence);
+    assertRiskCodes(
+      session.pendingAction.acknowledgedRiskWarningCodes,
+      'Management risk acknowledgements',
+    );
+    assertRiskAssessment(session.pendingAction.riskAssessment);
   }
   assertLots(session);
   assertAccounting(session.accounting);
@@ -2059,6 +2065,23 @@ function assertEvents(
   events: readonly PositionManagementEvent[],
   session: PositionManagementSession,
 ): void {
+  const supportedTypes: readonly PositionManagementEvent['type'][] = [
+    'management-session-created',
+    'management-draft-edited',
+    'management-action-submitted',
+    'management-action-cancelled',
+    'management-action-risk-rejected',
+    'protective-stop-replaced',
+    'target-replaced',
+    'voluntary-exit-filled',
+    'scale-in-filled',
+    'position-closed-stop',
+    'position-closed-target',
+    'position-management-ambiguous',
+    'management-observation-recorded',
+    'management-journal-corrected',
+    'position-open-at-replay-end',
+  ];
   if (events[0]?.type !== 'management-session-created')
     throw new Error('Management event history must begin with creation');
   if (!structurallyEqual(events[0].authority, session.authority))
@@ -2066,6 +2089,8 @@ function assertEvents(
   if (events[0].paperExecutionSessionId !== session.handoff.sessionId)
     throw new Error('Position management creation event differs from its paper handoff');
   events.forEach((entry, index) => {
+    if (!supportedTypes.includes(entry.type))
+      throw new Error('Unsupported position management event type');
     if (entry.sequence !== index || entry.eventId !== `${session.sessionId}:event:${index}`)
       throw new Error('Management events require deterministic sequential identities');
     assertTimestamp(entry.occurredAt, 'Management event timestamp');
@@ -2089,6 +2114,8 @@ function assertEvents(
       assertTimestamp(entry.cutoffCandleTimestamp, 'Management submission cutoff timestamp');
       assertPositiveSafeInteger(entry.submissionOrder, 'Management submission order');
       assertNonNegativeSafeInteger(entry.journalEntryOrder, 'Management journal entry order');
+      assertRiskCodes(entry.acknowledgedRiskWarningCodes, 'Management risk acknowledgements');
+      assertRiskCodes(entry.warningCodes, 'Management risk warnings');
     } else if (entry.type === 'management-observation-recorded') {
       assertId(entry.entryId, 'Management observation ID');
       assertText(entry.text, 'Management observation text');
@@ -2102,6 +2129,8 @@ function assertEvents(
       assertEvidenceTags(entry.evidenceTags, 'Management correction evidence tags');
       assertTimestamp(entry.cutoffCandleTimestamp, 'Management correction cutoff timestamp');
       assertNonNegativeSafeInteger(entry.journalEntryOrder, 'Management journal entry order');
+    } else if (entry.type === 'management-action-risk-rejected') {
+      assertRiskCodes(entry.issueCodes, 'Management execution risk rejection');
     }
   });
 }
@@ -2122,14 +2151,58 @@ function assertDerivedHistory(session: PositionManagementSession): void {
   );
   const eventFills: { readonly fillId: string; readonly fill: PositionManagementFill }[] = [];
   const scaleEvents: Extract<PositionManagementEvent, { type: 'scale-in-filled' }>[] = [];
+  const submissionFor = (
+    submissionId: string,
+  ): Extract<PositionManagementEvent, { type: 'management-action-submitted' }> | undefined =>
+    session.events.find(
+      (
+        candidate,
+      ): candidate is Extract<PositionManagementEvent, { type: 'management-action-submitted' }> =>
+        candidate.type === 'management-action-submitted' && candidate.submissionId === submissionId,
+    );
   for (const entry of session.events) {
+    if (isCandleDrivenEvent(entry)) {
+      if (!Number.isSafeInteger(entry.candleIndex))
+        throw new Error('Candle-driven management event requires an exact candle index');
+      const checkpoint = session.processedCandles.find(({ index }) => index === entry.candleIndex);
+      if (!checkpoint || entry.occurredAt !== checkpoint.timestamp)
+        throw new Error('Candle-driven management event differs from its persisted checkpoint');
+    }
     if (entry.type === 'protective-stop-replaced') {
+      const submission = submissionFor(entry.submissionId);
       if (entry.previousPriceTicks !== expectedStop)
         throw new Error('Protective-stop event history is discontinuous');
+      if (
+        !submission ||
+        submission.intent.kind !== 'replace-stop' ||
+        entry.candleIndex !== submission.candleIndex! + 1 ||
+        entry.priceTicks !==
+          priceToTicks(
+            submission.intent.price,
+            scale,
+            session.priceTickMinor,
+            'Submitted replacement stop',
+          )
+      )
+        throw new Error('Protective-stop event differs from its exact submitted action');
       expectedStop = entry.priceTicks;
     } else if (entry.type === 'target-replaced') {
+      const submission = submissionFor(entry.submissionId);
       if (entry.previousPriceTicks !== expectedTarget)
         throw new Error('Target event history is discontinuous');
+      if (
+        !submission ||
+        submission.intent.kind !== 'replace-target' ||
+        entry.candleIndex !== submission.candleIndex! + 1 ||
+        entry.priceTicks !==
+          priceToTicks(
+            submission.intent.price,
+            scale,
+            session.priceTickMinor,
+            'Submitted replacement target',
+          )
+      )
+        throw new Error('Target event differs from its exact submitted action');
       expectedTarget = entry.priceTicks;
     } else if (
       entry.type === 'voluntary-exit-filled' ||
@@ -2139,6 +2212,20 @@ function assertDerivedHistory(session: PositionManagementSession): void {
     ) {
       eventFills.push({ fillId: entry.fillId, fill: entry.fill });
       if (entry.type === 'scale-in-filled') scaleEvents.push(entry);
+      if (entry.type === 'voluntary-exit-filled' || entry.type === 'scale-in-filled') {
+        const submission = submissionFor(entry.submissionId);
+        if (!submission || entry.candleIndex !== submission.candleIndex! + 1)
+          throw new Error('Voluntary fill did not execute at its exact eligible candle');
+      }
+    } else if (entry.type === 'management-action-risk-rejected') {
+      const submission = submissionFor(entry.submissionId);
+      if (
+        !submission ||
+        submission.intent.kind !== 'scale-in' ||
+        entry.candleIndex !== submission.candleIndex! + 1 ||
+        !structurallyEqual(entry.issueCodes, ['PROJECTED_RISK_EXCEEDS_HARD_LIMIT'])
+      )
+        throw new Error('Execution-time risk rejection differs from its exact submitted action');
     }
   }
   if (
@@ -2424,8 +2511,24 @@ function assertCanonicalExecutionState(
     )
       throw new Error('Position fill is not linked to its exact processed candle checkpoint');
 
+    const openMinor = candlePriceToTickMinor(candle.open, replay, 'Fill open observation');
+    const lowMinor = candlePriceToTickMinor(candle.low, replay, 'Fill low observation');
+    const highMinor = candlePriceToTickMinor(candle.high, replay, 'Fill high observation');
+    const stopMinor = ticksToMinor(replay.activeProtectiveStopTicks, replay.priceTickMinor);
+    const targetMinor = ticksToMinor(replay.activeTargetTicks, replay.priceTickMinor);
+    const openingStop =
+      replay.direction === 'long' ? openMinor <= stopMinor : openMinor >= stopMinor;
+    const openingTarget =
+      replay.direction === 'long' ? openMinor >= targetMinor : openMinor <= targetMinor;
+    const stopTouched =
+      replay.direction === 'long' ? lowMinor <= stopMinor : highMinor >= stopMinor;
+    const targetTouched =
+      replay.direction === 'long' ? highMinor >= targetMinor : lowMinor <= targetMinor;
+
     let expectedFill: PositionManagementFill;
     if (event.type === 'voluntary-exit-filled') {
+      if (openingStop || openingTarget)
+        throw new Error('Voluntary fill bypasses a required opening-threshold ambiguity');
       const submission = session.events.find(
         (
           candidate,
@@ -2450,6 +2553,8 @@ function assertCanonicalExecutionState(
         'voluntary-exit',
       );
     } else if (event.type === 'scale-in-filled') {
+      if (openingStop || openingTarget)
+        throw new Error('Scale-in fill bypasses a required opening-threshold ambiguity');
       const submission = session.events.find(
         (
           candidate,
@@ -2467,14 +2572,14 @@ function assertCanonicalExecutionState(
         'scale-in',
       );
     } else if (event.type === 'position-closed-stop') {
-      const openMinor = candlePriceToTickMinor(candle.open, replay, 'Stop gap observation');
-      const stopMinor = ticksToMinor(replay.activeProtectiveStopTicks, replay.priceTickMinor);
       const gap = replay.direction === 'long' ? openMinor <= stopMinor : openMinor >= stopMinor;
+      if (!stopTouched || openingTarget || (!gap && targetTouched))
+        throw new Error('Protective-stop fill bypasses deterministic threshold ordering');
       expectedFill = stopFill(replay, candle, gap);
     } else {
-      const openMinor = candlePriceToTickMinor(candle.open, replay, 'Target gap observation');
-      const targetMinor = ticksToMinor(replay.activeTargetTicks, replay.priceTickMinor);
       const gap = replay.direction === 'long' ? openMinor >= targetMinor : openMinor <= targetMinor;
+      if (!targetTouched || openingStop || (!gap && stopTouched))
+        throw new Error('Target fill bypasses deterministic threshold ordering');
       expectedFill = targetFill(replay, candle, gap);
     }
     if (!structurallyEqual(event.fill, expectedFill))
@@ -2850,10 +2955,6 @@ function safeBpsProduct(value: number, bps: number): number {
   return safeMultiply(value, bps) / 10_000;
 }
 
-function hardRiskLimitFromBps(originalRiskMinor: number, bps: number): number {
-  return Math.floor((originalRiskMinor * bps) / 10_000);
-}
-
 function uniqueSorted<T extends string>(values: readonly T[]): readonly T[] {
   return [...new Set(values)].sort();
 }
@@ -2915,6 +3016,27 @@ function assertProcessEvidence(evidence: PositionManagementProcessEvidence): voi
   )
     throw new Error('Management process evidence contains an unsupported structured value');
   assertEvidenceTags(evidence.evidenceTags, 'Management process evidence tags');
+}
+
+function assertRiskAssessment(assessment: PositionManagementRiskAssessment): void {
+  assertNonNegativeSafeInteger(assessment.projectedRiskMinor, 'Projected management risk');
+  assertPositiveSafeInteger(assessment.originalRiskMinor, 'Original management risk');
+  assertRiskCodes(assessment.warningCodes, 'Management risk warnings');
+  assertRiskCodes(assessment.hardRejectionCodes, 'Management hard risk rejections');
+}
+
+function assertRiskCodes(codes: readonly PositionManagementRiskCode[], label: string): void {
+  const allowed: readonly PositionManagementRiskCode[] = [
+    'PROJECTED_RISK_EXCEEDS_ORIGINAL_1R',
+    'PROJECTED_RISK_EXCEEDS_HARD_LIMIT',
+    'SCALE_IN_EXCEEDS_QUANTITY_LIMIT',
+  ];
+  if (
+    !Array.isArray(codes) ||
+    new Set(codes).size !== codes.length ||
+    codes.some((code) => !allowed.includes(code))
+  )
+    throw new Error(`${label} must contain unique supported codes`);
 }
 
 function assertEvidenceTags(tags: readonly PositionManagementEvidenceTag[], label: string): void {
@@ -3049,9 +3171,6 @@ function structurallyEqual(left: unknown, right: unknown): boolean {
     lk.every((key, index) => key === rk[index] && structurallyEqual(l[key], r[key]))
   );
 }
-
-// Compile-time anchor for the fixed hard-risk calculation and its safe-integer intent.
-void hardRiskLimitFromBps;
 
 const SHA256_ROUND_CONSTANTS = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

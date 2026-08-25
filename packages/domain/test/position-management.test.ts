@@ -767,6 +767,47 @@ describe('replay integrity, selectors, debrief, and restored validation', () => 
         ),
       }),
     ).toThrow('structured value');
+
+    const pending = queue(session, { kind: 'full-exit' });
+    expect(() =>
+      assertValidPositionManagementSession({
+        ...pending,
+        pendingAction: {
+          ...pending.pendingAction!,
+          processEvidence: {
+            ...pending.pendingAction!.processEvidence,
+            evidenceTags: ['forged' as never],
+          },
+        },
+      }),
+    ).toThrow('supported tags');
+    expect(() =>
+      assertValidPositionManagementSession({
+        ...pending,
+        pendingAction: {
+          ...pending.pendingAction!,
+          riskAssessment: {
+            ...pending.pendingAction!.riskAssessment,
+            warningCodes: ['forged' as never],
+          },
+        },
+      }),
+    ).toThrow('supported codes');
+
+    const invalidAcceptedRubric = {
+      schemaVersion: 1,
+      criteria: [
+        {
+          criterionId: 'basis',
+          kind: 'decision-basis',
+          accepted: ['forged'],
+        },
+      ],
+    } as unknown as PositionManagementRubricV1;
+    const invalidAcceptedAuthority = authority({ rubric: invalidAcceptedRubric });
+    expect(() => managed(openPaper(), invalidAcceptedAuthority)).toThrow(
+      'Decision-basis rubric criterion',
+    );
   });
 
   it('enforces scenario risk boundaries again at the exact execution open', () => {
