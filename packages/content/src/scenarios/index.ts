@@ -15,3 +15,12 @@ export {
   type ScenarioInputPreflightResult,
 } from './schema.js';
 export * from './registry.js';
+export * from './management.js';
+export {
+  parseScenarioPositionManagementExtension,
+  parseScenarioPositionManagementConfiguration,
+  scenarioPositionManagementConfigurationSchema,
+  scenarioPositionManagementExtensionSchema,
+  type ScenarioPositionManagementConfigurationParseResult,
+  type ScenarioPositionManagementExtensionParseResult,
+} from './management-schema.js';

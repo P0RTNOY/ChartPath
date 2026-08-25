@@ -16,6 +16,7 @@ import {
 import { catalog as bundledCatalog } from './catalog.js';
 import type { ContentCatalog, ContentExercise } from './types.js';
 import { scenarioCandidateRegistry } from './scenarios/registry.js';
+import { scenarioPositionManagementVariantRegistry } from './scenarios/management.js';
 import type { ScenarioLearnerExerciseProjection } from './scenarios/types.js';
 
 export { DEVELOPMENT_HISTORICAL_DATASET, DEVELOPMENT_HISTORICAL_SCENARIO };
@@ -88,15 +89,49 @@ export const scenarioHistoricalContentRegistry: HistoricalContentRegistry = Obje
   learnerExercises: Object.freeze(scenarioCandidateRegistry.map((candidate) => candidate.exercise)),
 });
 
+function uniqueDatasetsByIdentity(
+  values: readonly HistoricalDataset[],
+): readonly HistoricalDataset[] {
+  const identities = new Set<string>();
+  return Object.freeze(
+    values.filter((dataset) => {
+      const identity = `${dataset.manifest.datasetId}@${dataset.manifest.datasetVersion}`;
+      if (identities.has(identity)) return false;
+      identities.add(identity);
+      return true;
+    }),
+  );
+}
+
+/** Explicit no-credit QA registry for management-enabled immutable scenario versions. */
+export const positionManagementHistoricalContentRegistry: HistoricalContentRegistry = Object.freeze(
+  {
+    datasets: uniqueDatasetsByIdentity(
+      scenarioPositionManagementVariantRegistry.map((variant) => variant.dataset),
+    ),
+    scenarios: Object.freeze(
+      scenarioPositionManagementVariantRegistry.map((variant) => variant.scenario),
+    ),
+    educationalExercises: Object.freeze(
+      scenarioCandidateRegistry.map((candidate) => candidate.gradingExercise),
+    ),
+    learnerExercises: Object.freeze(
+      scenarioCandidateRegistry.map((candidate) => candidate.exercise),
+    ),
+  },
+);
+
 /** Explicit QA/runtime registry. Ordinary catalog projections remain unchanged and published-only. */
 export const internalHistoricalContentRegistry: HistoricalContentRegistry = Object.freeze({
-  datasets: Object.freeze([
+  datasets: uniqueDatasetsByIdentity([
     DEVELOPMENT_HISTORICAL_DATASET,
     ...scenarioCandidateRegistry.map((candidate) => candidate.dataset),
+    ...scenarioPositionManagementVariantRegistry.map((variant) => variant.dataset),
   ]),
   scenarios: Object.freeze([
     DEVELOPMENT_HISTORICAL_SCENARIO,
     ...scenarioCandidateRegistry.map((candidate) => candidate.scenario),
+    ...scenarioPositionManagementVariantRegistry.map((variant) => variant.scenario),
   ]),
   educationalExercises: Object.freeze(
     scenarioCandidateRegistry.map((candidate) => candidate.gradingExercise),

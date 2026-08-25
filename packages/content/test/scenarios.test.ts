@@ -109,9 +109,9 @@ describe('scenario authoring library', () => {
     const validation = validateHistoricalContentRegistry(internalHistoricalContentRegistry);
     expect(validation.valid).toBe(true);
     expect(validation.counts).toMatchObject({
-      datasets: 10,
-      scenarios: 10,
-      internalOnly: 10,
+      datasets: 12,
+      scenarios: 13,
+      internalOnly: 13,
       courseCreditEligible: 0,
     });
     const first = scenarioAuthoringManifests[0]!;
