@@ -24,6 +24,7 @@
     "screenshots:guided": "node scripts/capture-guided-analysis-screenshots.mjs",
     "screenshots:historical": "node scripts/capture-historical-replay-screenshots.mjs",
     "screenshots:paper": "node scripts/capture-paper-execution-screenshots.mjs",
+    "screenshots:management": "node scripts/capture-position-management-screenshots.mjs",
     "screenshots:scenarios": "node scripts/capture-scenario-library-screenshots.mjs",
     "test:e2e:web": "playwright test",
     "test:e2e:qa:web": "playwright test --config playwright.qa.config.ts",
