@@ -677,6 +677,37 @@ levels, exit and ambiguity without color alone. Exact numeric fields and keyboar
 controls support learners who cannot place a chart gesture. Native screen-reader, largest OS text,
 gesture/lifecycle and physical-device validation remain pending until recorded from actual runs.
 
+## 18.4 Curated scenario practice and first-class no trade
+
+The scenario-authoring foundation expands repeated transfer practice without promoting unreviewed
+material into the course. Its internal candidate set balances long, short and no-trade applications
+across guided, independent and blind support. Difficulty changes scaffolding—hint specificity,
+workflow reminders and required independent identification—not safety information or the simulated
+profitability of the future candles.
+
+Each candidate has two exercise representations. The private grading exercise holds the authored
+rubric and expected answer. The learner projection contains only neutral prompts, learner-visible
+options, safety copy and blind accessibility instructions. This separation lets deterministic
+grading remain curated without leaking source identity, correct direction, future outcome or
+execution expectation through cards, serialized UI data or assistive text.
+
+No trade is a completed application decision, not the absence of work. The learner must still
+provide the authored evidence-based rationale through the eleven-step analysis. When it matches the
+source-backed rubric, finalization routes to a deterministic process review, creates no paper order
+or position and is not regraded from subsequent candles. It receives no less process recognition
+than a coherent trade merely because the learner stayed out.
+
+For trade candidates, the plan must remain consistent with the finalized analysis before paper
+execution is available. The execution outcome is then described separately from the educational
+process score. Target, protective-stop, unfilled and ambiguous results are authored transfer cases;
+none determine mastery by profit/loss.
+
+The ordinary learner scenario library includes only published, reviewed, blocker-free content. It is
+currently empty. The balanced synthetic candidate set is available solely in a conspicuous internal
+QA surface, grants no course credit and does not affect mastery, review, lesson progress, XP or
+streaks. Automated structural validation cannot substitute for seven-scope independent human
+review. See `docs/SCENARIO_AUTHORING.md` and `docs/SCENARIO_PUBLICATION_POLICY.md`.
+
 ## 19. Verified evidence and tunable decisions
 
 ### Source verification completed

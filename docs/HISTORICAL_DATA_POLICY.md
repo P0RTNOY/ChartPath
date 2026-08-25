@@ -22,6 +22,14 @@ model. Doing so does not change its licensing, editorial, publication or course-
 simulated fill is derived development evidence, not proof that the underlying dataset may be
 published and not permission to capture or redistribute real provider values.
 
+Milestone 5's scenario compiler also creates checksum-pinned synthetic datasets for
+an explicit internal QA registry. Those candidates remain generated-only, internal,
+redistribution-prohibited and no-credit. They are not real historical data, do not change the
+provider decisions below and cannot enter an ordinary learner catalog merely because deterministic
+generation and structural validation pass. Their authoring and lifecycle gates are defined in
+[SCENARIO_AUTHORING.md](./SCENARIO_AUTHORING.md) and
+[SCENARIO_PUBLICATION_POLICY.md](./SCENARIO_PUBLICATION_POLICY.md).
+
 ## 1. Rights and status vocabulary
 
 These states are deliberately separate. A technically valid dataset is not necessarily publishable.

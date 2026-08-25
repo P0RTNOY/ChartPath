@@ -1,6 +1,6 @@
 # Privacy, Security, and Financial Safety
 
-> Status snapshot: 2026-08-23. This document defines the policy and engineering
+> Status snapshot: 2026-08-25. This document defines the policy and engineering
 > requirements and now accompanies an implemented local beta. Evidence for controls,
 > test coverage, platform-backup behavior, and unresolved distribution gates is kept
 > in `docs/RELEASE_READINESS.md`; a requirement here is not evidence by itself.
@@ -18,11 +18,10 @@ orders do not guarantee execution price, and costs, spread, slippage, liquidity,
 gaps, correlation, and leverage can change outcomes. “Wait,” “no trade,” and
 “insufficient evidence” are valid and positively reinforced answers.
 
-Milestone 3 implementation and final repository verification are complete, while native
-accessibility remains pending. Its only installed historical-format dataset is a ChartPath-generated development
-fixture; no real price history, provider credential or runtime market-data integration is present.
-Paper trading, portfolios, live feeds, news, simulated or real orders and brokerage connectivity
-remain out of scope.
+Milestones 3 and 4 provide frozen generated replay and deterministic fictional paper execution,
+while native accessibility remains pending. There is no real price history, provider credential or
+runtime market-data integration. The simulator never routes an order or connects to an account.
+Portfolios, live feeds, news, real orders and brokerage connectivity remain out of scope.
 
 ## Status language
 
@@ -59,6 +58,7 @@ ads, ad SDKs, cross-app tracking, public profiles, social feeds, or leaderboards
 | Content/schema versions                       | Migration and reproducibility                                | Local SQLite                | Retained with relevant attempts                        |
 | Guided-analysis drafts                        | Offline resume, replay integrity and final reflection        | Local SQLite                | Until explicit reset; finalized sessions are read-only |
 | Paper-execution sessions                      | Resume one fictional plan, events and deterministic debrief  | Local SQLite                | Until explicit reset/abandonment; attempts unaffected  |
+| Internal scenario sessions                    | Resume checksum-pinned synthetic QA analysis                 | Local SQLite                | Until explicit reset; no ordinary credit projection    |
 | Generated development candles                 | Exercise infrastructure validation only                      | Bundled application data    | Replaced only by a reviewed build; not learner data    |
 
 The app may generate a random installation-scoped identifier for database
@@ -231,12 +231,14 @@ human confirms the governing agreement permits the exact commercial/educational 
 caching, display, bundling, redistribution, attribution and derived-data treatment. Procurement and
 legal approval are distinct from a technically successful API call.
 
-The separate historical registry currently reports zero course-credit-eligible scenarios and four
-blocking conditions: scenario not published, dataset not published, redistribution not verified and
-human editorial review required. Authors cannot self-declare credit. Publication also requires exact
-dataset and rubric pins, canonical validation, market and educational provenance, Hebrew disclosure,
-cutoff/future-leak validation and human editorial evidence. Databento is only a procurement lead;
-none of the researched providers is an approved bundled-data source.
+The legacy development replay remains zero-credit and is blocked by unpublished scenario/dataset,
+unverified redistribution, missing human editorial review and unpublished paper execution. The
+separate Milestone 5 candidate report adds nine internal synthetic candidates with 97 explicit
+publication blockers and zero structural issues; it does not change the ordinary learner catalog.
+Authors cannot self-declare credit. Publication also requires exact dataset and rubric pins,
+canonical validation, market and educational provenance, Hebrew disclosure, cutoff/future-leak
+validation and human editorial evidence. Databento is only a procurement lead; none of the
+researched providers is an approved bundled-data source.
 
 ### Deterministic paper-execution boundary
 
@@ -264,6 +266,33 @@ The fixture's reviewed analysis concludes no trade. The mechanics exercise must 
 visible and must not imply that a simulated result validates bypassing the analysis. Debriefs score
 process separately from P&L, do not celebrate profit or shame modeled loss, and state that historical
 simulation neither recommends an action nor predicts future performance.
+
+### Curated scenario and internal-QA boundary
+
+Scenario manifests and stored scenario identities are treated as untrusted until their supported
+top-level schema, compiler contract, exact reviewed source/content binding, checksums, replay cutoffs,
+Hebrew/accessibility/safety fields, rubric and deterministic execution snapshot validate. The
+current runtime parser is not an exhaustive nested-schema validator, so external serialized
+authoring input is not an approved ingestion path.
+
+Compilation keeps the private grading exercise separate from the learner exercise projection. The
+learner projection contains no accepted rubric, explanation, source identity, dataset identity,
+expected decision or execution outcome. Ordinary selection derives only published, reviewed,
+blocker-free records and is currently empty. Internal candidates are reachable only through an
+explicit developer QA route that labels them synthetic, internal and no-credit; detailed source,
+checksum, expected-outcome and blocker views require a separate reveal action.
+
+Reviewer authentication is external. The compiler accepts reviewer-record IDs asserted by a caller
+as authenticated and verifies all seven approval scopes, timestamp order and material checksum, but
+it neither identifies nor authenticates a human. A coding agent, manifest literal or passing command
+cannot close editorial, source, Hebrew, accessibility, financial-safety, execution or publication
+review. A later `changes-requested` record, including an equal-instant tie, blocks approval.
+
+Internal candidate sessions remain local and pin the same scenario/dataset/checksum evidence as
+historical replay. They create no new recipient, credential, real-price record or telemetry. Because
+they have no course credit, finalization must not change attempts, mastery, review, lesson progress,
+XP, streak or activity. A correct no-trade application creates no order/position and cannot be
+regraded from later price action.
 
 ## Financial-safety content rules
 
@@ -406,6 +435,10 @@ No beta-readiness claim is valid until the release record contains evidence for:
 - for paper execution, exact identity recovery; future isolation; next-open/gap/cost/rounding and
   ambiguity tests; active-state reload without duplicate events; explicit fictional-data copy; zero
   attempt/projection mutation; and non-color visual plus accessible event-state evidence;
+- for curated scenarios, private-grading/learner-projection separation, deterministic snapshot and
+  source pins, empty ordinary selection while unpublished, explicit internal QA gating, seven-scope
+  externally authenticated human approval, stale-review invalidation and correct no-trade with no
+  order or hindsight grading;
 - Hebrew RTL plus LTR numbers/formulas, screen reader, large text, contrast, and
   reduced-motion manual journeys;
 - content review for advice, guarantees, profit-based rewards, and unsafe leverage;

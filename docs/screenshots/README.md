@@ -89,3 +89,42 @@ As with earlier sets, web captures establish browser presentation only. They do 
 rendering, native gestures, VoiceOver/TalkBack focus or speech, OS largest-text layout,
 force-close/reopen recovery or physical-device ergonomics. Leave those gates pending until an actual
 native run is recorded in `docs/RELEASE_READINESS.md`.
+
+The Milestone 5 scenario-library evidence was generated with `pnpm screenshots:scenarios` against an
+Expo development web server. The development server is required because unpublished scenario
+candidates remain behind the explicit `developer=1` QA route; the ordinary learner library remains
+truthfully empty. The 12 original-resolution captures are:
+
+- `scenario-library-empty-light-phone.png` and
+  `scenario-library-empty-light-tablet.png` — the ordinary, unpublished-candidate-free learner
+  catalog at phone and tablet widths;
+- `scenario-guided-long-light-phone.png` and `scenario-blind-short-light-phone.png` — blind analysis
+  sessions started from two differently authored internal QA candidates without exposing direction,
+  identity or future outcome before finalization;
+- `scenario-no-trade-decision-light-phone.png` and
+  `scenario-no-trade-debrief-light-phone.png` — explicit no-trade selection and its finalized,
+  process-only 100% debrief with no paper-execution call to action;
+- `scenario-trade-plan-confirmation-light-phone.png` — the separate fictional plan confirmation for
+  an authored trade candidate;
+- `scenario-working-order-light-phone.png` — a submitted authored limit order that remains working;
+- `scenario-ambiguity-light-phone.png` — deterministic same-candle ambiguity with no invented
+  favorable sequence;
+- `scenario-qa-publication-blockers-light-phone.png` — explicit internal-QA, source, review,
+  licensing and publication blockers after a separate reveal action;
+- `scenario-library-empty-dark-phone.png` — the truthful ordinary empty catalog in dark mode; and
+- `scenario-guided-large-reduced-phone.png` — the blind QA analysis at the largest in-app text size
+  with reduced motion enabled.
+
+The 11 phone images are exactly `390×844`; the tablet image is exactly `1024×768`. They were inspected
+at original resolution for Hebrew RTL hierarchy, LTR prices and internal identifiers, clipping,
+wrapping, non-color state labels, phone/tablet composition, dark contrast, largest-text layout and
+the persistent separation between ordinary learner content and internal QA. These captures do not
+claim that any candidate passed human editorial, source, licensing, accessibility, Hebrew,
+financial-safety or publication review, and they do not establish native-device accessibility or
+ergonomics.
+
+`m5-native-expo-launch-timeout.png` is a separate `1206×2622` iPhone simulator capture from the
+bounded native attempt. Original-resolution inspection shows only a black Expo Go foreground with
+the iOS status bar. The correct M5 deep link was routed to Expo Go, but native activation timed out
+before Metro received a ChartPath bundle request. This file documents the blocker; it is not a
+ChartPath visual, RTL, lifecycle, or accessibility pass.

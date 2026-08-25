@@ -1,10 +1,10 @@
 # ChartPath Architecture
 
-> Status snapshot: 2026-08-24. This document is an implementation contract for the
+> Status snapshot: 2026-08-25. This document is an implementation contract for the
 > beta and records implemented foundations only where the repository contains the
-> corresponding code. Milestone 3 is complete; Milestone 4 paper-execution verification
-> is recorded separately and native distribution gates remain open. Release evidence belongs in
-> `docs/RELEASE_READINESS.md`.
+> corresponding code. Milestones 1–4 are complete; the Milestone 5 scenario-authoring and internal
+> QA architecture is implemented while final verification and native distribution gates remain
+> open. Release evidence belongs in `docs/RELEASE_READINESS.md`.
 
 ## Status language
 
@@ -46,7 +46,7 @@ packages/
   domain/              Learning types, pure graders, mastery, review scheduling
   chart-engine/        Seeded OHLCV generation and semantic ground truth
   historical-data/     Provider-neutral schema, import, integrity and replay views
-  content/             Versioned curriculum data, schemas, migrations, validator
+  content/             Versioned curriculum, scenario compiler, schemas and validators
   ui/                  Accessible React Native primitives and chart presentation
 docs/                   Product, learning, source, architecture, and release records
 ```
@@ -60,16 +60,16 @@ apps/mobile  ───────>  packages/content
      ├───────────────> packages/historical-data
      └───────────────> packages/ui
 
-packages/content ───> packages/domain + packages/historical-data
+packages/content ───> packages/domain + packages/historical-data + packages/chart-engine
 packages/ui ────────> React / React Native / react-native-svg
 packages/domain ────> platform-independent TypeScript only
 packages/historical-data ──> platform-independent TypeScript only
 ```
 
-`packages/content` may call `packages/chart-engine` from its validation command or
-tests to reproduce seeded examples. This is a tooling dependency, not permission
-to generate or mutate canonical content at runtime. Cycles among workspace packages
-are prohibited and should be checked in CI.
+`packages/content` calls `packages/chart-engine` while compiling its closed, bundled scenario
+candidate registry and from validation/tests to reproduce seeded examples. This deterministic build
+dependency is not permission for learner input or a screen to generate or mutate authoritative
+content at runtime. Cycles among workspace packages are prohibited and should be checked in CI.
 
 ### `apps/mobile`
 
@@ -150,6 +150,12 @@ permitted uncertainty answer.
 Content corrections create a new version. IDs are never silently reused for a
 different concept or rubric. Aliases and migration manifests map retired IDs while
 old attempts retain the exact exercise/content/generator versions they used.
+
+The Milestone 5 scenario compiler is also owned here. It converts a versioned platform-independent
+manifest into a canonical generated dataset, private grading exercise, narrow learner exercise,
+historical replay and optional deterministic execution snapshot. The compiler and neutral learner
+contract are themselves checksum-pinned material. Scenario candidates live in closed internal
+registries; only a separate publication-derived projection may enter ordinary learner selection.
 
 ### `packages/ui`
 
@@ -399,6 +405,58 @@ is unchanged, and the execution grants no attempt, mastery, review, lesson progr
 daily-activity credit. A future credited execution assessment requires a separately authored,
 reviewed rubric and historical publication/rights approval.
 
+## Curated Scenario Authoring and Internal QA
+
+**Implemented as an internal, non-publishable foundation on 2026-08-25; final milestone evidence is
+controlled by `docs/RELEASE_READINESS.md`.** `packages/content/src/scenarios` owns authoring schema
+version 1 and `scenario-compiler-v1`. A manifest pins scenario/dataset semantic identity, compiler
+contract, exact reviewed source/content prerequisites, stable chart seed/generator, generated
+dataset, cutoffs, Hebrew learner/accessibility/safety copy, application decision, process rubric,
+licensing, review lifecycle and retirement metadata.
+
+Compilation creates two intentionally different exercise views. `gradingExercise` is the private
+canonical `ContentExercise` containing deterministic rubrics and answer-bearing material. `exercise`
+is a `ScenarioLearnerExerciseProjection` containing only learner prompts, options, safety and
+accessibility instructions. Historical content registers them separately. Learner components do not
+receive source identity, dataset identity, expected decision, rubric, explanation or execution
+expectation before the appropriate reveal.
+
+The compiler regenerates candles through the existing chart and historical-data packages, verifies
+the canonical checksum and cutoff policy, and binds the replay to the private rubric identity. Trade
+candidates are simulated through the pure paper reducer. Their authored expectation pins not merely
+a terminal label but the complete ordered event/fill/debrief snapshot and checksum. No-trade
+candidates carry no execution configuration, so their finalized application routes directly to
+process review and cannot create an order or position.
+
+The current internal library contains three long, three short and three no-trade candidates. It
+exercises market, limit and stop entries, an opening gap, protective stop, target, unfilled order and
+explicit ambiguity. Structural validation reports zero errors. Publication validation reports 97
+blockers because all candidates remain synthetic/internal, no-credit and human-review-required; the
+third literal no-trade candidate also retains a precise source/rubric blocker. The normal learner
+library derives only published, reviewed, blocker-free records and is therefore empty. Internal
+candidate selection and full blocker/answer inspection require a visibly labelled developer QA
+route.
+
+An approved/published authoring ledger requires current approval for source, rubric, execution,
+accessibility, Hebrew, financial safety and publication. Reviewer-record IDs must be asserted by an
+external authenticated authority. The compiler checks the assertion, exact material checksum and
+chronological precedence; it does not authenticate humans itself. `changes-requested` supersedes an
+earlier approval and wins an equal-instant tie. Material changes stale prior reviews, while a
+published material change requires a new immutable semantic version. Retirement preserves exact old
+identity for saved sessions and attempts.
+
+The application layer exposes `/historical-scenarios` as the ordinary published projection and
+`/historical-scenario-qa?developer=1` as explicit internal QA. Starting a candidate still uses the
+existing Guided Analysis, checksum-bound historical resolution, persistence and execution adapters.
+Internal/no-credit finalization must not write ordinary attempts or change mastery, review,
+progress, XP, streak or daily activity. The older generated fixture's contradictory hypothetical
+short path remains available only through its explicit QA mechanics boundary; the ordinary reviewed
+conclusion remains no trade.
+
+Normative details are in `docs/SCENARIO_AUTHORING.md` and
+`docs/SCENARIO_PUBLICATION_POLICY.md`. Native and assistive-technology evidence requirements are in
+`docs/NATIVE_ACCESSIBILITY_READINESS.md`.
+
 ## Runtime flows
 
 ### Startup and content loading
@@ -638,6 +696,9 @@ The architecture is not “implemented” until evidence covers at least:
 - mastery bounds, lapses, due dates, and full projection replay;
 - schema upgrades preserving attempts and progress across an actual restart;
 - content validation for every published record;
+- deterministic scenario generation, exact source/dataset/rubric/execution snapshot validation,
+  seven-scope authenticated review gating, an empty ordinary catalog for unpublished candidates and
+  a separately labelled internal QA report;
 - RTL/LTR, screen-reader, touch-target, contrast, and reduced-motion behavior; and
 - critical offline app journeys with no network, AI key, or cloud credentials.
 - paper-ticket, working/open/terminal execution journeys and non-color chart/event alternatives at

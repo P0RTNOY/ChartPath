@@ -191,6 +191,14 @@ Real historical scenarios remain blocked until rights, redistribution, publicati
 educational/editorial approval pass. A future credited execution assessment would require a
 separately authored and reviewed rubric; a profitable simulation can never create credit by itself.
 
+The Milestone 5 compiler exercises this same engine with internally authored,
+checksum-pinned synthetic trade candidates. Their expected fills, gaps, stops, targets, unfilled
+orders and ambiguity are deterministic QA evidence for the execution policy, not source doctrine or
+publishability evidence. No-trade candidates compile without an aligned execution ticket. All
+current candidates remain internal and no-credit until the independent lifecycle in
+[SCENARIO_PUBLICATION_POLICY.md](./SCENARIO_PUBLICATION_POLICY.md) passes; authoring details are in
+[SCENARIO_AUTHORING.md](./SCENARIO_AUTHORING.md).
+
 ## 9. Educational-source provenance
 
 Learner-facing technical-analysis doctrine is limited to reviewed source records. Execution-policy

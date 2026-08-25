@@ -1,6 +1,6 @@
 # ChartPath beta execution plan
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
 ## Initial state
 
@@ -57,6 +57,7 @@ Native UI/runtime, SQLite-on-device, and screen-reader verification remain distr
 | 2. Persistent Guided Analysis Session       | Complete | Source-backed 11-step journey, resumable drafts, atomic finalization, debrief and local history.                                                                         |
 | 3. Frozen Historical Replay Foundation      | Complete | Provider-neutral data/import, internal generated replay, exact resume/recovery, blind reveal, non-credit finalization and history are integrated and fully verified.     |
 | 4. Deterministic Paper Execution Foundation | Complete | Pure one-plan/order/position engine, checksum-bound persistence, Hebrew ticket/overlays/debrief and final evidence; release gates remain in `docs/RELEASE_READINESS.md`. |
+| 5. Curated Scenarios and Native Readiness   | Complete | Internal authoring, no-trade, QA and fail-closed publication foundations are verified; learner publication and native-distribution gates remain explicitly open.         |
 
 Milestone 1 reuses reviewed exercise `u03-levels-e04`; it does not add historical or current market
 data, paper execution, news, AI grading, or a backend. Verification on 2026-08-24 produced a 50-route
@@ -107,3 +108,33 @@ eight inspected paper-execution screenshots and a limited iOS Expo Go native dee
 render smoke check. VoiceOver/TalkBack, OS largest-text behavior, native interaction/lifecycle
 recovery, physical-device ergonomics and human publication/editorial review remain release gates;
 they are not passing claims.
+
+Milestone 5 starts from the completed paper-execution foundation and adds a versioned, deterministic
+scenario-authoring compiler rather than adding more trading mechanics. The internal registry now
+contains nine independently generated candidates—three long, three short and three no-trade—with
+zero structural errors and 97 explicit publication blockers. The ordinary learner projection is
+truthfully empty. Candidates remain synthetic, internal, no-credit and human-review-required; a
+developer-gated QA surface is the only selection path.
+
+The compiler pins its own version and neutral learner-copy contract, chart and generated-dataset
+checksums, exact source/content prerequisites, the private process rubric, a learner-safe exercise
+projection, and exact execution event/debrief snapshots where trading is authored. Approved or
+published lifecycle states require seven current reviewer scopes asserted by an external
+authenticated authority; automation cannot create a real human approval. No trade finalizes into a
+process debrief without creating a paper order and without using later price action as a grade.
+
+Final Milestone 5 evidence:
+
+- final local SHA: reported from the clean branch HEAD in the milestone handoff;
+- full repository check: 51 suites and 546 tests passed, with formatting, lint, typecheck and content
+  validation green;
+- browser journeys: 16/16 production-export journeys and 16/16 development-only QA journeys passed;
+- exports: 56 web routes, an iOS Hermes bundle and an Android Hermes bundle were emitted. Exact
+  module, asset, file and byte counts are recorded in `docs/RELEASE_READINESS.md`.
+
+The 12 inspected browser screenshots cover the empty ordinary library, internal guided/blind
+candidates, correct no trade and debrief, plan confirmation, working order, ambiguity, QA blockers,
+dark mode, largest in-app text/reduced motion and tablet layout. They are not native accessibility
+evidence. Full native scenario interaction/restart, Android runtime, VoiceOver, TalkBack, largest OS
+text and physical-device checks remain open as recorded in
+`docs/NATIVE_ACCESSIBILITY_READINESS.md`.

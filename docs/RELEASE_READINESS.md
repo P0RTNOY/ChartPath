@@ -445,3 +445,108 @@ The final visual inspection covered exact dimensions, Hebrew RTL hierarchy, LTR 
 clipping and wrapping, chart chronology, planned-versus-actual fill distinction, line/shape/text
 status independent of color, dark contrast, very-large in-app text, reduced-motion state and
 phone/tablet composition. The exact files are recorded in `docs/screenshots/README.md`.
+
+## Curated Scenario Library and Native Readiness Milestone 5 addendum
+
+Core implementation is committed on local branch `codex/curated-scenarios-native-readiness` from
+the completed Milestone 4 checkpoint `f196abe37870fec1f245ad4a835d17148e54d513`. The exact clean
+final HEAD is reported in the milestone handoff because a commit cannot embed its own resulting
+hash. This addendum does not change the native-distribution NO-GO and does not promote an internal
+candidate into learner content.
+
+### Implemented boundary
+
+`packages/content/src/scenarios` now owns authoring schema 1, `scenario-compiler-v1`, its
+checksum-pinned neutral learner/grader contract, deterministic chart/dataset generation, exact
+source/content prerequisites, private grading exercises, learner-safe exercise projections, exact
+execution snapshots, lifecycle/review fingerprints and human/machine-readable reports.
+
+The internal registry contains nine candidates: three long, three short and three no-trade. It
+covers guided, independent and blind support; market, limit and stop entry; an opening gap;
+protective-stop, target and unfilled outcomes; and explicit OHLCV ambiguity. The current report has
+zero structural errors and 97 publication blockers. Every candidate remains ChartPath-generated,
+internal, no-credit and human-review-required. The third literal no-trade candidate retains its
+specific source/rubric-review blocker.
+
+Learner selection uses a distinct published-only projection. Because no candidate is published, the
+ordinary `/historical-scenarios` library is correctly empty. `/historical-scenario-qa?developer=1`
+is a visibly labelled internal QA route; it separates neutral pre-reveal cards from a deliberate
+reviewer detail action that exposes exact source, checksum, rubric, expected outcome and blockers.
+The route is unavailable without its developer gate.
+
+The application decision contract treats no trade as a complete, rationale-bearing result. A
+matching no-trade analysis finalizes to process review without opening a paper ticket, order or
+position and without hindsight regrading. Trade candidates enter paper execution only through their
+exact finalized analysis and allowed direction/order type. All internal paths preserve zero ordinary
+attempt/mastery/review/lesson/XP/streak/activity mutation.
+
+Approved or published manifests require current approval in seven scopes—source, rubric, execution,
+accessibility, Hebrew, financial safety and publication—against the exact material checksum.
+Reviewer-record IDs must be supplied by an external authenticated authority; the compiler cannot
+authenticate a human. Records are ordered by the instant from `Date.parse`, and
+`changes-requested` deterministically supersedes an earlier approval or wins an equal-instant tie.
+Material changes stale prior approval; published corrections require a new immutable version.
+
+### Baseline note
+
+The branch began clean at `f196abe37870fec1f245ad4a835d17148e54d513`. During parallel baseline
+work, formatting, lint, typecheck, content validation and historical validation passed, but one
+unchanged content test exceeded its five-second Vitest timeout twice under heavy shared-workspace
+contention before the mobile suite could run. It was a timeout rather than an assertion difference.
+The final uncontended repository check below is the authoritative Milestone 5 result.
+
+### Milestone 5 final gates
+
+| Gate                               | Recorded result                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scenario validation/report         | **PASS.** Nine candidates (three long / three short / three no-trade), zero structural errors, 97 explicit publication blockers and no publishable candidate. Human-readable validation, canonical machine report and neutral preview commands complete deterministically.                                                                                                        |
+| Source and learner-data separation | **PASS IN AUTOMATION.** Exact reviewed content/source pins, compiler-contract fingerprinting, private grading versus learner DTO separation, cutoff-safe preview serialization and answer/identity leak tests pass. This is not a human source or accessibility approval.                                                                                                         |
+| No-trade and execution integration | **PASS IN AUTOMATION.** Tests cover rationale-bearing no trade with no paper session/order/position, deterministic process review, no hindsight/P&L grading, aligned long/short execution, exact event/debrief snapshots and isolation of the legacy hypothetical mechanics path.                                                                                                 |
+| Persistence and credit isolation   | **PASS IN AUTOMATION.** Existing checksum-pinned Guided/paper repositories are reused; tests cover exact version resolution, resume, idempotent retry, no duplicate events and no ordinary attempt/projection changes for internal candidates. Full native terminate/relaunch remains open.                                                                                       |
+| Full `pnpm check` / build          | **PASS.** Formatting, lint, all workspace typechecks, content validation and build passed. 51 suites / 546 tests passed: domain 180, historical-data 98, UI 14, chart-engine 57, content 45, mobile 152. Two known non-failing overlapping React `act()` warnings remained. An earlier load-only five-second timeout passed immediately in isolation and in the clean full rerun. |
+| Production and QA browser E2E      | **PASS.** Production export: 16/16 across Chromium phone/tablet profiles in 41.7s. Explicit development QA: 16/16 across Pixel 7 and iPad Pro 11 profiles in 8.5m, including long, short, no-trade, working/unfilled, gap, ambiguity, exact reload and profit-independent grading.                                                                                                |
+| Web/iOS/Android exports            | **PASS AS BUNDLE EVIDENCE.** Web: 56 routes, 1,510 server modules, 1,462 web modules, 78 files / 5,046,775 bytes (JS 3,782,593; CSS 397). iOS: 1,894 modules, 23 assets, 25 files / 5,425,349 bytes (Hermes 5,400,623). Android: 1,983 modules, 27 assets, 29 files / 6,598,035 bytes (Hermes 5,610,467). Native exports emitted only the known `NO_COLOR`/`FORCE_COLOR` warning. |
+| Original-resolution visual set     | **PASS FOR BROWSER PRESENTATION.** Twelve inspected captures: 11 phone images at `390×844` and one tablet image at `1024×768`. They cover empty ordinary selection, guided long, blind short, no-trade decision/debrief, plan confirmation, working order, ambiguity, QA blockers, dark mode and largest in-app text/reduced motion.                                              |
+| Native scenario lifecycle          | **BLOCKED / NOT RUN.** Expo Go `57.0.9` on iPhone 17 Pro / iOS `26.5` routed the exact M5 deep link but activation timed out (`NSPOSIXErrorDomain Code=60`) before Metro received a bundle. Maestro `2.8.0` also failed because its XCTest driver socket never opened. No scenario UI or lifecycle pass is claimed.                                                               |
+| Native SQLite read-only audit      | **PASS WITHIN LIMITED SCOPE.** `PRAGMA integrity_check=ok`; expected migrations 1–4/checksums and guard triggers present; payload schema 5, 21 existing attempts, zero analysis/paper sessions. Because no M5 session was created, this is not resume/idempotency evidence.                                                                                                       |
+| Android runtime                    | **PENDING GATE.** No usable Android emulator/device was available. An Android Hermes export is bundle evidence only.                                                                                                                                                                                                                                                              |
+| VoiceOver                          | **PENDING GATE.** No human VoiceOver focus/speech/action pass was performed for scenario selection, blind chart alternatives, decision, recovery or debrief.                                                                                                                                                                                                                      |
+| TalkBack                           | **PENDING GATE.** No Android runtime or human TalkBack pass was available.                                                                                                                                                                                                                                                                                                        |
+| Largest OS text / physical device  | **PENDING GATE.** Largest in-app text is covered in browser evidence; largest operating-system text, standalone builds and physical-device gestures/ergonomics were not exercised.                                                                                                                                                                                                |
+| Human publication/editorial review | **BLOCKED.** No externally authenticated seven-scope approval, distribution decision or published registry entry exists. Automated checks and synthetic ownership do not close these gates.                                                                                                                                                                                       |
+
+### Visual evidence
+
+The exact files and inspection notes are recorded in `docs/screenshots/README.md`:
+
+- `scenario-library-empty-light-phone.png`
+- `scenario-library-empty-light-tablet.png`
+- `scenario-guided-long-light-phone.png`
+- `scenario-blind-short-light-phone.png`
+- `scenario-no-trade-decision-light-phone.png`
+- `scenario-no-trade-debrief-light-phone.png`
+- `scenario-trade-plan-confirmation-light-phone.png`
+- `scenario-working-order-light-phone.png`
+- `scenario-ambiguity-light-phone.png`
+- `scenario-qa-publication-blockers-light-phone.png`
+- `scenario-library-empty-dark-phone.png`
+- `scenario-guided-large-reduced-phone.png`
+- `m5-native-expo-launch-timeout.png` — blocker evidence only; not a visual pass
+
+Inspection at original resolution covered Hebrew RTL hierarchy, explicit LTR prices/identifiers,
+clipping/wrapping, phone/tablet composition, non-color state labels, dark contrast, largest in-app
+text, reduced motion and separation of ordinary learner content from internal QA. Browser images do
+not establish native layout, screen-reader speech/focus, OS text scaling, lifecycle recovery or
+physical-device ergonomics.
+
+The native blocker capture is `1206×2622` and was inspected at original resolution. It contains only
+the stalled black Expo foreground and iOS status bar, so it supports the activation-timeout record
+and no ChartPath UI, RTL, layout, interaction, or accessibility claim.
+
+### Milestone 5 release decision
+
+The deterministic scenario-authoring and internal-QA foundation may be used for local engineering
+and responsible human review. The ordinary scenario learner library remains empty and candidate
+course credit remains disabled. Public scenario publication and native distribution remain
+**NO-GO** until external human approval, publication licensing, full native iOS/Android lifecycle,
+VoiceOver, TalkBack, largest OS text, standalone build and physical-device gates are recorded.
