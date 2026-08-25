@@ -15,6 +15,8 @@ import {
 
 import { catalog as bundledCatalog } from './catalog.js';
 import type { ContentCatalog, ContentExercise } from './types.js';
+import { scenarioCandidateRegistry } from './scenarios/registry.js';
+import type { ScenarioLearnerExerciseProjection } from './scenarios/types.js';
 
 export { DEVELOPMENT_HISTORICAL_DATASET, DEVELOPMENT_HISTORICAL_SCENARIO };
 
@@ -27,6 +29,9 @@ export type HistoricalLearningCredit = 'course' | 'none';
 export interface HistoricalContentRegistry {
   readonly datasets: readonly HistoricalDataset[];
   readonly scenarios: readonly HistoricalReplayScenario[];
+  /** Closed set of authored virtual capstones allowed in addition to the fixed course catalog. */
+  readonly educationalExercises?: readonly ContentExercise[];
+  readonly learnerExercises?: readonly ScenarioLearnerExerciseProjection[];
 }
 
 export interface HistoricalContentScenarioReport {
@@ -60,6 +65,7 @@ export interface ResolvedHistoricalContent {
   readonly dataset: HistoricalDataset;
   readonly scenario: HistoricalReplayScenario;
   readonly educationalExercise: ContentExercise;
+  readonly learnerExercise?: ScenarioLearnerExerciseProjection;
   readonly learningCredit: HistoricalLearningCredit;
   readonly publicationBlockers: readonly HistoricalValidationIssue[];
 }
@@ -71,6 +77,31 @@ export type HistoricalContentResolution =
 export const historicalContentRegistry: HistoricalContentRegistry = Object.freeze({
   datasets: Object.freeze([DEVELOPMENT_HISTORICAL_DATASET]),
   scenarios: Object.freeze([DEVELOPMENT_HISTORICAL_SCENARIO]),
+});
+
+export const scenarioHistoricalContentRegistry: HistoricalContentRegistry = Object.freeze({
+  datasets: Object.freeze(scenarioCandidateRegistry.map((candidate) => candidate.dataset)),
+  scenarios: Object.freeze(scenarioCandidateRegistry.map((candidate) => candidate.scenario)),
+  educationalExercises: Object.freeze(
+    scenarioCandidateRegistry.map((candidate) => candidate.gradingExercise),
+  ),
+  learnerExercises: Object.freeze(scenarioCandidateRegistry.map((candidate) => candidate.exercise)),
+});
+
+/** Explicit QA/runtime registry. Ordinary catalog projections remain unchanged and published-only. */
+export const internalHistoricalContentRegistry: HistoricalContentRegistry = Object.freeze({
+  datasets: Object.freeze([
+    DEVELOPMENT_HISTORICAL_DATASET,
+    ...scenarioCandidateRegistry.map((candidate) => candidate.dataset),
+  ]),
+  scenarios: Object.freeze([
+    DEVELOPMENT_HISTORICAL_SCENARIO,
+    ...scenarioCandidateRegistry.map((candidate) => candidate.scenario),
+  ]),
+  educationalExercises: Object.freeze(
+    scenarioCandidateRegistry.map((candidate) => candidate.gradingExercise),
+  ),
+  learnerExercises: Object.freeze(scenarioCandidateRegistry.map((candidate) => candidate.exercise)),
 });
 
 function issue(
@@ -106,13 +137,10 @@ function referencedDataset(
   scenario: HistoricalReplayScenario,
   registry: HistoricalContentRegistry,
 ): HistoricalDataset | undefined {
-  return (
-    registry.datasets.find(
-      (dataset) =>
-        dataset.manifest.datasetId === scenario.dataset.datasetId &&
-        dataset.manifest.datasetVersion === scenario.dataset.datasetVersion,
-    ) ??
-    registry.datasets.find((dataset) => dataset.manifest.datasetId === scenario.dataset.datasetId)
+  return registry.datasets.find(
+    (dataset) =>
+      dataset.manifest.datasetId === scenario.dataset.datasetId &&
+      dataset.manifest.datasetVersion === scenario.dataset.datasetVersion,
   );
 }
 
@@ -122,11 +150,18 @@ function expectedRubricIdentity(exercise: ContentExercise): {
   readonly graderId: string;
   readonly checksum: Sha256Checksum;
 } {
-  const identity = {
-    rubricId: exercise.id,
-    rubricVersion: `content-v${exercise.schemaVersion}`,
-    graderId: HISTORICAL_GRADER_ID,
-  };
+  const identity = exercise.contentVersionId.startsWith('scenario-')
+    ? {
+        rubricId: exercise.id,
+        rubricVersion: exercise.contentVersionId,
+        graderId: HISTORICAL_GRADER_ID,
+        material: { rubric: exercise.rubric, capstoneSteps: exercise.capstoneSteps },
+      }
+    : {
+        rubricId: exercise.id,
+        rubricVersion: `content-v${exercise.schemaVersion}`,
+        graderId: HISTORICAL_GRADER_ID,
+      };
   return {
     ...identity,
     checksum: `sha256:${sha256Hex(canonicalSerialize(identity))}`,
@@ -149,33 +184,43 @@ function normalizedEducationalReferences(exercise: ContentExercise): readonly {
 
 function validateCanonicalContentBinding(
   scenario: HistoricalReplayScenario,
+  registry: HistoricalContentRegistry,
   catalog: ContentCatalog,
 ): {
   readonly exercise?: ContentExercise;
   readonly issues: readonly HistoricalValidationIssue[];
 } {
   const issues: HistoricalValidationIssue[] = [];
-  const exercise = catalog.exercises.find((item) => item.id === scenario.educationalContentId);
+  const virtualMatches =
+    registry.educationalExercises?.filter((item) => item.id === scenario.educationalContentId) ??
+    [];
+  const catalogMatches = catalog.exercises.filter(
+    (item) => item.id === scenario.educationalContentId,
+  );
+  const matches = [...virtualMatches, ...catalogMatches];
+  const exercise = matches.length === 1 ? matches[0] : undefined;
   if (!exercise) {
     issues.push(
       issue(
         'historical-educational-content-missing',
         'scenario.educationalContentId',
-        `Historical scenario references unknown exercise ${scenario.educationalContentId}.`,
+        matches.length === 0
+          ? `Historical scenario references unknown exercise ${scenario.educationalContentId}.`
+          : `Historical scenario exercise ${scenario.educationalContentId} is not unique in the closed registry.`,
       ),
     );
     return { issues };
   }
+  const isRegisteredVirtual = virtualMatches.length === 1;
   if (
-    scenario.educationalContentId !== HISTORICAL_EDUCATIONAL_CONTENT_ID ||
-    exercise.id !== HISTORICAL_EDUCATIONAL_CONTENT_ID ||
-    exercise.rubric.kind !== 'capstone'
+    exercise.rubric.kind !== 'capstone' ||
+    (!isRegisteredVirtual && exercise.id !== HISTORICAL_EDUCATIONAL_CONTENT_ID)
   )
     issues.push(
       issue(
         'historical-capstone-mismatch',
         'scenario.educationalContentId',
-        `Historical replay must bind to the canonical ${HISTORICAL_EDUCATIONAL_CONTENT_ID} capstone.`,
+        `Historical replay must bind to the canonical ${HISTORICAL_EDUCATIONAL_CONTENT_ID} capstone or an exact closed-registry virtual capstone.`,
       ),
     );
 
@@ -207,27 +252,26 @@ function validateCanonicalContentBinding(
       exercise.capstoneSteps?.flatMap((step) =>
         step.rubric.kind === 'decision' ? step.rubric.acceptedDecisions : [],
       ) ?? [];
-    if (
-      scenario.paperExecution.analysisAlignmentConclusion !==
-        HISTORICAL_PAPER_EXECUTION_ANALYSIS_CONCLUSION ||
-      !acceptedAnalysisConclusions.includes(HISTORICAL_PAPER_EXECUTION_ANALYSIS_CONCLUSION)
-    )
+    const applicationDecision = scenario.application.expectedDecision;
+    const canonicalConclusion =
+      applicationDecision.kind === 'trade' ? 'trade' : applicationDecision.disposition;
+    if (!acceptedAnalysisConclusions.includes(canonicalConclusion))
       issues.push(
         issue(
           'historical-paper-execution-analysis-mismatch',
-          'scenario.paperExecution.analysisAlignmentConclusion',
-          'Paper-execution alignment must preserve the canonical no-trade capstone conclusion.',
+          'scenario.application.expectedDecision',
+          'Paper execution must preserve an application conclusion accepted by the bound capstone.',
         ),
       );
     if (
-      canonicalSerialize(scenario.paperExecution.permittedDirections) !==
-      canonicalSerialize(['short'])
+      applicationDecision.kind === 'trade' &&
+      !scenario.paperExecution.permittedDirections.includes(applicationDecision.direction)
     )
       issues.push(
         issue(
           'historical-paper-execution-direction-mismatch',
           'scenario.paperExecution.permittedDirections',
-          'This countertrend-short scenario may expose only the short paper direction.',
+          'Aligned paper execution must permit the direction selected by the canonical application.',
         ),
       );
   }
@@ -282,7 +326,7 @@ function validateScenario(
 ): HistoricalContentScenarioReport {
   const dataset = referencedDataset(scenario, registry);
   const identity = verifyDatasetIdentity(scenario.dataset, dataset);
-  const content = validateCanonicalContentBinding(scenario, catalog);
+  const content = validateCanonicalContentBinding(scenario, registry, catalog);
   const issues: HistoricalValidationIssue[] = [...content.issues];
   const publicationBlockers: HistoricalValidationIssue[] = [];
 
@@ -356,15 +400,16 @@ export function validateHistoricalContentRegistry(
 
   const scenarioIds = new Set<string>();
   const scenarios = registry.scenarios.map((scenario, index) => {
-    if (scenarioIds.has(scenario.scenarioId))
+    const scenarioKey = `${scenario.scenarioId}@${scenario.scenarioVersion}`;
+    if (scenarioIds.has(scenarioKey))
       issues.push(
         issue(
           'duplicate-historical-scenario',
           `scenarios[${index}].scenarioId`,
-          `Historical scenario ID ${scenario.scenarioId} is duplicated.`,
+          `Historical scenario identity ${scenarioKey} is duplicated.`,
         ),
       );
-    scenarioIds.add(scenario.scenarioId);
+    scenarioIds.add(scenarioKey);
     const report = validateScenario(scenario, registry, catalog);
     issues.push(...report.issues.map((item) => withPrefix(item, `scenarios[${index}]`)));
     return report;
@@ -420,7 +465,7 @@ export function resolveHistoricalContent(
   const scenario = matching[0]!;
   const scenarioReport = validateScenario(scenario, registry, catalog);
   const dataset = referencedDataset(scenario, registry);
-  const educationalExercise = catalog.exercises.find(
+  const educationalExercise = [...(registry.educationalExercises ?? []), ...catalog.exercises].find(
     (exercise) => exercise.id === scenario.educationalContentId,
   );
   if (!scenarioReport.valid || !dataset || !educationalExercise)
@@ -431,8 +476,45 @@ export function resolveHistoricalContent(
       dataset,
       scenario,
       educationalExercise,
+      ...(registry.learnerExercises
+        ? {
+            learnerExercise: registry.learnerExercises.find(
+              (exercise) => exercise.exerciseId === educationalExercise.id,
+            ),
+          }
+        : {}),
       learningCredit: scenarioReport.learningCredit,
       publicationBlockers: scenarioReport.publicationBlockers,
     },
   };
+}
+
+export function resolveHistoricalContentVersion(
+  identity: { readonly scenarioId: string; readonly scenarioVersion: string },
+  registry: HistoricalContentRegistry = historicalContentRegistry,
+  catalog: ContentCatalog = bundledCatalog,
+): HistoricalContentResolution {
+  const matching = registry.scenarios.filter(
+    (scenario) =>
+      scenario.scenarioId === identity.scenarioId &&
+      scenario.scenarioVersion === identity.scenarioVersion,
+  );
+  if (matching.length !== 1)
+    return {
+      ok: false,
+      issues: [
+        issue(
+          matching.length === 0
+            ? 'historical-scenario-version-missing'
+            : 'duplicate-historical-scenario',
+          'scenarioVersion',
+          `Historical scenario ${identity.scenarioId}@${identity.scenarioVersion} must resolve exactly once.`,
+        ),
+      ],
+    };
+  const singleRegistry: HistoricalContentRegistry = {
+    ...registry,
+    scenarios: matching,
+  };
+  return resolveHistoricalContent(identity.scenarioId, singleRegistry, catalog);
 }

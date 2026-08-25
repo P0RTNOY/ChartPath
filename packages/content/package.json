@@ -11,7 +11,10 @@
     "lint": "eslint src test",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "tsx src/validate-cli.ts"
+    "validate": "tsx src/validate-cli.ts",
+    "scenarios:validate": "tsx src/scenarios/validate-cli.ts",
+    "scenarios:report": "tsx src/scenarios/report-cli.ts",
+    "scenarios:preview": "tsx src/scenarios/preview-cli.ts"
   },
   "dependencies": {
     "@chartpath/chart-engine": "workspace:*",

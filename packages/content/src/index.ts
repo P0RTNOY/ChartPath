@@ -2,6 +2,7 @@ export { catalog, exercises } from './catalog.js';
 export { draftLessons, lessons, misconceptions, skills, units } from './curriculum.js';
 export { glossary } from './glossary.js';
 export * from './historical.js';
+export * from './scenarios/index.js';
 export * from './schemas.js';
 export { SOURCE_IDS, sourceRefs } from './source.js';
 export * from './types.js';

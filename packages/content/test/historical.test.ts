@@ -103,7 +103,7 @@ describe('historical content registry', () => {
       permittedDirections: ['short'],
       permittedEntryOrderTypes: ['market', 'limit', 'stop'],
       executionBoundary: { afterDecisionCandleIndex: 72, lastCandleIndex: 95 },
-      analysisAlignmentConclusion: 'no-trade',
+      mode: 'hypothetical-mechanics',
       publicationStatus: 'development-only',
     });
   });
@@ -167,7 +167,7 @@ describe('historical content registry', () => {
   it('rejects dataset version, checksum, content, source, and rubric mismatches', () => {
     const version = cloneScenario();
     version.dataset.datasetVersion = 'different-version';
-    expect(scenarioCodes(version)).toContain('historical-dataset-identity-mismatch');
+    expect(scenarioCodes(version)).toContain('historical-dataset-missing');
 
     const checksum = cloneScenario();
     checksum.dataset.canonicalChecksum = `sha256:${'a'.repeat(64)}`;
@@ -186,12 +186,16 @@ describe('historical content registry', () => {
     expect(scenarioCodes(rubric)).toContain('historical-rubric-mismatch');
 
     const analysisConclusion = cloneScenario();
-    analysisConclusion.paperExecution!.analysisAlignmentConclusion = 'short';
+    analysisConclusion.application.expectedDecision = {
+      kind: 'no-trade',
+      disposition: 'insufficient-evidence',
+    };
     expect(scenarioCodes(analysisConclusion)).toContain(
       'historical-paper-execution-analysis-mismatch',
     );
 
     const direction = cloneScenario();
+    direction.application.expectedDecision = { kind: 'trade', direction: 'short' };
     direction.paperExecution!.permittedDirections = ['long'];
     expect(scenarioCodes(direction)).toContain('historical-paper-execution-direction-mismatch');
   });
