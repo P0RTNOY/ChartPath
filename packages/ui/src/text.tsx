@@ -53,7 +53,7 @@ export function UiText({
   align = 'start',
   style,
   allowFontScaling = true,
-  maxFontSizeMultiplier = 2,
+  maxFontSizeMultiplier,
   children,
   ...props
 }: UiTextProps) {

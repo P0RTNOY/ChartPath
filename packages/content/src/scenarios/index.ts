@@ -17,6 +17,17 @@ export {
 export * from './registry.js';
 export * from './management.js';
 export {
+  publicationCandidateRegistry,
+  resolvePublicationCandidate,
+  validatePublicationCandidateRegistry,
+} from './publication/candidates.js';
+export {
+  PUBLICATION_CANDIDATE_SCHEMA_VERSION,
+  PUBLICATION_REVIEW_SCOPES,
+  type PublicationCandidateV1,
+  type PublicationReviewScope,
+} from './publication/types.js';
+export {
   parseScenarioPositionManagementExtension,
   parseScenarioPositionManagementConfiguration,
   scenarioPositionManagementConfigurationSchema,

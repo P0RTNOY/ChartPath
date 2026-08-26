@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react-native';
 
-import { ChartPathThemeProvider } from '@chartpath/ui';
+import { ChartPathThemeProvider, UiText } from '@chartpath/ui';
 
 import { Glyph } from '../glyph';
 import { TopBar } from '../top-bar';
@@ -31,5 +31,16 @@ describe('shared direction-aware navigation', () => {
     );
 
     expect(screen.getByText('‹', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('does not cap operating-system Dynamic Type categories globally', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <UiText>טקסט בגודל מערכת</UiText>
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByText('טקסט בגודל מערכת').props.allowFontScaling).toBe(true);
+    expect(screen.getByText('טקסט בגודל מערכת').props.maxFontSizeMultiplier).toBeUndefined();
   });
 });

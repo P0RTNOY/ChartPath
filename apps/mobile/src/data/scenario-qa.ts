@@ -1,4 +1,5 @@
 import {
+  publicationCandidateRegistry,
   scenarioCandidateRegistry,
   scenarioPositionManagementVariantRegistry,
   type CompiledScenarioCandidate,
@@ -19,7 +20,6 @@ export interface BlindQaCandidateCard {
   readonly qaKey: string;
   readonly ordinal: number;
   readonly readinessHe: string;
-  readonly startTestID?: string;
 }
 
 export interface RevealedQaCandidateDetail {
@@ -40,6 +40,13 @@ export interface RevealedQaCandidateDetail {
   readonly executionEvidence: readonly string[];
   readonly structuralIssues: readonly string[];
   readonly publicationBlockers: readonly string[];
+  readonly publicationCandidate?: {
+    readonly candidateId: string;
+    readonly state: 'publication-candidate';
+    readonly materialSetChecksum: string;
+    readonly reviewPacketPath: string;
+    readonly requiredReviewScopes: readonly string[];
+  };
 }
 
 export interface PositionManagementQaJourney {
@@ -66,12 +73,26 @@ function candidateForQaKey(qaKey: string): QaCandidate | undefined {
   return qaCandidates[index];
 }
 
+function publicationCandidateFor(
+  scenarioId: string,
+  scenarioVersion: string,
+): RevealedQaCandidateDetail['publicationCandidate'] | undefined {
+  const candidate = publicationCandidateRegistry.find(
+    (item) =>
+      item.scenario.scenarioId === scenarioId && item.scenario.scenarioVersion === scenarioVersion,
+  );
+  if (!candidate) return undefined;
+  return {
+    candidateId: candidate.candidateId,
+    state: candidate.state,
+    materialSetChecksum: candidate.materialSetChecksum,
+    reviewPacketPath: `packages/content/src/scenarios/publication/review-packets/${candidate.candidateId}.jsonl`,
+    requiredReviewScopes: candidate.requiredReviewScopes,
+  };
+}
+
 export function blindQaCandidateCards(): readonly BlindQaCandidateCard[] {
   return qaCandidates.map((item, index) => {
-    const managementTestID =
-      item.kind === 'management'
-        ? `scenario-management-qa-start-${item.variant.scenarioId.includes('short') ? 'short' : 'long'}-${item.variant.scenarioVersion.split('.').slice(0, 2).join('-')}`
-        : undefined;
     return {
       qaKey: `candidate-${String(index + 1).padStart(2, '0')}`,
       ordinal: index + 1,
@@ -79,7 +100,6 @@ export function blindQaCandidateCards(): readonly BlindQaCandidateCard[] {
         item.kind === 'analysis' && item.candidate.structuralIssues.length
           ? 'נמצאו כשלים מבניים — לבדיקה בלבד'
           : 'הידור מבני הושלם — עדיין לא אושר לפרסום',
-      ...(managementTestID ? { startTestID: managementTestID } : {}),
     };
   });
 }
@@ -193,6 +213,12 @@ export function revealedQaCandidateDetail(qaKey: string): RevealedQaCandidateDet
   if (!item) return undefined;
   if (item.kind === 'management') {
     const { variant } = item;
+    const baseCandidate = scenarioCandidateRegistry.find(
+      ({ manifest }) =>
+        manifest.scenarioId === variant.scenarioId &&
+        manifest.scenarioVersion === variant.baseScenarioVersion,
+    );
+    if (!baseCandidate) return undefined;
     const source = variant.scenario.educationalSourceReferences[0];
     const expected = variant.scenario.application.expectedDecision;
     const direction = expected.kind === 'trade' ? expected.direction : undefined;
@@ -213,7 +239,7 @@ export function revealedQaCandidateDetail(qaKey: string): RevealedQaCandidateDet
         : 'מקור חינוכי מוצמד לתרחיש',
       sourceSectionHe: source?.section ?? 'סעיף מקור יוצג לאחר חשיפה',
       sourceRationaleHe: variant.scenario.paperExecution?.learnerDisclosureHebrew ?? '',
-      chartSpecChecksum: variant.materialArtifactChecksum,
+      chartSpecChecksum: baseCandidate.manifest.chartSpecChecksum,
       materialArtifactChecksum: variant.materialArtifactChecksum,
       datasetChecksum: variant.datasetChecksum,
       providerIdentity: `${variant.dataset.manifest.provenance.providerId} · ${variant.publication.status}`,
@@ -225,6 +251,14 @@ export function revealedQaCandidateDetail(qaKey: string): RevealedQaCandidateDet
       executionEvidence: variant.management.expectedCases.flatMap(({ evidence }) => evidence),
       structuralIssues: [],
       publicationBlockers: variant.publication.blockers,
+      ...(publicationCandidateFor(variant.scenarioId, variant.scenarioVersion)
+        ? {
+            publicationCandidate: publicationCandidateFor(
+              variant.scenarioId,
+              variant.scenarioVersion,
+            ),
+          }
+        : {}),
     };
   }
   const { candidate } = item;
@@ -252,5 +286,13 @@ export function revealedQaCandidateDetail(qaKey: string): RevealedQaCandidateDet
     executionEvidence: candidate.execution?.evidence ?? [],
     structuralIssues: candidate.structuralIssues,
     publicationBlockers: candidate.publicationBlockers,
+    ...(publicationCandidateFor(manifest.scenarioId, manifest.scenarioVersion)
+      ? {
+          publicationCandidate: publicationCandidateFor(
+            manifest.scenarioId,
+            manifest.scenarioVersion,
+          ),
+        }
+      : {}),
   };
 }

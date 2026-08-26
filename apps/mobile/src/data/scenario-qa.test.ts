@@ -16,11 +16,7 @@ describe('internal scenario QA projections', () => {
     expect(serialized).not.toMatch(
       /internal-|לונג|שורט|אין עסקה|ta-he-v2|PDF|sha256|market|limit|stop|target|ambiguous/,
     );
-    expect(cards.slice(-3).map(({ startTestID }) => startTestID)).toEqual([
-      'scenario-management-qa-start-long-2-0',
-      'scenario-management-qa-start-long-2-1',
-      'scenario-management-qa-start-short-2-0',
-    ]);
+    expect(serialized).not.toMatch(/2\.0|2\.1|startTestID|management|range-breakout|double-top/);
   });
 
   it('returns full provenance and blockers only from the explicit reveal lookup', () => {
@@ -40,6 +36,40 @@ describe('internal scenario QA projections', () => {
     expect(first?.publicationBlockers.length).toBeGreaterThan(0);
     expect(blockedNoTrade?.publicationBlockers.join(' ')).toMatch(/אין בקטלוג רובריקה שלישית/);
     expect(revealedQaCandidateDetail('candidate-99')).toBeUndefined();
+  });
+
+  it('projects the base chart specification checksum separately from management material', () => {
+    const management = revealedQaCandidateDetail('candidate-11');
+
+    expect(management?.chartSpecChecksum).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(management?.materialArtifactChecksum).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(management?.chartSpecChecksum).not.toBe(management?.materialArtifactChecksum);
+  });
+
+  it('marks exactly the three selected publication candidates only after QA reveal', () => {
+    const details = Array.from({ length: 12 }, (_, index) =>
+      revealedQaCandidateDetail(`candidate-${String(index + 1).padStart(2, '0')}`),
+    );
+    const selected = details.filter((detail) => detail?.publicationCandidate);
+
+    expect(selected.map((detail) => detail?.qaKey)).toEqual([
+      'candidate-04',
+      'candidate-11',
+      'candidate-12',
+    ]);
+    expect(selected.map((detail) => detail?.publicationCandidate?.candidateId)).toEqual([
+      'publication-candidate-no-trade-v1',
+      'publication-candidate-long-v1',
+      'publication-candidate-short-v1',
+    ]);
+    for (const detail of selected) {
+      expect(detail?.publicationCandidate).toMatchObject({
+        state: 'publication-candidate',
+        materialSetChecksum: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        requiredReviewScopes: expect.arrayContaining(['accessibility', 'licensing', 'publication']),
+      });
+      expect(detail?.publicationCandidate?.reviewPacketPath).toMatch(/review-packets\/.+\.jsonl$/);
+    }
   });
 
   it('resolves identity only through the explicit QA action-boundary lookup', () => {

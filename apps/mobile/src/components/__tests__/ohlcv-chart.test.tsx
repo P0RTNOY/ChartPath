@@ -62,13 +62,17 @@ describe('OhlcvChart accessibility', () => {
     expect(screen.getByText(/נר עולה = גוף חלול/)).toBeTruthy();
   });
 
-  it('describes an interactive chart as a button', async () => {
+  it('describes an interactive chart as an image and directs assistive technology to precise inputs', async () => {
     const screen = await render(
       <ChartPathThemeProvider mode="light">
         <OhlcvChart chart={chart} interactive onChartPress={jest.fn()} />
       </ChartPathThemeProvider>,
     );
-    expect(screen.getByRole('button', { name: /גרף נרות .*CPTH/ })).toBeTruthy();
+    const accessibleChart = screen.getByRole('image', { name: /גרף נרות .*CPTH/ });
+    expect(accessibleChart).toBeTruthy();
+    expect(accessibleChart.props.accessibilityHint).toMatch(/שדות מספר הנר והמחיר/);
+    expect(accessibleChart.props.onPress).toBeUndefined();
+    expect(screen.getByTestId('ohlcv-chart').props.accessible).toBe(false);
   });
 
   it('provides every visible candle as screen-reader-operable OHLC data', async () => {
@@ -372,6 +376,7 @@ describe('OhlcvChart accessibility', () => {
         <OhlcvChart
           accessibilityLabel="SECRET ticker on 2026-01-03"
           chart={chart}
+          cutoffCandleIndex={2}
           interactionHint="SECRET on 2026-01-03"
           interactive
           onChartPress={jest.fn()}
@@ -397,5 +402,93 @@ describe('OhlcvChart accessibility', () => {
     expect(screen.getByLabelText(/נר רציף 2: פתיחה 102.00/)).toBeTruthy();
     expect(screen.getByText(/#2 \| O 102.00/)).toBeTruthy();
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/SECRET|2026-01-03|01\/01|03\/01|1D/);
+  });
+
+  it('fails closed when blind presentation omits its explicit knowledge cutoff', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <OhlcvChart chart={chart} presentationPolicy="blind" ticker="SECRET" />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('תרשים נרות היסטורי מוסתר זהות, ללא נתונים')).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/SECRET|2026-01-0[1-3]|100\.00|108\.00/);
+  });
+
+  it('makes blind output independent of future tails and rejects reference or execution secrets', async () => {
+    const secretChart: GeneratedChart = {
+      ...chart,
+      annotations: [
+        {
+          id: 'SECRET-GRADER-ANNOTATION',
+          kind: 'point',
+          role: 'SECRET-CORRECT-ANSWER',
+          candleIndex: 1,
+          price: 104,
+          visibleFromCandleIndex: 1,
+        },
+      ],
+    };
+    const extremeTail: GeneratedChart = {
+      ...secretChart,
+      candles: [
+        secretChart.candles[0]!,
+        secretChart.candles[1]!,
+        {
+          ...secretChart.candles[2]!,
+          timestamp: '2099-12-31T00:00:00.000Z',
+          open: 9_500,
+          high: 10_000,
+          low: 9_000,
+          close: 9_600,
+          volume: 99_000_000,
+        },
+      ],
+    };
+    const renderBlind = (source: GeneratedChart) =>
+      render(
+        <ChartPathThemeProvider mode="light">
+          <OhlcvChart
+            accessibilityLabel="SECRET CUSTOM LABEL"
+            chart={source}
+            cutoffCandleIndex={1}
+            executionOverlays={[
+              {
+                id: 'SECRET-OUTCOME',
+                kind: 'target',
+                labelHe: 'SECRET FUTURE TARGET 9999',
+                price: 9_999,
+                visibleFromCandleIndex: 0,
+              },
+            ]}
+            expectedLine={{
+              start: { candleIndex: 0, price: 100 },
+              end: { candleIndex: 1, price: 104 },
+            }}
+            expectedPoints={[{ candleIndex: 1, price: 104 }]}
+            expectedZone={{
+              startCandleIndex: 0,
+              endCandleIndex: 1,
+              priceLow: 99,
+              priceHigh: 105,
+            }}
+            interactionHint="SECRET FUTURE HINT"
+            presentationPolicy="blind"
+            showAnnotations
+            ticker="SECRET"
+          />
+        </ChartPathThemeProvider>,
+      );
+
+    const ordinary = await renderBlind(secretChart);
+    const extreme = await renderBlind(extremeTail);
+    const ordinaryJson = JSON.stringify(ordinary.toJSON());
+    const extremeJson = JSON.stringify(extreme.toJSON());
+
+    expect(extremeJson).toBe(ordinaryJson);
+    expect(ordinaryJson).not.toMatch(
+      /SECRET|CORRECT|TARGET|9999|9500|10000|2099|expected-|execution-|semantic-/,
+    );
+    expect(ordinary.getByRole('image', { name: /נרות גלויים/ })).toBeTruthy();
   });
 });

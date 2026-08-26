@@ -67,7 +67,9 @@ export function Card({
     return (
       <View
         accessibilityLabel={accessibilityLabel}
-        accessible={accessibilityLabel !== undefined}
+        // Composite cards frequently contain independently operable controls. Grouping the
+        // container would flatten those descendants in native screen-reader traversal.
+        accessible={false}
         style={[baseStyle, variantStyle, style]}
         testID={testID}
       >

@@ -160,10 +160,7 @@ export function HistoricalScenarioQa({
                 disabled={startingKey !== undefined}
                 loading={startingKey === selectedKey}
                 onPress={() => onStart(selectedKey)}
-                testID={
-                  cards.find(({ qaKey }) => qaKey === selectedKey)?.startTestID ??
-                  `scenario-qa-start-${selectedKey}`
-                }
+                testID={`scenario-qa-start-${selectedKey}`}
               >
                 פתיחה עיוורת ללא קרדיט
               </Button>
@@ -185,6 +182,9 @@ export function HistoricalScenarioQa({
           <Card variant="accent">
             <View style={{ gap: 8 }}>
               <Badge tone="warning">מידע גלוי ל־QA בלבד</Badge>
+              {detail.publicationCandidate ? (
+                <Badge tone="warning">מועמד לפרסום · טרם פורסם</Badge>
+              ) : undefined}
               <Heading level={1}>{detail.titleHe}</Heading>
               <UiText variant="label">{detail.decisionHe}</UiText>
               <UiText color="textMuted">רמת עבודה: {detail.difficultyHe}</UiText>
@@ -196,6 +196,30 @@ export function HistoricalScenarioQa({
               </LtrText>
             </View>
           </Card>
+
+          {detail.publicationCandidate ? (
+            <Card testID="scenario-qa-review-packet" variant="outlined">
+              <View style={{ gap: 7 }}>
+                <Heading level={2}>חבילת ביקורת למועמד פרסום</Heading>
+                <UiText>
+                  החבילה זמינה רק בכלי QA ובקובצי הביקורת המקומיים. היא אינה חלק מהקטלוג הרגיל ואינה
+                  אישור לפרסום.
+                </UiText>
+                <LtrText color="textMuted" variant="caption">
+                  {detail.publicationCandidate.candidateId}
+                </LtrText>
+                <LtrText color="textMuted" variant="caption">
+                  {detail.publicationCandidate.reviewPacketPath}
+                </LtrText>
+                <LtrText color="textMuted" variant="caption">
+                  {detail.publicationCandidate.materialSetChecksum}
+                </LtrText>
+                <UiText color="warning" variant="bodySmall">
+                  {`נדרשות ${detail.publicationCandidate.requiredReviewScopes.length} סקירות חתומות, כולל נגישות, עברית, בטיחות פיננסית ורישוי.`}
+                </UiText>
+              </View>
+            </Card>
+          ) : undefined}
 
           <Card variant="outlined">
             <View style={{ gap: 7 }}>

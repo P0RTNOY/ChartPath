@@ -4,15 +4,12 @@ const STORAGE_KEY = 'chartpath:guest-learning-data:v1';
 const MANAGEMENT_CANDIDATES = {
   'long-2-0': {
     candidateKey: 'candidate-10',
-    startTestId: 'scenario-management-qa-start-long-2-0',
   },
   'long-2-1': {
     candidateKey: 'candidate-11',
-    startTestId: 'scenario-management-qa-start-long-2-1',
   },
   'short-2-0': {
     candidateKey: 'candidate-12',
-    startTestId: 'scenario-management-qa-start-short-2-0',
   },
 } as const;
 
@@ -100,10 +97,11 @@ async function sourceAnalysis(page: Page, session: StoredManagementSession) {
 async function launchManagedOpen(page: Page, variant: ManagementVariant) {
   await enterQa(page);
   const control = MANAGEMENT_CANDIDATES[variant];
-  if ((await page.getByTestId(control.startTestId).count()) === 0) {
+  const startTestId = `scenario-qa-start-${control.candidateKey}`;
+  if ((await page.getByTestId(startTestId).count()) === 0) {
     await page.getByTestId(`scenario-qa-select-${control.candidateKey}`).click();
   }
-  await page.getByTestId(control.startTestId).click();
+  await page.getByTestId(startTestId).click();
   await page.waitForURL(/\/paper-execution\?[^#]*analysisSessionId=[^&]+/);
   await expect(page.getByTestId('paper-management-screen')).toBeVisible();
   await expect(page.getByTestId('paper-management-dashboard')).toBeVisible();

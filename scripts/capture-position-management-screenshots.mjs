@@ -13,11 +13,9 @@ const tablet = { width: 1024, height: 768 };
 const managementCandidates = {
   'long-2-0': {
     candidateKey: 'candidate-10',
-    startTestId: 'scenario-management-qa-start-long-2-0',
   },
   'long-2-1': {
     candidateKey: 'candidate-11',
-    startTestId: 'scenario-management-qa-start-long-2-1',
   },
 };
 
@@ -72,10 +70,11 @@ async function launchManagedOpen(page, variant = 'long-2-0') {
   await page.getByTestId('scenario-qa-ack').click();
   await page.getByTestId('scenario-qa-enter').click();
   const control = managementCandidates[variant];
-  if ((await page.getByTestId(control.startTestId).count()) === 0) {
+  const startTestId = `scenario-qa-start-${control.candidateKey}`;
+  if ((await page.getByTestId(startTestId).count()) === 0) {
     await page.getByTestId(`scenario-qa-select-${control.candidateKey}`).click();
   }
-  await page.getByTestId(control.startTestId).click();
+  await page.getByTestId(startTestId).click();
   await page.waitForURL(/\/paper-execution\?[^#]*analysisSessionId=[^&]+/);
   await page.getByTestId('paper-management-dashboard').waitFor();
 }

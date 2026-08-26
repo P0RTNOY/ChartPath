@@ -39,8 +39,11 @@ describe('HistoricalScenarioLibrary', () => {
       </ChartPathThemeProvider>,
     );
 
-    expect(screen.getByLabelText(/תרחיש עיוור 1.*זמין לתרגול עיוור.*זכאי לקרדיט/)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('scenario-start-published-01'));
+    const card = screen.getByTestId('scenario-card-published-01');
+    const start = screen.getByTestId('scenario-start-published-01');
+    expect(card.props.accessible).toBe(false);
+    expect(start.props.accessibilityRole).toBe('button');
+    fireEvent.press(start);
     expect(onStart).toHaveBeenCalledWith('published-01');
   });
 });

@@ -25,6 +25,23 @@ const secretDetail: RevealedQaCandidateDetail = {
   executionEvidence: ['market-entry', 'target'],
   structuralIssues: [],
   publicationBlockers: ['חסם פרסום סודי'],
+  publicationCandidate: {
+    candidateId: 'publication-candidate-long-v1',
+    state: 'publication-candidate',
+    materialSetChecksum: `sha256:${'d'.repeat(64)}`,
+    reviewPacketPath:
+      'packages/content/src/scenarios/publication/review-packets/publication-candidate-long-v1.jsonl',
+    requiredReviewScopes: [
+      'source',
+      'rubric',
+      'execution',
+      'accessibility',
+      'hebrew',
+      'financial-safety',
+      'licensing',
+      'publication',
+    ],
+  },
 };
 
 describe('HistoricalScenarioQa', () => {
@@ -46,7 +63,8 @@ describe('HistoricalScenarioQa', () => {
         />
       </ChartPathThemeProvider>,
     );
-    const deny = /SECRET|כותרת סודית|תרחיש לונג|PDF 72|sha256|market-entry|target/;
+    const deny =
+      /SECRET|כותרת סודית|תרחיש לונג|PDF 72|sha256|market-entry|target|publication-candidate-long/;
 
     expect(JSON.stringify(screen.toJSON())).not.toMatch(deny);
     expect(screen.getByTestId('scenario-qa-enter').props.accessibilityState.disabled).toBe(true);
@@ -55,6 +73,7 @@ describe('HistoricalScenarioQa', () => {
 
     expect(screen.getByTestId('scenario-qa-screen')).toBeTruthy();
     expect(screen.getByTestId('scenario-qa-persistent-warning')).toBeTruthy();
+    expect(screen.getByTestId('scenario-qa-candidate-candidate-01').props.accessible).toBe(false);
     expect(JSON.stringify(screen.toJSON())).not.toMatch(deny);
     await fireEvent.press(screen.getByTestId('scenario-qa-select-candidate-01'));
     expect(revealDetail).not.toHaveBeenCalled();
@@ -71,6 +90,8 @@ describe('HistoricalScenarioQa', () => {
     expect(screen.getByText('כותרת סודית לונג')).toBeTruthy();
     expect(screen.getByText('SECRET-SCENARIO@1.0.0')).toBeTruthy();
     expect(screen.getByTestId('scenario-qa-blockers')).toBeTruthy();
+    expect(screen.getByTestId('scenario-qa-review-packet')).toBeTruthy();
+    expect(screen.getByText('publication-candidate-long-v1')).toBeTruthy();
     expect(screen.getByText('חסם פרסום סודי')).toBeTruthy();
   });
 });

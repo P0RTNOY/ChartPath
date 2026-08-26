@@ -223,11 +223,16 @@ export function OhlcvChart({
   const [showAccessibleData, setShowAccessibleData] = useState(false);
   const [interactionStatus, setInteractionStatus] = useState<string | undefined>();
   const sourceLastCandleIndex = chart.candles.at(-1)?.index ?? -1;
+  const blindCutoffMissing = presentationPolicy === 'blind' && cutoffCandleIndex === undefined;
   const revealCutoff =
     revealCount === undefined
       ? sourceLastCandleIndex
       : (chart.candles[Math.max(0, Math.min(chart.candles.length, revealCount)) - 1]?.index ?? -1);
-  const cutoff = Math.min(cutoffCandleIndex ?? sourceLastCandleIndex, revealCutoff);
+  // Blind presentation is a knowledge boundary, not just an identity-redaction style. Refuse to
+  // project any candle unless the caller supplies the exact inclusive knowledge cutoff.
+  const cutoff = blindCutoffMissing
+    ? -1
+    : Math.min(cutoffCandleIndex ?? sourceLastCandleIndex, revealCutoff);
   const candleSequence = useMemo(
     () => new Map(chart.candles.map((candle, position) => [candle.index, position + 1])),
     [chart.candles],
@@ -243,17 +248,22 @@ export function OhlcvChart({
   );
   const candles = projection.candles;
   const frame = projection.stats;
+  const referenceGeometryAllowed = presentationPolicy !== 'blind';
   const safeSemanticAnnotations =
-    showAnnotations && cutoff >= 0 ? annotationsVisibleAt(chart.annotations, cutoff) : [];
+    referenceGeometryAllowed && showAnnotations && cutoff >= 0
+      ? annotationsVisibleAt(chart.annotations, cutoff)
+      : [];
   const safeLearnerAnnotations =
     cutoff >= 0 ? learnerAnnotationsVisibleAt(learnerAnnotations, cutoff) : [];
   const safeHighlightedCandleIndices = highlightedCandleIndices.filter((index) => index <= cutoff);
   const safeSelectedPoints = selectedPoints.filter((point) => anchorVisible(point, cutoff));
-  const safeExpectedPoints = expectedPoints.filter((point) => anchorVisible(point, cutoff));
+  const safeExpectedPoints = referenceGeometryAllowed
+    ? expectedPoints.filter((point) => anchorVisible(point, cutoff))
+    : [];
   const safeSelectedZone = clipZone(selectedZone, cutoff);
-  const safeExpectedZone = clipZone(expectedZone, cutoff);
+  const safeExpectedZone = referenceGeometryAllowed ? clipZone(expectedZone, cutoff) : undefined;
   const safeSelectedLine = lineVisible(selectedLine, cutoff);
-  const safeExpectedLine = lineVisible(expectedLine, cutoff);
+  const safeExpectedLine = referenceGeometryAllowed ? lineVisible(expectedLine, cutoff) : undefined;
   const safeSelectedCandleIndex =
     selectedCandleIndex !== undefined && selectedCandleIndex <= cutoff
       ? selectedCandleIndex
@@ -265,12 +275,14 @@ export function OhlcvChart({
   )
     ? selectedAnnotationId
     : undefined;
-  const safeExecutionOverlays = executionOverlays.filter((overlay) => {
-    if (overlay.visibleFromCandleIndex > cutoff) return false;
-    if ('candleIndex' in overlay && overlay.candleIndex > cutoff) return false;
-    if ('startCandleIndex' in overlay && overlay.startCandleIndex > cutoff) return false;
-    return true;
-  });
+  const safeExecutionOverlays = referenceGeometryAllowed
+    ? executionOverlays.filter((overlay) => {
+        if (overlay.visibleFromCandleIndex > cutoff) return false;
+        if ('candleIndex' in overlay && overlay.candleIndex > cutoff) return false;
+        if ('startCandleIndex' in overlay && overlay.startCandleIndex > cutoff) return false;
+        return true;
+      })
+    : [];
   const plotWidth = Math.max(1, width - AXIS_LEFT - AXIS_RIGHT);
   const firstIndex = frame?.firstCandleIndex ?? 0;
   const lastIndex = frame?.lastCandleIndex ?? firstIndex;
@@ -1020,25 +1032,29 @@ export function OhlcvChart({
           </View>
         )}
       </View>
-      <Pressable
+      <View
+        accessible
         accessibilityHint={
           interactive
             ? `${
-                presentationPolicy === 'blind'
-                  ? 'הקישו במיקום הרצוי בתוך אזור המחיר'
-                  : (interactionHint ?? 'הקישו במיקום הרצוי בתוך אזור המחיר')
-              } הגרף מצמיד את הבחירה לנר הקרוב.`
+                presentationPolicy === 'standard' && interactionHint ? `${interactionHint} ` : ''
+              }לסימון נגיש ומדויק השתמשו בשדות מספר הנר והמחיר שמתחת לגרף.`
             : undefined
         }
         accessibilityLabel={description}
-        accessibilityRole={interactive ? 'button' : 'image'}
-        onLayout={onLayout}
-        onPress={onPress}
+        accessibilityRole="image"
         style={[styles.chart, { borderColor: theme.colors.border, direction: 'ltr' }]}
-        testID={testID}
       >
-        {body}
-      </Pressable>
+        <Pressable
+          accessible={false}
+          onLayout={onLayout}
+          onPress={onPress}
+          style={styles.chartInteraction}
+          testID={testID}
+        >
+          {body}
+        </Pressable>
+      </View>
       <UiText color="textMuted" variant="caption">
         מקרא: נר עולה = גוף חלול; נר יורד = גוף מלא.
       </UiText>
@@ -1139,6 +1155,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
+  chartInteraction: { height: '100%', width: '100%' },
   empty: {
     alignItems: 'center',
     borderRadius: 16,

@@ -8,9 +8,10 @@ import {
   type ColorScheme,
   type LayoutDirection,
 } from './tokens';
+import { resolveReducedMotion, type ReducedMotionPreferenceValue } from './motion-utils';
 
 export type ThemeMode = ColorScheme | 'system';
-export type ReducedMotionPreference = boolean | 'system';
+export type ReducedMotionPreference = ReducedMotionPreferenceValue;
 
 export interface ThemeContextValue {
   theme: ChartPathTheme;
@@ -75,8 +76,7 @@ export function ChartPathThemeProvider({
       : mode === 'dark'
         ? 'dark'
         : 'light';
-  const reducedMotion =
-    reducedMotionPreference === 'system' ? systemReducedMotion : reducedMotionPreference;
+  const reducedMotion = resolveReducedMotion(systemReducedMotion, reducedMotionPreference);
   const safeTextScale = normalizeTextScale(textScale);
   const value = useMemo<ThemeContextValue>(
     () => ({ theme: createTheme(scheme, direction), reducedMotion, textScale: safeTextScale }),

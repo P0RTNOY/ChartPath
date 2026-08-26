@@ -5,6 +5,7 @@ export * from './card';
 export * from './feedback';
 export * from './mastery';
 export * from './mastery-utils';
+export * from './motion-utils';
 export * from './progress';
 export * from './progress-utils';
 export * from './screen';

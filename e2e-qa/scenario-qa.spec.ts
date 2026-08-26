@@ -243,6 +243,29 @@ test('QA gate requires acknowledgement and starts a blind candidate without reve
   expect(await creditState(page)).toEqual(before);
 });
 
+test('only the three selected candidates expose local reviewer packets after the explicit QA reveal', async ({
+  page,
+}) => {
+  const selected = [
+    ['candidate-04', 'publication-candidate-no-trade-v1'],
+    ['candidate-11', 'publication-candidate-long-v1'],
+    ['candidate-12', 'publication-candidate-short-v1'],
+  ] as const;
+
+  for (const [key, candidateId] of selected) {
+    await enterQa(page);
+    await expect(page.getByTestId(`scenario-qa-candidate-${key}`)).not.toContainText(candidateId);
+    await page.getByTestId(`scenario-qa-select-${key}`).click();
+    await expect(page.getByTestId('scenario-qa-review-packet')).toHaveCount(0);
+    await page.getByTestId(`scenario-qa-reveal-${key}`).click();
+    const packet = page.getByTestId('scenario-qa-review-packet');
+    await expect(packet).toContainText(candidateId);
+    await expect(packet).toContainText(`${candidateId}.jsonl`);
+    await expect(packet).toContainText('נדרשות 8 סקירות חתומות');
+    await expect(packet).toContainText('אינה אישור לפרסום');
+  }
+});
+
 test('authored long candidate reaches its deterministic target while process score remains 100%', async ({
   page,
 }) => {

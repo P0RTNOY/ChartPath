@@ -4,6 +4,7 @@ import { isTextOnlyBadgeContent } from '../src/badge-utils';
 import { isolateLtrRunsInHebrew } from '../src/bidi';
 import { defaultMasteryLevels, getMasteryLevel } from '../src/mastery-utils';
 import { normalizeProgress } from '../src/progress-utils';
+import { resolveReducedMotion } from '../src/motion-utils';
 import { darkColors, lightColors, normalizeTextScale } from '../src/tokens';
 
 function relativeLuminance(hex: string): number {
@@ -86,6 +87,15 @@ describe('normalizeTextScale', () => {
     expect(normalizeTextScale(0.5)).toBe(1);
     expect(normalizeTextScale(2)).toBe(1.4);
     expect(normalizeTextScale(Number.NaN)).toBe(1);
+  });
+});
+
+describe('resolveReducedMotion', () => {
+  it('honors the operating-system request even when the app force flag is false', () => {
+    expect(resolveReducedMotion(true, false)).toBe(true);
+    expect(resolveReducedMotion(false, false)).toBe(false);
+    expect(resolveReducedMotion(false, true)).toBe(true);
+    expect(resolveReducedMotion(true, 'system')).toBe(true);
   });
 });
 
