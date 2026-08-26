@@ -143,9 +143,7 @@ function passphraseReady(value: string): boolean {
 function focusAccessibleTarget(target: View | null): void {
   if (!target) return;
   if (Platform.OS === 'web') {
-    requestAnimationFrame(() =>
-      (target as unknown as { readonly focus?: () => void }).focus?.(),
-    );
+    requestAnimationFrame(() => (target as unknown as { readonly focus?: () => void }).focus?.());
     return;
   }
   const handle = findNodeHandle(target);
@@ -175,16 +173,15 @@ export function RecoveryBundlePanel() {
   const [categories, setCategories] = useState<ReadonlySet<RecoveryCategory>>(
     () => new Set(DEFAULT_RECOVERY_CATEGORIES),
   );
-  const [consents, setConsents] = useState<ReadonlySet<SensitiveRecoveryCategory>>(
-    () => new Set(),
-  );
+  const [consents, setConsents] = useState<ReadonlySet<SensitiveRecoveryCategory>>(() => new Set());
   const [exportPassword, setExportPassword] = useState('');
   const [exported, setExported] = useState<RecoveryBundleExportResultV1 | null>(null);
   const exportFileRef = useRef<File | null>(null);
   const [importPassword, setImportPassword] = useState('');
-  const [pickedFile, setPickedFile] = useState<{ readonly name: string; readonly text: string } | null>(
-    null,
-  );
+  const [pickedFile, setPickedFile] = useState<{
+    readonly name: string;
+    readonly text: string;
+  } | null>(null);
   const [importPayload, setImportPayload] = useState<RecoveryPayloadV1 | null>(null);
   const [importPlan, setImportPlan] = useState<RecoveryImportPlan | null>(null);
   const [confirmImport, setConfirmImport] = useState(false);
@@ -285,10 +282,7 @@ export function RecoveryBundlePanel() {
     setMessageIsError(false);
     try {
       if (Platform.OS === 'web') {
-        webDownload(
-          exported.bundleText,
-          `chartpath-recovery-${exported.payload.bundleId}.json`,
-        );
+        webDownload(exported.bundleText, `chartpath-recovery-${exported.payload.bundleId}.json`);
         setMessage('הורדה נוספת של הקובץ המוצפן הופעלה בדפדפן.');
         return;
       }
@@ -581,8 +575,8 @@ export function RecoveryBundlePanel() {
                 <Heading level={3}>תכנית יבוא</Heading>
                 <UiText variant="label">קטגוריות ליבוא בפועל</UiText>
                 <UiText color="textMuted" variant="caption">
-                  העדפות כבויות כברירת מחדל כאשר קיימים נתוני לומד במכשיר. כל שינוי מריץ מחדש
-                  בדיקה יבשה ונקשר לאסימון האישור.
+                  העדפות כבויות כברירת מחדל כאשר קיימים נתוני לומד במכשיר. כל שינוי מריץ מחדש בדיקה
+                  יבשה ונקשר לאסימון האישור.
                 </UiText>
                 <View style={{ gap: 8 }} testID="recovery-import-categories">
                   {importPayload?.includedCategories.map((category) => {

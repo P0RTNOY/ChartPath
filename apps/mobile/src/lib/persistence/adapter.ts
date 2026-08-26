@@ -50,9 +50,7 @@ export class UnsupportedPersistenceVersionError extends Error {
 }
 
 export type PersistenceInitializationFailureReason =
-  | 'unsupported-newer-schema'
-  | 'corrupt-store'
-  | 'transient';
+  'unsupported-newer-schema' | 'corrupt-store' | 'transient';
 
 export interface PersistenceInitializationFailure {
   readonly reason: PersistenceInitializationFailureReason;

@@ -125,8 +125,13 @@ describe('RecoveryBundlePanel', () => {
 
   it('requires explicit consent before exporting management journal text', async () => {
     const screen = await renderPanel();
-    await fireEvent.press(screen.getByTestId('recovery-export-category-position-management-sessions'));
-    await fireEvent.changeText(screen.getByTestId('recovery-export-password'), 'a-secure-password-123');
+    await fireEvent.press(
+      screen.getByTestId('recovery-export-category-position-management-sessions'),
+    );
+    await fireEvent.changeText(
+      screen.getByTestId('recovery-export-password'),
+      'a-secure-password-123',
+    );
 
     expect(screen.getByTestId('recovery-export-create').props.accessibilityState.disabled).toBe(
       true,
@@ -148,17 +153,22 @@ describe('RecoveryBundlePanel', () => {
     expect(screen.getByTestId('recovery-export-summary')).toBeTruthy();
     expect(screen.getByText('כולל טקסט יומן וניהול פוזיציה')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('recovery-export-share'));
-    await waitFor(() => expect(mockShareAsync).toHaveBeenCalledWith(
-      'file:///cache/recovery.json',
-      expect.objectContaining({ mimeType: 'application/json' }),
-    ));
+    await waitFor(() =>
+      expect(mockShareAsync).toHaveBeenCalledWith(
+        'file:///cache/recovery.json',
+        expect.objectContaining({ mimeType: 'application/json' }),
+      ),
+    );
   });
 
   it('performs decrypt and dry-run before exposing a separate additive import confirmation', async () => {
     const screen = await renderPanel();
     await fireEvent.press(screen.getByTestId('recovery-import-pick'));
     await waitFor(() => expect(screen.getByText('backup.json')).toBeTruthy());
-    await fireEvent.changeText(screen.getByTestId('recovery-import-password'), 'a-secure-password-123');
+    await fireEvent.changeText(
+      screen.getByTestId('recovery-import-password'),
+      'a-secure-password-123',
+    );
     await fireEvent.press(screen.getByTestId('recovery-import-preview'));
 
     await waitFor(() => expect(mockPreviewRecoveryImport).toHaveBeenCalledWith(payload));

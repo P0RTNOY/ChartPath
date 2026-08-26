@@ -29,9 +29,7 @@ const recoveryLabels: Readonly<Record<RecoveryKind, string>> = {
 function focusAccessibleTarget(target: View | null): void {
   if (!target) return;
   if (Platform.OS === 'web') {
-    requestAnimationFrame(() =>
-      (target as unknown as { readonly focus?: () => void }).focus?.(),
-    );
+    requestAnimationFrame(() => (target as unknown as { readonly focus?: () => void }).focus?.());
     return;
   }
   const handle = findNodeHandle(target);
@@ -62,8 +60,8 @@ function QuarantineSection({
           <Badge tone="warning">{`${items.length} בהסגר`}</Badge>
         </View>
         <UiText color="textMuted" variant="bodySmall">
-          הרשומה המקורית נשמרת מקומית ולא מוצגת במסך. הסרה מוחקת רק את הטיוטות שסומנו ואינה
-          מוחקת ניסיונות או התקדמות.
+          הרשומה המקורית נשמרת מקומית ולא מוצגת במסך. הסרה מוחקת רק את הטיוטות שסומנו ואינה מוחקת
+          ניסיונות או התקדמות.
         </UiText>
         {items.map((item, index) => {
           const checked = selected.has(item.quarantineId);
@@ -284,8 +282,8 @@ export function RecoveryCenter() {
             ChartPath.
           </UiText>
           <UiText color="textMuted" variant="bodySmall">
-            מאגר הלמידה מוחרג מגיבויי מערכת ההפעלה. מסלול ההעברה הנתמך הוא קובץ השחזור המוצפן
-            שנוצר ונשמר ביוזמתכם.
+            מאגר הלמידה מוחרג מגיבויי מערכת ההפעלה. מסלול ההעברה הנתמך הוא קובץ השחזור המוצפן שנוצר
+            ונשמר ביוזמתכם.
           </UiText>
         </View>
       </Card>

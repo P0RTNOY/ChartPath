@@ -77,17 +77,15 @@ describe('RecoveryCenter', () => {
     );
 
     await fireEvent.press(screen.getByTestId('recovery-item-analysis-1'));
-    expect(
-      screen.getByTestId('recovery-item-analysis-1').props.accessibilityState.checked,
-    ).toBe(true);
+    expect(screen.getByTestId('recovery-item-analysis-1').props.accessibilityState.checked).toBe(
+      true,
+    );
     await fireEvent.press(screen.getByTestId('recovery-discard-analysis'));
     expect(screen.getByTestId('recovery-discard-confirmation')).toBeTruthy();
     expect(discardAnalysis).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: 'הסרת המסומנות בלבד' }));
 
-    await waitFor(() =>
-      expect(discardAnalysis).toHaveBeenCalledWith(['analysis-quarantine-1']),
-    );
+    await waitFor(() => expect(discardAnalysis).toHaveBeenCalledWith(['analysis-quarantine-1']));
     expect(discardPaper).not.toHaveBeenCalled();
     expect(discardManagement).not.toHaveBeenCalled();
     expect(screen.getByTestId('recovery-message').props.accessibilityLiveRegion).toBe('polite');

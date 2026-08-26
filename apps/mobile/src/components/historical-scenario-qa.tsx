@@ -9,9 +9,7 @@ import type { BlindQaCandidateCard, RevealedQaCandidateDetail } from '@/data/sce
 function focusAccessibleTarget(target: View | null): void {
   if (!target) return;
   if (Platform.OS === 'web') {
-    requestAnimationFrame(() =>
-      (target as unknown as { readonly focus?: () => void }).focus?.(),
-    );
+    requestAnimationFrame(() => (target as unknown as { readonly focus?: () => void }).focus?.());
     return;
   }
   const handle = findNodeHandle(target);
@@ -40,7 +38,11 @@ export function HistoricalScenarioQa({
   const revealedHeadingRef = useRef<View>(null);
 
   useEffect(() => {
-    const target = detail ? revealedHeadingRef.current : selectedKey ? actionHeadingRef.current : null;
+    const target = detail
+      ? revealedHeadingRef.current
+      : selectedKey
+        ? actionHeadingRef.current
+        : null;
     focusAccessibleTarget(target);
   }, [detail, selectedKey]);
 

@@ -1,14 +1,6 @@
 import { ActivityIndicator, View } from 'react-native';
 
-import {
-  Button,
-  Card,
-  Heading,
-  Screen,
-  UiText,
-  useTheme,
-  type ButtonVariant,
-} from '@chartpath/ui';
+import { Button, Card, Heading, Screen, UiText, useTheme, type ButtonVariant } from '@chartpath/ui';
 
 import { BrandMark } from './brand-mark';
 

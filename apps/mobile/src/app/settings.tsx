@@ -24,9 +24,7 @@ import { useLearning } from '@/state/learning';
 function focusAccessibleTarget(target: View | null): void {
   if (!target) return;
   if (Platform.OS === 'web') {
-    requestAnimationFrame(() =>
-      (target as unknown as { readonly focus?: () => void }).focus?.(),
-    );
+    requestAnimationFrame(() => (target as unknown as { readonly focus?: () => void }).focus?.());
     return;
   }
   const handle = findNodeHandle(target);
@@ -294,8 +292,8 @@ export default function SettingsScreen() {
             הניסיונות, ההתקדמות וההגדרות נשמרים מקומית במכשיר. אין חשבון ואין סנכרון ענן.
           </UiText>
           <UiText color="textMuted" variant="caption">
-            מאגר הלמידה מוחרג מגיבויי מערכת ההפעלה ב־Android וב־iOS, והגיבויים האלה אינם מסלול
-            שחזור נתמך. העברה נתמכת רק דרך קובץ שחזור מוצפן שנוצר ונשמר ביוזמתכם.
+            מאגר הלמידה מוחרג מגיבויי מערכת ההפעלה ב־Android וב־iOS, והגיבויים האלה אינם מסלול שחזור
+            נתמך. העברה נתמכת רק דרך קובץ שחזור מוצפן שנוצר ונשמר ביוזמתכם.
           </UiText>
           <Card
             onPress={() => router.push('/data-recovery' as Href)}

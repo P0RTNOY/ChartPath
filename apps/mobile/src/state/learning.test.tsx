@@ -1145,9 +1145,7 @@ describe('guided analysis learning integration', () => {
     }[] = [
       {
         repository: new LearningRepository(
-          new InMemoryPersistenceAdapter(
-            JSON.stringify({ metadata: { schemaVersion: 999 } }),
-          ),
+          new InMemoryPersistenceAdapter(JSON.stringify({ metadata: { schemaVersion: 999 } })),
           { contentVersion: contentVersion.id },
         ),
         expected: 'unsupported-newer-schema',

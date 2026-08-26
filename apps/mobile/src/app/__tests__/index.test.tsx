@@ -5,8 +5,7 @@ import { ChartPathThemeProvider } from '@chartpath/ui';
 import IndexScreen from '../index';
 
 const mockPush = jest.fn();
-let mockFailureReason: 'corrupt-store' | 'unsupported-newer-schema' | 'transient' =
-  'corrupt-store';
+let mockFailureReason: 'corrupt-store' | 'unsupported-newer-schema' | 'transient' = 'corrupt-store';
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,

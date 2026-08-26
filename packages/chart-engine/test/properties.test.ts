@@ -24,44 +24,40 @@ const scenarios: readonly ChartScenario[] = [
 ];
 
 describe('generator properties', () => {
-  it(
-    'always emits finite, positive, internally valid OHLCV candles',
-    () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: Number.MIN_SAFE_INTEGER, max: Number.MAX_SAFE_INTEGER }),
-          fc.integer({ min: 20, max: 180 }),
-          fc.double({ min: 0.0005, max: 0.2, noNaN: true }),
-          fc.double({ min: 0, max: 2, noNaN: true }),
-          fc.constantFrom(...scenarios),
-          (seed, candleCount, volatility, noise, scenario) => {
-            const chart = generateFullChart(
-              createChartSpec({ seed, scenario, candleCount, volatility, noise }),
-            );
-            expect(chart.candles).toHaveLength(candleCount);
-            for (const [index, candle] of chart.candles.entries()) {
-              expect(candle.index).toBe(index);
-              expect(Number.isFinite(candle.open)).toBe(true);
-              expect(Number.isFinite(candle.high)).toBe(true);
-              expect(Number.isFinite(candle.low)).toBe(true);
-              expect(Number.isFinite(candle.close)).toBe(true);
-              expect(Number.isFinite(candle.volume)).toBe(true);
-              expect(candle.open).toBeGreaterThan(0);
-              expect(candle.close).toBeGreaterThan(0);
-              expect(candle.low).toBeGreaterThan(0);
-              expect(candle.volume).toBeGreaterThan(0);
-              expect(candle.low).toBeLessThanOrEqual(Math.min(candle.open, candle.close));
-              expect(candle.high).toBeGreaterThanOrEqual(Math.max(candle.open, candle.close));
-              expect(Number.isInteger(candle.volume)).toBe(true);
-              expect(Number.isNaN(Date.parse(candle.timestamp))).toBe(false);
-            }
-          },
-        ),
-        { numRuns: 120 },
-      );
-    },
-    30_000,
-  );
+  it('always emits finite, positive, internally valid OHLCV candles', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: Number.MIN_SAFE_INTEGER, max: Number.MAX_SAFE_INTEGER }),
+        fc.integer({ min: 20, max: 180 }),
+        fc.double({ min: 0.0005, max: 0.2, noNaN: true }),
+        fc.double({ min: 0, max: 2, noNaN: true }),
+        fc.constantFrom(...scenarios),
+        (seed, candleCount, volatility, noise, scenario) => {
+          const chart = generateFullChart(
+            createChartSpec({ seed, scenario, candleCount, volatility, noise }),
+          );
+          expect(chart.candles).toHaveLength(candleCount);
+          for (const [index, candle] of chart.candles.entries()) {
+            expect(candle.index).toBe(index);
+            expect(Number.isFinite(candle.open)).toBe(true);
+            expect(Number.isFinite(candle.high)).toBe(true);
+            expect(Number.isFinite(candle.low)).toBe(true);
+            expect(Number.isFinite(candle.close)).toBe(true);
+            expect(Number.isFinite(candle.volume)).toBe(true);
+            expect(candle.open).toBeGreaterThan(0);
+            expect(candle.close).toBeGreaterThan(0);
+            expect(candle.low).toBeGreaterThan(0);
+            expect(candle.volume).toBeGreaterThan(0);
+            expect(candle.low).toBeLessThanOrEqual(Math.min(candle.open, candle.close));
+            expect(candle.high).toBeGreaterThanOrEqual(Math.max(candle.open, candle.close));
+            expect(Number.isInteger(candle.volume)).toBe(true);
+            expect(Number.isNaN(Date.parse(candle.timestamp))).toBe(false);
+          }
+        },
+      ),
+      { numRuns: 120 },
+    );
+  }, 30_000);
 
   it('reproduces annotations for arbitrary supported specifications', () => {
     fc.assert(
