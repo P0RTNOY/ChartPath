@@ -19,6 +19,7 @@
     "reviews:check": "pnpm --filter @chartpath/content reviews:check",
     "reviews:verify": "pnpm --filter @chartpath/content reviews:verify",
     "release:preflight": "pnpm --filter @chartpath/content release:preflight",
+    "identity:audit": "pnpm --filter @chartpath/content identity:audit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "pnpm -r --if-present lint",
