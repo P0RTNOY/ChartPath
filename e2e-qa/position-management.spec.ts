@@ -104,6 +104,10 @@ async function launchManagedOpen(page: Page, variant: ManagementVariant) {
   await page.getByTestId(startTestId).click();
   await page.waitForURL(/\/paper-execution\?[^#]*analysisSessionId=[^&]+/);
   await expect(page.getByTestId('paper-management-screen')).toBeVisible();
+  const boundary = page.getByTestId('internal-qa-boundary');
+  await expect(boundary).toContainText('פנימי');
+  await expect(boundary).toContainText('לא פורסם');
+  await expect(boundary).toContainText('ללא קרדיט');
   await expect(page.getByTestId('paper-management-dashboard')).toBeVisible();
   const management = await latestManagement(page);
   expect(management).toMatchObject({ status: 'active', source: { learningCredit: 'none' } });
@@ -303,6 +307,9 @@ test('a short stop replacement is processed before the later adverse gap', async
   expect(replacementIndex).toBeGreaterThanOrEqual(0);
   expect(stopIndex).toBeGreaterThan(replacementIndex);
   expect(terminal.events.some(({ fill }) => fill?.gap)).toBe(true);
+  await page.reload();
+  await expect(page.getByTestId('paper-management-debrief')).toBeVisible();
+  expect(await latestManagement(page)).toEqual(terminal);
 });
 
 test('same-candle management uncertainty ends in an explicit ambiguity state', async ({ page }) => {
@@ -312,6 +319,10 @@ test('same-candle management uncertainty ends in an explicit ambiguity state', a
   expect(ambiguous.status).toBe('ambiguous');
   await expect(page.getByTestId('paper-management-ambiguous')).toBeVisible();
   await expect(page.getByTestId('paper-management-debrief')).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('paper-management-ambiguous')).toBeVisible();
+  await expect(page.getByTestId('paper-management-debrief')).toBeVisible();
+  expect(await latestManagement(page)).toEqual(ambiguous);
 });
 
 test('a correct no-trade analysis never exposes paper or management controls', async ({ page }) => {

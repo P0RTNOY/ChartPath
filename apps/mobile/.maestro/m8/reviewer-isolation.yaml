@@ -1,0 +1,37 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 reviewer candidate remains explicit, unpublished, and no-credit
+tags:
+  - m8
+  - reviewer
+  - isolation
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-gate
+    timeout: 90000
+- tapOn:
+    id: scenario-qa-ack
+- tapOn:
+    id: scenario-qa-enter
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-persistent-warning
+    timeout: 90000
+- assertVisible: 'ללא קרדיט'
+- assertVisible: 'לא פורסם'
+- tapOn:
+    id: ${CHARTPATH_REVIEWER_SELECT_TEST_ID}
+- assertNotVisible:
+    id: scenario-qa-review-packet
+- tapOn:
+    id: ${CHARTPATH_REVIEWER_REVEAL_TEST_ID}
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-review-packet
+    timeout: 90000
+- assertVisible: ${CHARTPATH_EXPECTED_CANDIDATE_IDENTITY}
+- assertVisible: 'אינה אישור לפרסום'
+- takeScreenshot: m8-reviewer-isolation

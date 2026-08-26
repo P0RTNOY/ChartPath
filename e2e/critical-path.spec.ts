@@ -113,6 +113,29 @@ test('glossary search and accessibility preferences work without an account', as
   await expect(page.getByRole('switch', { name: 'הפחתת תנועה' })).toBeChecked();
 });
 
+test('largest-text recovery center remains reachable, scrollable, and stable after reload', async ({
+  page,
+}) => {
+  await beginFreshGuest(page);
+  await page.goto('/settings');
+  await page.getByRole('radio', { name: 'גדול מאוד' }).click();
+  await page.getByRole('switch', { name: 'הפחתת תנועה' }).click();
+  await page.getByTestId('settings-recovery').click();
+  await page.waitForURL(/\/data-recovery$/);
+  await expect(page.getByTestId('recovery-center')).toBeVisible();
+  await expect(page.getByTestId('recovery-privacy')).toBeVisible();
+  await expect(page.getByText('אין רשומות בהסגר')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.reload();
+  await expect(page.getByTestId('recovery-center')).toBeVisible();
+  await expect(page.getByTestId('recovery-privacy')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test('learner completes a deterministic Chart Lab trendline analysis', async ({ page }) => {
   await beginFreshGuest(page);
   await page.getByRole('button', { name: 'פתיחת מעבדת הגרפים' }).click();

@@ -119,6 +119,10 @@ async function startCandidate(page: Page, key: CandidateKey): Promise<string> {
   await page.getByTestId(`scenario-qa-start-${key}`).click();
   await page.waitForURL(/\/analysis\?sessionId=/);
   await expect(page.getByTestId('guided-analysis-session')).toBeVisible();
+  const boundary = page.getByTestId('internal-qa-boundary');
+  await expect(boundary).toContainText('פנימי');
+  await expect(boundary).toContainText('לא פורסם');
+  await expect(boundary).toContainText('ללא קרדיט');
   await expect(page.getByTestId('historical-session-disclosure')).toContainText(
     /ללא[^]*XP[^]*רגיל/,
   );
@@ -243,10 +247,31 @@ test('QA gate requires acknowledgement and starts a blind candidate without reve
   expect(await creditState(page)).toEqual(before);
 });
 
+for (const candidateKey of ['candidate-04', 'candidate-07'] as const) {
+  test(`blind chart for ${candidateKey} exposes a visible-only accessible summary without identity, outcome, or future metadata`, async ({
+    page,
+  }) => {
+    await beginFreshGuest(page);
+    await startCandidate(page, candidateKey);
+    const chart = page.getByRole('img', {
+      name: /תרשים נרות היסטורי מוסתר זהות/,
+    });
+    await expect(chart).toBeVisible();
+    const accessibleName = (await chart.getAttribute('aria-label')) ?? '';
+    expect(accessibleName).toMatch(/48[^]*נרות גלויים/u);
+    expect(accessibleName).toContain('טווח מחיר');
+    expect(accessibleName).not.toMatch(
+      /internal-|double-top|תרחיש שורט|אי־עסקה|Generated fixture|\d{4}-\d{2}-\d{2}/u,
+    );
+    await expect(page.getByTestId('historical-replay-reveal')).toHaveCount(0);
+  });
+}
+
 test('only the three selected candidates expose local reviewer packets after the explicit QA reveal', async ({
   page,
 }) => {
   await beginFreshGuest(page);
+  const learningBefore = await creditState(page);
   const selected = [
     ['candidate-04', 'publication-candidate-no-trade-v1'],
     ['candidate-11', 'publication-candidate-long-v1'],
@@ -264,8 +289,23 @@ test('only the three selected candidates expose local reviewer packets after the
     await expect(packet).toContainText(
       `review-packets/${candidateId}/review-packet.canonical.jsonl`,
     );
-    await expect(packet).toContainText(/נדרשות[^]*8[^]*סקירות חתומות/);
+    await expect(packet).toContainText('נדרשות סקירות חתומות בכל ההיקפים הבאים');
     await expect(packet).toContainText('אינה אישור לפרסום');
+    for (const scope of [
+      'source',
+      'rubric',
+      'execution',
+      'accessibility',
+      'hebrew',
+      'financial-safety',
+      'licensing',
+      'publication',
+    ]) {
+      await expect(packet.getByText(scope, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByTestId('scenario-qa-reveal-announcement')).toBeVisible();
+    await expect(page.getByTestId('scenario-qa-persistent-warning')).toContainText('ללא קרדיט');
+    expect(await creditState(page)).toEqual(learningBefore);
   }
 });
 
@@ -316,6 +356,10 @@ test('correct no-trade candidate finalizes without exposing a contradictory pape
   await expect(page.getByText('תועדה נכון גם החלטה לא לפעול.')).toBeVisible();
   await expect(page.getByTestId('paper-execution-launch')).toHaveCount(0);
   expect(await creditState(page)).toEqual(creditBefore);
+  await page.reload();
+  await expect(page.getByTestId('guided-analysis-debrief').last()).toBeVisible();
+  await expect(page.getByTestId('paper-execution-launch')).toHaveCount(0);
+  expect(await creditState(page)).toEqual(creditBefore);
 });
 
 test('working authored limit order reloads byte-for-byte and expires unfilled', async ({
@@ -340,6 +384,9 @@ test('working authored limit order reloads byte-for-byte and expires unfilled', 
     workingOrder: { status: 'expired' },
   });
   expect(completed?.events.some(({ type }) => type === 'order-expired')).toBe(true);
+  await page.reload();
+  await expect(page.getByTestId('paper-execution-screen')).toBeVisible();
+  expect(await executionFor(page, sessionId)).toEqual(completed);
 });
 
 test('authored stop order preserves adverse opening-gap evidence', async ({ page }) => {

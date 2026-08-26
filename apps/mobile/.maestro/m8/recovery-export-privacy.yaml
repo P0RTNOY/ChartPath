@@ -1,0 +1,35 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 encrypted recovery keeps journal history behind explicit privacy consent
+tags:
+  - m8
+  - recovery
+  - privacy
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_RECOVERY_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: recovery-center
+    timeout: 90000
+- assertVisible:
+    id: recovery-privacy
+- assertVisible:
+    id: recovery-export
+- tapOn:
+    id: recovery-export-category-position-management-sessions
+- assertVisible:
+    id: recovery-export-consent-position-management-sessions
+- tapOn:
+    id: recovery-export-consent-position-management-sessions
+- tapOn:
+    id: recovery-export-password
+- inputText: ${CHARTPATH_RECOVERY_TEST_PASSWORD}
+- tapOn:
+    id: recovery-export-create
+- extendedWaitUntil:
+    visible:
+      id: recovery-export-summary
+    timeout: 90000
+- assertVisible: 'כולל טקסט יומן וניהול פוזיציה'
+- takeScreenshot: m8-recovery-journal-explicit-consent

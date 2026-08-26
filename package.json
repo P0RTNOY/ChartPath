@@ -37,6 +37,7 @@
     "screenshots:management": "node scripts/capture-position-management-screenshots.mjs",
     "screenshots:scenarios": "node scripts/capture-scenario-library-screenshots.mjs",
     "screenshots:publication": "node scripts/capture-publication-candidate-screenshots.mjs",
+    "screenshots:m8": "node scripts/capture-m8-recovery-reviewer-screenshots.mjs",
     "test:e2e:web": "playwright test",
     "test:e2e:qa:web": "playwright test --config playwright.qa.config.ts",
     "web:e2e:serve": "pnpm --filter @chartpath/mobile export:web && serve apps/mobile/dist -l 4173",

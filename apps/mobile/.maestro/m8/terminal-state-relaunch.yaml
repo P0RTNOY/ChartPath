@@ -1,0 +1,31 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 exact terminal management state survives standalone relaunch
+tags:
+  - m8
+  - lifecycle
+  - terminal
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_EXPECTED_TERMINAL_TEST_ID}
+    timeout: 90000
+- assertVisible:
+    id: paper-management-journal
+- takeScreenshot: m8-terminal-before-relaunch
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_EXPECTED_TERMINAL_TEST_ID}
+    timeout: 90000
+- assertVisible:
+    id: paper-management-journal
+- assertNotVisible:
+    id: paper-management-submit
+- takeScreenshot: m8-terminal-after-relaunch

@@ -1,0 +1,28 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 pre-seeded recovery failure remains fail closed across relaunch
+tags:
+  - m8
+  - lifecycle
+  - recovery
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_EXPECTED_RECOVERY_TEST_ID}
+    timeout: 90000
+- assertNotVisible:
+    id: ${CHARTPATH_FORBIDDEN_MUTATION_TEST_ID}
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_EXPECTED_RECOVERY_TEST_ID}
+    timeout: 90000
+- assertNotVisible:
+    id: ${CHARTPATH_FORBIDDEN_MUTATION_TEST_ID}
+- takeScreenshot: m8-recovery-fail-closed

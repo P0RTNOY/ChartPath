@@ -1,0 +1,32 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 exact no-trade debrief survives standalone relaunch without execution controls
+tags:
+  - m8
+  - lifecycle
+  - no-trade
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-debrief
+    timeout: 90000
+- assertNotVisible:
+    id: paper-execution-launch
+- assertNotVisible:
+    id: paper-management-screen
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-debrief
+    timeout: 90000
+- assertNotVisible:
+    id: paper-execution-launch
+- assertNotVisible:
+    id: paper-management-screen
+- takeScreenshot: m8-no-trade-after-relaunch
