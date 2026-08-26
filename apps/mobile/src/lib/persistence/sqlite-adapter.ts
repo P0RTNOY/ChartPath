@@ -18,6 +18,7 @@ import type {
 } from '@chartpath/domain';
 import type { PersistedAttempt } from './types';
 import { canonicalStringify, isObject } from './validation';
+import { ensureSQLiteBackupPolicy } from './native-backup-policy';
 
 const DEFAULT_DATABASE_NAME = 'chartpath.db';
 const MIGRATION_1_CHECKSUM =
@@ -515,7 +516,10 @@ export class SQLitePersistenceAdapter implements PersistenceAdapter {
   public constructor(private readonly options: SQLiteAdapterOptions = {}) {}
 
   private async open(): Promise<SQLiteDatabase> {
-    this.database ??= await openDatabaseAsync(this.options.databaseName ?? DEFAULT_DATABASE_NAME);
+    if (!this.database) {
+      await ensureSQLiteBackupPolicy();
+      this.database = await openDatabaseAsync(this.options.databaseName ?? DEFAULT_DATABASE_NAME);
+    }
     return this.database;
   }
 

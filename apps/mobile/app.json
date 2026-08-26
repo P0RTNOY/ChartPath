@@ -8,6 +8,8 @@
     "scheme": "chartpath",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "appleTeamId": "9R9UQ6GTQW",
+      "bundleIdentifier": "com.omerportnoy.chartpath",
       "icon": "./assets/images/chartpath-icon.png",
       "supportsTablet": true
     },
@@ -24,6 +26,7 @@
       "favicon": "./assets/images/chartpath-favicon.png"
     },
     "plugins": [
+      "./plugins/with-chartpath-native-policy.cjs",
       "expo-router",
       [
         "expo-splash-screen",

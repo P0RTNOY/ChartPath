@@ -1,0 +1,24 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M7 terminal management debrief survives exact-app relaunch
+tags:
+  - m7
+  - lifecycle
+  - management
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: paper-management-debrief
+    timeout: 90000
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: paper-management-debrief
+    timeout: 90000
+- takeScreenshot: m7-management-terminal-after-relaunch

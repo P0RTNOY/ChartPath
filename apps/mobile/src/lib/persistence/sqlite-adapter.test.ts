@@ -3,8 +3,18 @@ import { openDatabaseAsync } from 'expo-sqlite';
 import { PersistenceCorruptionError } from './adapter';
 import { LearningRepository } from './repository';
 import { SQLitePersistenceAdapter } from './sqlite-adapter';
+import { ensureSQLiteBackupPolicy } from './native-backup-policy';
 
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: jest.fn() }));
+jest.mock('./native-backup-policy', () => ({
+  ensureSQLiteBackupPolicy: jest.fn(async () => ({
+    directoryKind: 'documents-sqlite',
+    excluded: true,
+    kind: 'verified',
+    platform: 'ios',
+    policyVersion: 'ios-sqlite-exclusion-v1',
+  })),
+}));
 
 interface FakeDatabase {
   execAsync(sql: string): Promise<void>;
@@ -16,6 +26,33 @@ interface FakeDatabase {
 }
 
 describe('SQLitePersistenceAdapter recovery', () => {
+  beforeEach(() => {
+    jest.mocked(ensureSQLiteBackupPolicy).mockClear();
+  });
+
+  it('verifies the native backup policy before opening SQLite and only once per adapter', async () => {
+    const database: FakeDatabase = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
+      runAsync: jest.fn(async () => ({})),
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (transaction: FakeDatabase) => Promise<void>): Promise<void> =>
+          operation(database),
+      ),
+    };
+    jest.mocked(openDatabaseAsync).mockResolvedValue(database as never);
+    const adapter = new SQLitePersistenceAdapter({ databaseName: 'backup-policy-test.db' });
+
+    await adapter.initialize();
+    await adapter.initialize();
+
+    expect(ensureSQLiteBackupPolicy).toHaveBeenCalledTimes(1);
+    expect(openDatabaseAsync).toHaveBeenCalledWith('backup-policy-test.db');
+    expect(jest.mocked(ensureSQLiteBackupPolicy).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(openDatabaseAsync).mock.invocationCallOrder[0]!,
+    );
+  });
+
   it('lets an explicit repository reset replace a corrupt payload and clear attempts', async () => {
     let repositoryPayload = '{broken-json';
     const executed: string[] = [];

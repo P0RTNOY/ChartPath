@@ -1,0 +1,15 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M7 pre-seeded quarantine recovery remains fail closed
+tags:
+  - m7
+  - lifecycle
+  - quarantine
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible: ${CHARTPATH_EXPECTED_RECOVERY_TEXT}
+    timeout: 90000
+- assertNotVisible: ${CHARTPATH_FORBIDDEN_MUTATION_TEXT}
+- takeScreenshot: m7-quarantine-recovery

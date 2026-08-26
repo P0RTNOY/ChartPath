@@ -1,0 +1,28 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M7 pending management action survives exact-app relaunch
+tags:
+  - m7
+  - lifecycle
+  - management
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: paper-management-pending
+    timeout: 90000
+- assertVisible:
+    id: paper-management-journal
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: paper-management-pending
+    timeout: 90000
+- assertVisible:
+    id: paper-management-journal
+- takeScreenshot: m7-management-pending-after-relaunch

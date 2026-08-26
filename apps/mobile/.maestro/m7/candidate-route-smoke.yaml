@@ -1,0 +1,14 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M7 exact candidate route smoke
+tags:
+  - m7
+  - candidate
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_NATIVE_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_EXPECTED_TEST_ID}
+    timeout: 90000
+- takeScreenshot: m7-candidate-route-smoke
