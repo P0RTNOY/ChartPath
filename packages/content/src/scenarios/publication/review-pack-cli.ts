@@ -1,24 +1,36 @@
 import { canonicalSerialize } from '@chartpath/historical-data';
 
-import { publicationCandidateEvidence } from './candidates.js';
 import { assertOnlyArguments, optionalArgument, parseArguments } from './cli-arguments.js';
-import { findRepositoryRoot, verifyEvidenceFiles, writeReviewPacketArtifacts } from './node-io.js';
+import {
+  REVIEW_PACKET_OUTPUT_DIRECTORY,
+  findRepositoryRoot,
+  verifyPublicationArtifacts,
+  writeReviewPacketArtifacts,
+} from './node-io.js';
 import { buildReviewPacketArtifacts } from './review-packet.js';
 
 const argumentsMap = parseArguments(process.argv.slice(2));
-assertOnlyArguments(argumentsMap, ['--out']);
-const outputDirectory = optionalArgument(argumentsMap, '--out', 'review-packets');
+assertOnlyArguments(argumentsMap, ['--out', '--check']);
+if (argumentsMap.get('--check') !== undefined && argumentsMap.get('--check') !== true)
+  throw new TypeError('--check does not accept a value.');
+const checkOnly = argumentsMap.get('--check') === true;
+const outputDirectory = optionalArgument(argumentsMap, '--out', REVIEW_PACKET_OUTPUT_DIRECTORY);
 const repositoryRoot = await findRepositoryRoot();
-await verifyEvidenceFiles(repositoryRoot, Object.values(publicationCandidateEvidence).flat());
 const bundles = buildReviewPacketArtifacts();
-const written = await writeReviewPacketArtifacts({ repositoryRoot, outputDirectory, bundles });
+if (!checkOnly) await writeReviewPacketArtifacts({ repositoryRoot, outputDirectory, bundles });
+const verification = await verifyPublicationArtifacts({
+  repositoryRoot,
+  outputDirectory,
+  bundles,
+});
 console.log(
   canonicalSerialize({
     schemaVersion: 1,
     deterministic: true,
     publishable: false,
+    mode: checkOnly ? 'check' : 'write',
     outputDirectory,
-    indexPath: written.indexPath.slice(repositoryRoot.length + 1),
-    index: written.index,
+    verification,
   }),
 );
+if (!verification.valid) process.exitCode = 1;

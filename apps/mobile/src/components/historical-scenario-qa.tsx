@@ -205,13 +205,25 @@ export function HistoricalScenarioQa({
                   החבילה זמינה רק בכלי QA ובקובצי הביקורת המקומיים. היא אינה חלק מהקטלוג הרגיל ואינה
                   אישור לפרסום.
                 </UiText>
-                <LtrText color="textMuted" variant="caption">
+                <LtrText
+                  color="textMuted"
+                  style={{ flexShrink: 1, width: '100%' }}
+                  variant="caption"
+                >
                   {detail.publicationCandidate.candidateId}
                 </LtrText>
-                <LtrText color="textMuted" variant="caption">
+                <LtrText
+                  color="textMuted"
+                  style={{ flexShrink: 1, width: '100%' }}
+                  variant="caption"
+                >
                   {detail.publicationCandidate.reviewPacketPath}
                 </LtrText>
-                <LtrText color="textMuted" variant="caption">
+                <LtrText
+                  color="textMuted"
+                  style={{ flexShrink: 1, width: '100%' }}
+                  variant="caption"
+                >
                   {detail.publicationCandidate.materialSetChecksum}
                 </LtrText>
                 <UiText color="warning" variant="bodySmall">

@@ -32,6 +32,25 @@ export interface ExactDatasetIdentityV1 {
   readonly datasetChecksum: Sha256Checksum;
 }
 
+export interface PublicationSourceProvenanceV1 {
+  readonly provenanceId: string;
+  readonly role: 'base-scenario' | 'position-management-doctrine';
+  readonly sourceId: string;
+  readonly pdfDocumentId: string;
+  readonly sourcePdfChecksum: Sha256Checksum;
+  readonly physicalPages: { readonly start: number; readonly end: number };
+  readonly printedPages: {
+    readonly start: number | string;
+    readonly end: number | string;
+  };
+  readonly chapter: string;
+  readonly figureOrCase: string;
+  readonly reviewedContentIds: readonly string[];
+  readonly concept: string;
+  readonly originalSummaryHe: string;
+  readonly sourcePdfRightsStatus: 'human-decision-required';
+}
+
 export interface PublicationCandidateV1 {
   readonly schemaVersion: typeof PUBLICATION_CANDIDATE_SCHEMA_VERSION;
   readonly candidateId: string;
@@ -45,6 +64,8 @@ export interface PublicationCandidateV1 {
     readonly materialArtifactChecksum: Sha256Checksum;
     readonly dataset: ExactDatasetIdentityV1;
   };
+  /** Every educational source reviewed for this exact composite candidate. */
+  readonly sourceProvenance: readonly PublicationSourceProvenanceV1[];
   readonly management?: {
     readonly materialArtifactChecksum: Sha256Checksum;
     readonly policyVersion: string;
@@ -142,19 +163,7 @@ export interface ReviewPacketMaterialV1 {
     readonly ambiguityEvidence: readonly string[];
     readonly profitAndLossAffectsScore: false;
   };
-  readonly sourceProvenance: {
-    readonly sourceId: string;
-    readonly pdfDocumentId: string;
-    readonly sourcePdfChecksum: Sha256Checksum;
-    readonly physicalPages: { readonly start: number; readonly end: number };
-    readonly printedPages: { readonly start: number; readonly end: number };
-    readonly chapter: string;
-    readonly figureOrCase: string;
-    readonly reviewedContentIds: readonly string[];
-    readonly concept: string;
-    readonly originalSummaryHe: string;
-    readonly sourcePdfRightsStatus: 'human-decision-required';
-  };
+  readonly sourceProvenance: readonly PublicationSourceProvenanceV1[];
   readonly licensing: PublicationCandidateV1['licensing'] & {
     readonly currentManifestRedistributionStatus: string;
     readonly currentManifestPublicationStatus: string;

@@ -6,8 +6,12 @@ import {
   PUBLICATION_CANDIDATE_SCHEMA_VERSION,
   PUBLICATION_REVIEW_SCOPES,
   type PublicationCandidateV1,
+  type PublicationSourceProvenanceV1,
   type ReviewEvidenceFileV1,
 } from './types.js';
+
+const SOURCE_PDF_CHECKSUM =
+  'sha256:25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33' as const;
 
 function checksum(value: unknown): Sha256Checksum {
   return `sha256:${sha256Hex(canonicalSerialize(value))}`;
@@ -85,6 +89,57 @@ function datasetDerivation(
   return deepFreeze({ ...recipeMaterial, recipeChecksum: checksum(recipeMaterial) });
 }
 
+function sourceProvenance(
+  source: ReturnType<typeof base>,
+  variant: ReturnType<typeof management> | undefined,
+): readonly PublicationSourceProvenanceV1[] {
+  const baseSource = source.manifest.source;
+  const managementSources =
+    variant?.management.rubric.criteria.flatMap((criterion) => {
+      const doctrine = criterion.source;
+      if (!doctrine) return [];
+      if (doctrine.sourceId !== baseSource.sourceId)
+        throw new Error(
+          `Management doctrine ${criterion.criterionId} uses a different source document.`,
+        );
+      return [
+        {
+          provenanceId: `position-management-doctrine:${criterion.criterionId}`,
+          role: 'position-management-doctrine' as const,
+          sourceId: doctrine.sourceId,
+          pdfDocumentId: baseSource.pdfDocumentId,
+          sourcePdfChecksum: SOURCE_PDF_CHECKSUM,
+          physicalPages: { start: doctrine.pageStart, end: doctrine.pageEnd },
+          printedPages: { start: doctrine.bookPageStart, end: doctrine.bookPageEnd },
+          chapter: doctrine.chapter,
+          figureOrCase: doctrine.figureOrCase,
+          reviewedContentIds: [doctrine.reviewedContentId],
+          concept: criterion.criterionHe,
+          originalSummaryHe: `${criterion.criterionHe} ${criterion.expectedEvidenceHe}`,
+          sourcePdfRightsStatus: 'human-decision-required' as const,
+        },
+      ];
+    }) ?? [];
+  return deepFreeze([
+    {
+      provenanceId: `base-scenario:${source.manifest.scenarioId}`,
+      role: 'base-scenario',
+      sourceId: baseSource.sourceId,
+      pdfDocumentId: baseSource.pdfDocumentId,
+      sourcePdfChecksum: SOURCE_PDF_CHECKSUM,
+      physicalPages: { start: baseSource.pageStart, end: baseSource.pageEnd },
+      printedPages: { start: baseSource.bookPageStart, end: baseSource.bookPageEnd },
+      chapter: baseSource.chapter,
+      figureOrCase: baseSource.figure,
+      reviewedContentIds: baseSource.reviewedContentIds,
+      concept: baseSource.concept,
+      originalSummaryHe: baseSource.rationaleHe,
+      sourcePdfRightsStatus: 'human-decision-required',
+    },
+    ...managementSources,
+  ]);
+}
+
 function publicationCandidate(input: {
   readonly candidateId: string;
   readonly decisionKind: PublicationCandidateV1['decisionKind'];
@@ -121,6 +176,7 @@ function publicationCandidate(input: {
         datasetChecksum: source.dataset.manifest.canonicalChecksum,
       },
     },
+    sourceProvenance: sourceProvenance(source, variant),
     ...(variant
       ? {
           management: {
@@ -210,6 +266,7 @@ export function validatePublicationCandidateRegistry(
         ? management(candidate.scenario.scenarioId, candidate.scenario.scenarioVersion)
         : undefined;
     const expectedDataset = variant?.dataset ?? source.dataset;
+    const expectedSourceProvenance = sourceProvenance(source, variant);
     if (
       candidate.baseScenario.materialArtifactChecksum !==
         source.manifest.materialArtifactChecksum ||
@@ -227,6 +284,11 @@ export function validatePublicationCandidateRegistry(
       candidate.management?.materialArtifactChecksum !== variant.materialArtifactChecksum
     )
       issues.push(`${candidate.candidateId} management material identity is stale`);
+    if (
+      canonicalSerialize(candidate.sourceProvenance) !==
+      canonicalSerialize(expectedSourceProvenance)
+    )
+      issues.push(`${candidate.candidateId} source provenance is stale`);
     const {
       state: _state,
       decisionKind: _decisionKind,
@@ -262,9 +324,9 @@ export const publicationCandidateEvidence: Readonly<
     {
       evidenceId: 'long-decision-browser',
       kind: 'browser-screenshot',
-      path: 'docs/screenshots/scenario-guided-long-light-phone.png',
-      checksum: 'sha256:137ddaad49499a38f2ffa86256363552f91eed74abe9dfd169f0b8edab66f8ad',
-      sizeBytes: 54_619,
+      path: 'docs/screenshots/m7-publication-candidate-long-decision-browser.png',
+      checksum: 'sha256:5775d8ed78649175991cf094c1758da49441f00cdcecbba9096e0eeff474a2c6',
+      sizeBytes: 62_850,
       widthPixels: 390,
       heightPixels: 844,
       status: 'supporting-only',
@@ -286,11 +348,11 @@ export const publicationCandidateEvidence: Readonly<
     {
       evidenceId: 'short-decision-browser',
       kind: 'browser-screenshot',
-      path: 'docs/screenshots/scenario-blind-short-light-phone.png',
-      checksum: 'sha256:e778af7db52d174fa77cd4f3f907c2c85287b6ea99f33cd755e3a1784bcd1487',
-      sizeBytes: 55_924,
-      widthPixels: 390,
-      heightPixels: 844,
+      path: 'docs/screenshots/m7-publication-candidate-short-decision-browser.png',
+      checksum: 'sha256:df8d755868ca2ce9fccf5799238472ba697d67572e73a29808f85acfbe8c79bb',
+      sizeBytes: 72_689,
+      widthPixels: 430,
+      heightPixels: 932,
       status: 'supporting-only',
       descriptionHe: 'מצב תרחיש שורט עיוור בדפדפן; אינו בדיקת TalkBack או מכשיר Android.',
     },

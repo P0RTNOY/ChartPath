@@ -29,6 +29,10 @@ export interface PublicationPreflightInputV1 {
   readonly asOf: string;
   readonly packet: ReviewPacketV1;
   readonly attestations: AttestationVerificationReportV1;
+  readonly artifactVerification: {
+    readonly valid: boolean;
+    readonly issues: readonly string[];
+  };
   readonly evidence: {
     readonly licensingAndRedistributionAuthorized: boolean;
     readonly nativeLifecycleVerified: boolean;
@@ -71,6 +75,15 @@ export function runPublicationPreflight(
       code: 'REVIEW_PACKET_STALE',
       detail: 'The supplied review packet is not the exact regenerated packet.',
     });
+  if (!input.artifactVerification.valid) {
+    if (input.artifactVerification.issues.length === 0)
+      blockers.push({
+        code: 'PUBLICATION_ARTIFACT_INTEGRITY_FAILED',
+        detail: 'Publication artifact verification failed without a diagnostic.',
+      });
+    for (const issue of input.artifactVerification.issues)
+      blockers.push({ code: 'PUBLICATION_ARTIFACT_INTEGRITY_FAILED', detail: issue });
+  }
   if (
     input.attestations.candidateId !== candidate.candidateId ||
     input.attestations.asOf !== input.asOf

@@ -6,25 +6,16 @@ import { runPublicationPreflight } from '../src/scenarios/publication/preflight.
 import { buildReviewPacket } from '../src/scenarios/publication/review-packet.js';
 import {
   PUBLICATION_REVIEW_SCOPES,
-  REVIEW_ATTESTATION_POLICY_VERSION,
   type AttestationVerificationReportV1,
-  type TrustedReviewerRegistryV1,
 } from '../src/scenarios/publication/types.js';
 
 const AS_OF = '2032-01-01T00:00:00.000Z';
 const candidate = publicationCandidateRegistry[0]!;
 const packet = buildReviewPacket(candidate);
-const emptyRegistry: TrustedReviewerRegistryV1 = {
-  schemaVersion: 1,
-  environment: 'production',
-  policyVersion: REVIEW_ATTESTATION_POLICY_VERSION,
-  reviewers: [],
-};
 const missingReviews = verifyProductionReviewAttestations({
   candidate,
   packet,
   attestations: [],
-  registry: emptyRegistry,
   asOf: AS_OF,
 });
 
@@ -39,6 +30,7 @@ function preflight(overrides: Partial<Parameters<typeof runPublicationPreflight>
     asOf: AS_OF,
     packet,
     attestations: missingReviews,
+    artifactVerification: { valid: true, issues: [] },
     evidence: {
       licensingAndRedistributionAuthorized: false,
       nativeLifecycleVerified: false,
@@ -91,6 +83,26 @@ describe('fail-closed dry-run publication preflight', () => {
     expect(preflight({ packet: changedPacket }).blockers).toContainEqual(
       expect.objectContaining({ code: 'REVIEW_PACKET_STALE' }),
     );
+  });
+
+  it('fails closed when source, evidence, or tracked packet artifact verification fails', () => {
+    const report = preflight({
+      artifactVerification: {
+        valid: false,
+        issues: [
+          'source PDF checksum mismatch',
+          'tracked packet is stale review-packets/example/review-packet.md',
+        ],
+      },
+    });
+    expect(
+      report.blockers.filter((blocker) => blocker.code === 'PUBLICATION_ARTIFACT_INTEGRITY_FAILED'),
+    ).toEqual([
+      expect.objectContaining({ detail: 'source PDF checksum mismatch' }),
+      expect.objectContaining({
+        detail: 'tracked packet is stale review-packets/example/review-packet.md',
+      }),
+    ]);
   });
 
   it('remains fail-closed after synthetically complete review projections because rights material is internal', () => {

@@ -1,5 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 
+import { canonicalSerialize, sha256Hex } from '@chartpath/historical-data';
 import { describe, expect, it } from 'vitest';
 
 import { publicationCandidateRegistry } from '../src/scenarios/publication/candidates.js';
@@ -9,6 +10,7 @@ import {
   verifyReviewAttestationsForTesting,
 } from '../src/scenarios/publication/attestation-node.js';
 import { buildReviewPacket } from '../src/scenarios/publication/review-packet.js';
+import { PRODUCTION_TRUSTED_REVIEWER_REGISTRY } from '../src/scenarios/publication/trusted-reviewers.js';
 import {
   PUBLICATION_REVIEW_SCOPES,
   REVIEW_ATTESTATION_CONTRACT_VERSION,
@@ -98,8 +100,8 @@ describe('detached Ed25519 review attestations', () => {
     expect(JSON.stringify({ attestations, registry })).not.toMatch(/PRIVATE KEY|privateKey/u);
   });
 
-  it('rejects test registries in the production path and keeps the real empty registry incomplete', () => {
-    const { registry } = fixture();
+  it('binds production verification to the repository registry and keeps it incomplete', () => {
+    const { registry, payload, signed } = fixture();
     expect(() =>
       verifyProductionReviewAttestations({
         candidate,
@@ -108,21 +110,32 @@ describe('detached Ed25519 review attestations', () => {
         registry,
         asOf: AS_OF,
       }),
-    ).toThrow(/production verification rejects test/u);
-    const production: TrustedReviewerRegistryV1 = {
-      schemaVersion: 1,
-      environment: 'production',
-      policyVersion: REVIEW_ATTESTATION_POLICY_VERSION,
-      reviewers: [],
-    };
+    ).toThrow(/bound to the repository trusted reviewer registry/u);
+    const selfDeclaredProduction = structuredClone(registry);
+    Object.assign(selfDeclaredProduction, { environment: 'production' });
+    Object.assign(selfDeclaredProduction.reviewers[0]!, { reviewerKind: 'external-human' });
+    const selfSignedApprovals = PUBLICATION_REVIEW_SCOPES.map((reviewScope) =>
+      signed(payload(reviewScope)),
+    );
+    expect(() =>
+      verifyProductionReviewAttestations({
+        candidate,
+        packet,
+        attestations: selfSignedApprovals,
+        registry: selfDeclaredProduction,
+        asOf: AS_OF,
+      }),
+    ).toThrow(/bound to the repository trusted reviewer registry/u);
     const report = verifyProductionReviewAttestations({
       candidate,
       packet,
       attestations: [],
-      registry: production,
       asOf: AS_OF,
     });
     expect(report.complete).toBe(false);
+    expect(report.registryChecksum).toBe(
+      `sha256:${sha256Hex(canonicalSerialize(PRODUCTION_TRUSTED_REVIEWER_REGISTRY))}`,
+    );
     expect(report.records).toEqual([]);
     expect(report.scopes.every((scope) => scope.decision === 'missing')).toBe(true);
   });
@@ -291,5 +304,108 @@ describe('detached Ed25519 review attestations', () => {
     ).toMatchObject({
       status: 'invalid',
     });
+  });
+
+  it('rejects self, equal-time, and non-earlier supersession references', () => {
+    const { registry, payload, signed } = fixture();
+    const selfId = 'test-attestation-self-supersession';
+    const self = signed(
+      payload('source', {
+        attestationId: selfId,
+        supersedesAttestationId: selfId,
+      }),
+    );
+    const equalTarget = signed(
+      payload('rubric', {
+        attestationId: 'test-attestation-equal-target',
+      }),
+    );
+    const equalSuperseder = signed(
+      payload('rubric', {
+        attestationId: 'test-attestation-equal-superseder',
+        supersedesAttestationId: equalTarget.payload.attestationId,
+      }),
+    );
+    const laterTarget = signed(
+      payload('execution', {
+        attestationId: 'test-attestation-later-target',
+        reviewedAt: '2031-01-03T00:00:00.000Z',
+      }),
+    );
+    const earlierSuperseder = signed(
+      payload('execution', {
+        attestationId: 'test-attestation-earlier-superseder',
+        reviewedAt: '2031-01-02T00:00:00.000Z',
+        supersedesAttestationId: laterTarget.payload.attestationId,
+      }),
+    );
+    const report = verifyReviewAttestationsForTesting({
+      candidate,
+      packet,
+      attestations: [self, equalTarget, equalSuperseder, laterTarget, earlierSuperseder],
+      registry,
+      asOf: AS_OF,
+    });
+    expect(report.records.find((record) => record.attestationId === selfId)).toMatchObject({
+      status: 'invalid',
+      issues: expect.arrayContaining(['attestation cannot supersede itself']),
+    });
+    for (const id of [
+      equalSuperseder.payload.attestationId,
+      earlierSuperseder.payload.attestationId,
+    ])
+      expect(report.records.find((record) => record.attestationId === id)).toMatchObject({
+        status: 'invalid',
+        issues: expect.arrayContaining([
+          'supersedes reference must identify a strictly earlier valid attestation in the same candidate and scope',
+        ]),
+      });
+  });
+
+  it('invalidates every cycle member and dependents regardless of input order', () => {
+    const { registry, payload, signed } = fixture();
+    const first = signed(
+      payload('accessibility', {
+        attestationId: 'test-attestation-cycle-first',
+        reviewedAt: '2031-01-02T00:00:00.000Z',
+        supersedesAttestationId: 'test-attestation-cycle-second',
+      }),
+    );
+    const second = signed(
+      payload('accessibility', {
+        attestationId: 'test-attestation-cycle-second',
+        reviewedAt: '2031-01-01T00:00:00.000Z',
+        supersedesAttestationId: first.payload.attestationId,
+      }),
+    );
+    const dependent = signed(
+      payload('accessibility', {
+        attestationId: 'test-attestation-cycle-dependent',
+        reviewedAt: '2031-01-03T00:00:00.000Z',
+        supersedesAttestationId: first.payload.attestationId,
+      }),
+    );
+    const verifyOrder = (attestations: readonly SignedReviewAttestationV1[]) =>
+      verifyReviewAttestationsForTesting({
+        candidate,
+        packet,
+        attestations,
+        registry,
+        asOf: AS_OF,
+      });
+    const forward = verifyOrder([first, second, dependent]);
+    const reverse = verifyOrder([dependent, second, first]);
+    for (const report of [forward, reverse]) {
+      for (const id of [first.payload.attestationId, second.payload.attestationId])
+        expect(report.records.find((record) => record.attestationId === id)).toMatchObject({
+          status: 'invalid',
+          issues: expect.arrayContaining(['supersession cycle detected']),
+        });
+      expect(
+        report.records.find((record) => record.attestationId === dependent.payload.attestationId),
+      ).toMatchObject({ status: 'invalid' });
+    }
+    expect(forward.records).toEqual(reverse.records);
+    expect(forward.issues).toEqual(reverse.issues);
   });
 });

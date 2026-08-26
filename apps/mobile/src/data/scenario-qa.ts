@@ -86,7 +86,7 @@ function publicationCandidateFor(
     candidateId: candidate.candidateId,
     state: candidate.state,
     materialSetChecksum: candidate.materialSetChecksum,
-    reviewPacketPath: `packages/content/src/scenarios/publication/review-packets/${candidate.candidateId}.jsonl`,
+    reviewPacketPath: `review-packets/${candidate.candidateId}/review-packet.canonical.jsonl`,
     requiredReviewScopes: candidate.requiredReviewScopes,
   };
 }

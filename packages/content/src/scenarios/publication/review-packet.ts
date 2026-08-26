@@ -13,9 +13,6 @@ import {
   type ReviewPacketV1,
 } from './types.js';
 
-const SOURCE_PDF_CHECKSUM =
-  'sha256:25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33' as const;
-
 function checksum(value: unknown): Sha256Checksum {
   return `sha256:${sha256Hex(canonicalSerialize(value))}`;
 }
@@ -95,6 +92,10 @@ function componentChecksums(candidate: PublicationCandidateV1) {
       componentId: 'scenario-compiler-contract',
       checksum: checksum(SCENARIO_COMPILER_CONTRACT_V1),
     },
+    ...candidate.sourceProvenance.map((source) => ({
+      componentId: `source-provenance:${source.provenanceId}`,
+      checksum: checksum(source),
+    })),
     ...(base.manifest.expectedExecution
       ? [
           {
@@ -166,7 +167,6 @@ export function buildReviewPacketMaterial(
   candidate: PublicationCandidateV1,
 ): ReviewPacketMaterialV1 {
   const { base, variant, dataset } = resolveMaterial(candidate);
-  const source = base.manifest.source;
   const reviewerHebrewStrings = stableUnique([
     base.manifest.titleHe,
     base.manifest.promptHe,
@@ -245,19 +245,7 @@ export function buildReviewPacketMaterial(
       ambiguityEvidence,
       profitAndLossAffectsScore: false,
     },
-    sourceProvenance: {
-      sourceId: source.sourceId,
-      pdfDocumentId: source.pdfDocumentId,
-      sourcePdfChecksum: SOURCE_PDF_CHECKSUM,
-      physicalPages: { start: source.pageStart, end: source.pageEnd },
-      printedPages: { start: source.bookPageStart, end: source.bookPageEnd },
-      chapter: source.chapter,
-      figureOrCase: source.figure,
-      reviewedContentIds: source.reviewedContentIds,
-      concept: source.concept,
-      originalSummaryHe: source.rationaleHe,
-      sourcePdfRightsStatus: 'human-decision-required',
-    },
+    sourceProvenance: candidate.sourceProvenance,
     licensing: {
       ...candidate.licensing,
       currentManifestRedistributionStatus: base.manifest.licensing.redistributionStatus,
@@ -303,24 +291,90 @@ export function serializeReviewPacket(packet: ReviewPacketV1): string {
 }
 
 function markdownList(values: readonly string[]): string {
-  return values.map((value) => `- ${value}`).join('\n');
+  return values.length === 0 ? '- אין.' : values.map((value) => `- ${value}`).join('\n');
+}
+
+function markdownJson(value: unknown): string {
+  return value === undefined
+    ? '_לא חל על מועמד זה._'
+    : `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+}
+
+function evidenceMarkdown(packet: ReviewPacketV1): string {
+  if (packet.evidenceFiles.length === 0) return '- אין קובצי ראיות מוצמדים.';
+  return packet.evidenceFiles
+    .map((item) => {
+      const dimensions =
+        item.widthPixels === undefined || item.heightPixels === undefined
+          ? 'לא חל'
+          : `${item.widthPixels}×${item.heightPixels}`;
+      return [
+        `### ${item.evidenceId}`,
+        '',
+        `- סוג: \`${item.kind}\``,
+        `- מצב: \`${item.status}\``,
+        `- נתיב: \`${item.path}\``,
+        `- checksum: \`${item.checksum}\``,
+        `- גודל: ${item.sizeBytes} bytes`,
+        `- ממדים: ${dimensions}`,
+        `- תיאור: ${item.descriptionHe}`,
+      ].join('\n');
+    })
+    .join('\n\n');
+}
+
+function sourceProvenanceMarkdown(packet: ReviewPacketV1): string {
+  return packet.sourceProvenance
+    .map((source, index) =>
+      [
+        `### ${index + 1}. ${source.provenanceId}`,
+        '',
+        `- תפקיד: \`${source.role}\``,
+        `- מקור: \`${source.sourceId}\``,
+        `- מסמך PDF: \`${source.pdfDocumentId}\``,
+        `- checksum של מסמך המקור: \`${source.sourcePdfChecksum}\``,
+        `- עמודי PDF פיזיים: ${source.physicalPages.start}–${source.physicalPages.end}`,
+        `- עמודים מודפסים: ${source.printedPages.start}–${source.printedPages.end}`,
+        `- פרק: ${source.chapter}`,
+        `- איור/מקרה: ${source.figureOrCase}`,
+        `- מזהי תוכן שנבדקו: ${source.reviewedContentIds.map((id) => `\`${id}\``).join(', ')}`,
+        `- מושג נתמך: ${source.concept}`,
+        `- מצב זכויות PDF: \`${source.sourcePdfRightsStatus}\``,
+        '',
+        source.originalSummaryHe,
+      ].join('\n'),
+    )
+    .join('\n\n');
 }
 
 export function renderReviewPacketMarkdown(packet: ReviewPacketV1): string {
-  const management = packet.candidate.management
-    ? `\n- Position-management material: \`${packet.candidate.management.materialArtifactChecksum}\``
-    : '';
+  const managementMaterial = packet.candidate.management
+    ? packet.candidate.management.materialArtifactChecksum
+    : 'לא חל';
+  const workflowPrompts = Object.entries(packet.learnerMaterial.workflowPromptsHe)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([step, prompt]) => `\`${step}\`: ${prompt}`);
   return [
     `# חבילת ביקורת — ${packet.candidate.candidateId}`,
     '',
     '> חומר לביקורת אנושית בלבד. מועמד לפרסום אינו תרחיש מפורסם ואינו מעניק קרדיט.',
     '',
-    '## זהות מדויקת',
+    '## חוזה וזהות מדויקת',
     '',
+    `- Schema: \`${packet.schemaVersion}\``,
+    `- Contract: \`${packet.contractVersion}\``,
+    `- Canonicalization: \`${packet.canonicalization}\``,
+    `- Candidate state: \`${packet.candidate.state}\``,
+    `- Candidate kind: \`${packet.candidate.kind}\``,
+    `- Correct decision kind: \`${packet.candidate.decisionKind}\``,
     `- Scenario: \`${packet.candidate.scenario.scenarioId}@${packet.candidate.scenario.scenarioVersion}\``,
     `- Dataset: \`${packet.candidate.dataset.datasetId}@${packet.candidate.dataset.datasetVersion}\``,
     `- Dataset checksum: \`${packet.candidate.dataset.datasetChecksum}\``,
-    `- Base material: \`${packet.candidate.baseScenario.materialArtifactChecksum}\`${management}`,
+    `- Base scenario: \`${packet.candidate.baseScenario.scenarioId}@${packet.candidate.baseScenario.scenarioVersion}\``,
+    `- Base dataset: \`${packet.candidate.baseScenario.dataset.datasetId}@${packet.candidate.baseScenario.dataset.datasetVersion}\``,
+    `- Base dataset checksum: \`${packet.candidate.baseScenario.dataset.datasetChecksum}\``,
+    `- Base material: \`${packet.candidate.baseScenario.materialArtifactChecksum}\``,
+    `- Position-management material: \`${managementMaterial}\``,
     `- Material set: \`${packet.candidate.materialSetChecksum}\``,
     `- Review packet: \`${packet.reviewPacketChecksum}\``,
     '',
@@ -328,27 +382,154 @@ export function renderReviewPacketMarkdown(packet: ReviewPacketV1): string {
     '',
     packet.candidate.selectionRationaleHe,
     '',
-    '## מקור',
+    '## הידור, יצירה ונתוני מקור',
     '',
-    `${packet.sourceProvenance.sourceId}; PDF ${packet.sourceProvenance.physicalPages.start}–${packet.sourceProvenance.physicalPages.end}; printed ${packet.sourceProvenance.printedPages.start}–${packet.sourceProvenance.printedPages.end}; chapter ${packet.sourceProvenance.chapter}; ${packet.sourceProvenance.figureOrCase}.`,
+    `- Scenario compiler: \`${packet.compiler.scenarioCompilerVersion}\``,
+    `- Compiler contract checksum: \`${packet.compiler.scenarioCompilerContractChecksum}\``,
+    `- Chart generator: \`${packet.compiler.chartGeneratorVersion}\``,
+    `- Generator seed: \`${packet.datasetProvenance.generatorSeed}\``,
+    `- Chart-spec checksum: \`${packet.datasetProvenance.chartSpecChecksum}\``,
     '',
-    packet.sourceProvenance.originalSummaryHe,
+    '### Chart spec',
     '',
-    '## חומר לומד ונגישות',
+    markdownJson(packet.datasetProvenance.chartSpec),
+    '',
+    '### Dataset manifest',
+    '',
+    markdownJson(packet.datasetProvenance.datasetManifest),
+    '',
+    '### מתכון גזירת נרות עתידיים',
+    '',
+    markdownJson(packet.datasetProvenance.futurePatchRecipe),
+    '',
+    '## Replay, חיתוך ידע ועיוורון',
+    '',
+    `- נר החלטה: \`${packet.replay.decisionCandleIndex}\``,
+    `- טווח גלוי התחלתי: \`${packet.replay.initialVisibleRange.startCandleIndex}–${packet.replay.initialVisibleRange.endCandleIndex}\``,
+    `- גבול Replay מורשה: \`${packet.replay.permittedReplayBoundaryIndex}\``,
+    `- חיתוך ידע: \`${packet.replay.knowledgeCutoffIndex}\``,
+    `- Blind: \`${packet.replay.blind}\``,
+    `- Reveal: \`${packet.replay.reveal}\``,
+    '',
+    '## חומר לומד בעברית ומבנה Guided Analysis',
+    '',
+    `### ${packet.learnerMaterial.titleHe}`,
     '',
     packet.learnerMaterial.promptHe,
     '',
-    packet.accessibility.chartAlternativeHe,
+    `**סיכום ראיות עיוור:** ${packet.learnerMaterial.blindEvidenceSummaryHe}`,
+    '',
+    `**שפת בטיחות פיננסית:** ${packet.learnerMaterial.financialSafetyDisclosureHe}`,
+    '',
+    '### רמזים',
+    '',
+    markdownList(packet.learnerMaterial.hintsHe),
+    '',
+    '### 11 שלבי התהליך / הנחיות עבודה',
+    '',
+    markdownList(workflowPrompts),
+    '',
+    '### Guided Analysis',
+    '',
+    `- מופעל: \`${packet.guidedAnalysis.enabled}\``,
+    `- מספר רמזים זמין: \`${packet.guidedAnalysis.availableHintCount}\``,
+    `- שומר על חיתוך ההחלטה: \`${packet.guidedAnalysis.preservesDecisionCutoff}\``,
+    '',
+    '## תשובה נכונה ורובריקת תהליך — פרטי לסוקר',
+    '',
+    '### החלטה נכונה ונימוק',
+    '',
+    markdownJson(packet.privateReviewerEvidence.correctDecision),
+    '',
+    '### רובריקת תהליך',
+    '',
+    markdownJson(packet.privateReviewerEvidence.processRubric),
+    '',
+    '## תכנית, סיכון וביצוע דטרמיניסטי',
+    '',
+    '### תצורת Paper Execution',
+    '',
+    markdownJson(packet.privateReviewerEvidence.paperExecutionConfiguration),
+    '',
+    '### תכנית Paper ראשונית — כניסה, סטופ, יעד וגודל',
+    '',
+    markdownJson(packet.privateReviewerEvidence.initialPaperPlan),
+    '',
+    '### אירועי ביצוע בסיסיים צפויים',
+    '',
+    markdownJson(packet.privateReviewerEvidence.expectedBaseExecution),
+    '',
+    '## הרשאות ניהול, מקרי בדיקה ו־P&L',
+    '',
+    '### פין חומר הניהול, מדיניות, הרשאות וגזירת dataset',
+    '',
+    markdownJson(packet.candidate.management),
+    '',
+    '### תצורת ניהול, מגבלות סיכון ופעולות מותרות',
+    '',
+    markdownJson(packet.privateReviewerEvidence.positionManagementConfiguration),
+    '',
+    '### מקרי ניהול, אירועים, עמימות ותוצאות צפויות',
+    '',
+    markdownJson(packet.privateReviewerEvidence.expectedManagementCases),
+    '',
+    '### ראיות עמימות',
+    '',
+    markdownList(packet.privateReviewerEvidence.ambiguityEvidence),
+    '',
+    `- רווח/הפסד משפיע על הציון: \`${packet.privateReviewerEvidence.profitAndLossAffectsScore}\``,
+    '',
+    '## מקורות חינוכיים מדויקים וסיכומים מקוריים',
+    '',
+    sourceProvenanceMarkdown(packet),
+    '',
+    '## זכויות ורישוי',
+    '',
+    `- מקור dataset סינתטי: \`${packet.licensing.syntheticDatasetOrigin}\``,
+    `- גאומטריית תרשים הועתקה: \`${packet.licensing.chartGeometryCopied}\``,
+    `- פרוזה הועתקה: \`${packet.licensing.proseCopied}\``,
+    `- מצב זכויות נתונים שנוצרו: \`${packet.licensing.generatedDataRightsStatus}\``,
+    `- מצב זכויות עיבוד המקור: \`${packet.licensing.sourceAdaptationRightsStatus}\``,
+    `- מצב הפצה מיועד: \`${packet.licensing.intendedRedistributionMode}\``,
+    `- מצב הפצה במניפסט: \`${packet.licensing.currentManifestRedistributionStatus}\``,
+    `- מצב פרסום במניפסט: \`${packet.licensing.currentManifestPublicationStatus}\``,
+    '',
+    '### שאלות רישוי פתוחות',
+    '',
+    markdownList(packet.licensing.unresolvedQuestionsHe),
+    '',
+    '## נגישות, עברית ואימות Native',
+    '',
+    `- סדר קריאה: \`${packet.accessibility.readingOrder}\``,
+    `- כיוון מספרי: \`${packet.accessibility.numericDirection}\``,
+    `- שומר עיוורון: \`${packet.accessibility.preservesBlindness}\``,
+    `- מצב אימות Native: \`${packet.accessibility.nativeVerificationStatus}\``,
+    '',
+    `**הוראות אינטראקציה:** ${packet.accessibility.interactionInstructionsHe}`,
+    '',
+    `**חלופת תרשים:** ${packet.accessibility.chartAlternativeHe}`,
+    '',
+    '### מחרוזות עבריות לביקורת',
+    '',
+    markdownList(packet.accessibility.reviewerHebrewStrings),
     '',
     '## תחומי ביקורת נדרשים',
     '',
     markdownList(packet.candidate.requiredReviewScopes),
     '',
-    '## ראיות',
+    '## צילומי מסך וקובצי ראיות',
+    '',
+    evidenceMarkdown(packet),
+    '',
+    '## בדיקות אוטומטיות',
+    '',
+    markdownList(packet.automatedTestReferences.map((reference) => `\`${reference}\``)),
+    '',
+    '## hashes של כל רכיבי החומר שנבדקו',
     '',
     markdownList(
-      packet.evidenceFiles.map(
-        (item) => `${item.evidenceId}: ${item.path} — ${item.checksum} — ${item.status}`,
+      packet.componentChecksums.map(
+        (component) => `\`${component.componentId}\`: \`${component.checksum}\``,
       ),
     ),
     '',

@@ -246,6 +246,7 @@ test('QA gate requires acknowledgement and starts a blind candidate without reve
 test('only the three selected candidates expose local reviewer packets after the explicit QA reveal', async ({
   page,
 }) => {
+  await beginFreshGuest(page);
   const selected = [
     ['candidate-04', 'publication-candidate-no-trade-v1'],
     ['candidate-11', 'publication-candidate-long-v1'],
@@ -260,8 +261,10 @@ test('only the three selected candidates expose local reviewer packets after the
     await page.getByTestId(`scenario-qa-reveal-${key}`).click();
     const packet = page.getByTestId('scenario-qa-review-packet');
     await expect(packet).toContainText(candidateId);
-    await expect(packet).toContainText(`${candidateId}.jsonl`);
-    await expect(packet).toContainText('נדרשות 8 סקירות חתומות');
+    await expect(packet).toContainText(
+      `review-packets/${candidateId}/review-packet.canonical.jsonl`,
+    );
+    await expect(packet).toContainText(/נדרשות[^]*8[^]*סקירות חתומות/);
     await expect(packet).toContainText('אינה אישור לפרסום');
   }
 });

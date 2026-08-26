@@ -29,8 +29,7 @@ const secretDetail: RevealedQaCandidateDetail = {
     candidateId: 'publication-candidate-long-v1',
     state: 'publication-candidate',
     materialSetChecksum: `sha256:${'d'.repeat(64)}`,
-    reviewPacketPath:
-      'packages/content/src/scenarios/publication/review-packets/publication-candidate-long-v1.jsonl',
+    reviewPacketPath: 'review-packets/publication-candidate-long-v1/review-packet.canonical.jsonl',
     requiredReviewScopes: [
       'source',
       'rubric',

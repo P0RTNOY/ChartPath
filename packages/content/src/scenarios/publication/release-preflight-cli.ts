@@ -11,11 +11,10 @@ import {
 import {
   findRepositoryRoot,
   readCanonicalAttestations,
-  readTrustedReviewerRegistry,
+  verifyPublicationArtifacts,
 } from './node-io.js';
 import { runPublicationPreflight } from './preflight.js';
-import { buildReviewPacket } from './review-packet.js';
-import { PRODUCTION_TRUSTED_REVIEWER_REGISTRY } from './trusted-reviewers.js';
+import { buildReviewPacket, buildReviewPacketArtifacts } from './review-packet.js';
 
 const argumentsMap = parseArguments(process.argv.slice(2));
 assertOnlyArguments(argumentsMap, [
@@ -28,7 +27,6 @@ assertOnlyArguments(argumentsMap, [
   '--dataset-checksum',
   '--as-of',
   '--attestations',
-  '--registry',
 ]);
 if (argumentsMap.get('--dry-run') !== true)
   throw new TypeError('Only the explicit --dry-run promotion workflow is implemented.');
@@ -40,18 +38,15 @@ const repositoryRoot = await findRepositoryRoot();
 const attestations = await readCanonicalAttestations(
   `${repositoryRoot}/${optionalArgument(argumentsMap, '--attestations', 'review-attestations')}`,
 );
-const registryPath = argumentsMap.get('--registry');
-if (registryPath !== undefined && typeof registryPath !== 'string')
-  throw new TypeError('Argument --registry requires a value.');
-const registry = registryPath
-  ? await readTrustedReviewerRegistry(`${repositoryRoot}/${registryPath}`)
-  : PRODUCTION_TRUSTED_REVIEWER_REGISTRY;
 const packet = buildReviewPacket(candidate);
+const artifactVerification = await verifyPublicationArtifacts({
+  repositoryRoot,
+  bundles: buildReviewPacketArtifacts(),
+});
 const verification = verifyProductionReviewAttestations({
   candidate,
   packet,
   attestations,
-  registry,
   asOf,
 });
 const report = runPublicationPreflight({
@@ -64,6 +59,7 @@ const report = runPublicationPreflight({
   asOf,
   packet,
   attestations: verification,
+  artifactVerification,
   evidence: {
     licensingAndRedistributionAuthorized: false,
     nativeLifecycleVerified: false,

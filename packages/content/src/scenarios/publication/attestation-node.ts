@@ -14,6 +14,7 @@ import {
   type SignedReviewAttestationV1,
   type TrustedReviewerRegistryV1,
 } from './types.js';
+import { PRODUCTION_TRUSTED_REVIEWER_REGISTRY } from './trusted-reviewers.js';
 
 const IDENTIFIER = /^[a-z0-9][a-z0-9._:-]{2,127}$/u;
 const CHECKSUM = /^sha256:[0-9a-f]{64}$/u;
@@ -461,21 +462,69 @@ function verifyWithEnvironment(input: {
       .filter((record) => record.status === 'valid' && record.value)
       .map((record) => [record.attestationId, record.value!] as const),
   );
+  const initiallyValidById = new Map(validById);
+  const supersessionCycleIds = new Set<string>();
+  const visited = new Set<string>();
+  for (const startId of [...initiallyValidById.keys()].sort()) {
+    if (visited.has(startId)) continue;
+    const path: string[] = [];
+    const pathIndex = new Map<string, number>();
+    let currentId: string | undefined = startId;
+    while (
+      currentId !== undefined &&
+      initiallyValidById.has(currentId) &&
+      !visited.has(currentId)
+    ) {
+      const existingIndex = pathIndex.get(currentId);
+      if (existingIndex !== undefined) {
+        for (const cycleId of path.slice(existingIndex)) supersessionCycleIds.add(cycleId);
+        break;
+      }
+      pathIndex.set(currentId, path.length);
+      path.push(currentId);
+      currentId = initiallyValidById.get(currentId)!.payload.supersedesAttestationId;
+    }
+    for (const pathId of path) visited.add(pathId);
+  }
   for (const record of records) {
     const payload = record.value?.payload;
     if (record.status !== 'valid' || !payload?.supersedesAttestationId) continue;
-    const superseded = validById.get(payload.supersedesAttestationId)?.payload;
+    const superseded = initiallyValidById.get(payload.supersedesAttestationId)?.payload;
+    if (payload.supersedesAttestationId === payload.attestationId)
+      record.issues.push('attestation cannot supersede itself');
+    if (supersessionCycleIds.has(payload.attestationId))
+      record.issues.push('supersession cycle detected');
     if (
       !superseded ||
       superseded.candidateId !== payload.candidateId ||
       superseded.scope !== payload.scope ||
-      superseded.reviewedAt > payload.reviewedAt
-    ) {
+      superseded.reviewedAt >= payload.reviewedAt
+    )
+      record.issues.push(
+        'supersedes reference must identify a strictly earlier valid attestation in the same candidate and scope',
+      );
+    if (record.issues.length > 0) {
+      record.status = 'invalid';
+      validById.delete(record.attestationId);
+    }
+  }
+  let invalidatedReference = true;
+  while (invalidatedReference) {
+    invalidatedReference = false;
+    for (const record of records) {
+      const payload = record.value?.payload;
+      if (
+        record.status !== 'valid' ||
+        !payload?.supersedesAttestationId ||
+        validById.has(payload.supersedesAttestationId)
+      )
+        continue;
       record.status = 'invalid';
       record.issues.push(
-        'supersedes reference must identify an earlier valid attestation in the same candidate and scope',
+        'supersedes reference must identify a strictly earlier valid attestation in the same candidate and scope',
       );
       validById.delete(record.attestationId);
+      invalidatedReference = true;
     }
   }
   const scopes = PUBLICATION_REVIEW_SCOPES.map((reviewScope) => {
@@ -544,10 +593,21 @@ export function verifyProductionReviewAttestations(input: {
   readonly candidate: PublicationCandidateV1;
   readonly packet: ReviewPacketV1;
   readonly attestations: readonly unknown[];
-  readonly registry: TrustedReviewerRegistryV1;
+  /** Compatibility only for repository-owned callers; arbitrary production registries are rejected. */
+  readonly registry?: TrustedReviewerRegistryV1;
   readonly asOf: string;
 }): AttestationVerificationReportV1 {
-  return verifyWithEnvironment({ ...input, environment: 'production' });
+  if (input.registry !== undefined && input.registry !== PRODUCTION_TRUSTED_REVIEWER_REGISTRY)
+    throw new TypeError(
+      'Production verification is bound to the repository trusted reviewer registry.',
+    );
+  const { registry: _registry, ...verificationInput } = input;
+  void _registry;
+  return verifyWithEnvironment({
+    ...verificationInput,
+    registry: PRODUCTION_TRUSTED_REVIEWER_REGISTRY,
+    environment: 'production',
+  });
 }
 
 /** Test-only entry point. It is intentionally not exported from the mobile-facing package root. */

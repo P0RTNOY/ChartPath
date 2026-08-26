@@ -9,6 +9,7 @@ const outputDirectory = join(process.cwd(), 'docs', 'screenshots');
 const storageKey = 'chartpath:guest-learning-data:v1';
 const correctEvidenceSuffix = 'יש לנמק באמצעות הכלל שנקבע מראש';
 const correctManagementReason = 'ההחלטה נשענת על שילוב הקשר';
+const selectedTarget = process.env.CHARTPATH_SCREENSHOT_TARGET;
 
 async function stabilizeRuntime(context) {
   await context.addInitScript(() => {
@@ -64,6 +65,27 @@ async function startCandidate(page, key) {
   await page.waitForURL(/\/analysis\?sessionId=/);
   await page.getByTestId('guided-analysis-session').waitFor();
   return new globalThis.URL(page.url()).searchParams.get('sessionId');
+}
+
+async function assertHistoricalScenarioIdentity(page, sessionId, scenarioId, scenarioVersion) {
+  const identity = await page.evaluate(
+    ({ key, id }) => {
+      const stored = JSON.parse(globalThis.localStorage.getItem(key) ?? '{}');
+      const session = stored.analysisSessions?.find((item) => item.sessionId === id);
+      return session?.chart?.kind === 'historical'
+        ? {
+            scenarioId: session.chart.scenarioId,
+            scenarioVersion: session.chart.scenarioVersion,
+          }
+        : undefined;
+    },
+    { key: storageKey, id: sessionId },
+  );
+  if (identity?.scenarioId !== scenarioId || identity.scenarioVersion !== scenarioVersion) {
+    throw new Error(
+      `Screenshot scenario identity mismatch: expected ${scenarioId}@${scenarioVersion}, received ${identity?.scenarioId ?? 'missing'}@${identity?.scenarioVersion ?? 'missing'}.`,
+    );
+  }
 }
 
 async function chooseEvidence(page) {
@@ -199,6 +221,44 @@ async function withPage(browser, storageState, work, viewport) {
   }
 }
 
+async function captureBlindShort(browser, storageState) {
+  await withPage(browser, storageState, async (page) => {
+    const sessionId = await startCandidate(page, 'candidate-07');
+    await assertHistoricalScenarioIdentity(page, sessionId, 'internal-short-double-top', '1.0.0');
+    await captureAt(
+      page,
+      page.getByTestId('guided-analysis-responsive-layout'),
+      'scenario-blind-short-light-phone.png',
+    );
+  });
+}
+
+async function captureSelectedCandidateDecision(
+  browser,
+  storageState,
+  { key, scenarioIdentity, decision, filename, viewport },
+) {
+  await withPage(
+    browser,
+    storageState,
+    async (page) => {
+      await page.goto(`${baseURL}/historical-scenario-qa?developer=1`);
+      await page.getByTestId('scenario-qa-gate').waitFor();
+      await page.getByTestId('scenario-qa-ack').click();
+      await page.getByTestId('scenario-qa-enter').click();
+      await page.getByTestId(`scenario-qa-select-${key}`).click();
+      await page.getByTestId(`scenario-qa-reveal-${key}`).click();
+      const detail = page.getByTestId('scenario-qa-revealed-detail');
+      const identity = detail.getByText(scenarioIdentity, { exact: true });
+      const decisionLabel = detail.getByText(decision, { exact: true });
+      await identity.waitFor();
+      await decisionLabel.waitFor();
+      await captureAt(page, decisionLabel, filename);
+    },
+    viewport,
+  );
+}
+
 async function captureMatrix(browser, storageState) {
   await withPage(browser, storageState, async (page) => {
     await page.goto(`${baseURL}/historical-scenarios`);
@@ -234,14 +294,7 @@ async function captureMatrix(browser, storageState) {
     );
   });
 
-  await withPage(browser, storageState, async (page) => {
-    await startCandidate(page, 'candidate-09');
-    await captureAt(
-      page,
-      page.getByTestId('historical-session-disclosure'),
-      'scenario-blind-short-light-phone.png',
-    );
-  });
+  await captureBlindShort(browser, storageState);
 
   await withPage(browser, storageState, async (page) => {
     const sessionId = await startCandidate(page, 'candidate-04');
@@ -353,7 +406,27 @@ try {
   await completeOnboarding(setupPage);
   const storageState = await setup.storageState();
   await setup.close();
-  await captureMatrix(browser, storageState);
+  if (selectedTarget === undefined) await captureMatrix(browser, storageState);
+  else if (selectedTarget === 'scenario-blind-short-light-phone') {
+    await captureBlindShort(browser, storageState);
+  } else if (selectedTarget === 'm7-publication-candidate-long-decision-browser') {
+    await captureSelectedCandidateDecision(browser, storageState, {
+      key: 'candidate-11',
+      scenarioIdentity: 'internal-long-range-breakout@2.1.0',
+      decision: 'תרחיש לונג',
+      filename: 'm7-publication-candidate-long-decision-browser.png',
+    });
+  } else if (selectedTarget === 'm7-publication-candidate-short-decision-browser') {
+    await captureSelectedCandidateDecision(browser, storageState, {
+      key: 'candidate-12',
+      scenarioIdentity: 'internal-short-double-top@2.0.0',
+      decision: 'תרחיש שורט',
+      filename: 'm7-publication-candidate-short-decision-browser.png',
+      viewport: { width: 430, height: 932 },
+    });
+  } else {
+    throw new Error(`Unknown screenshot target: ${selectedTarget}`);
+  }
 } finally {
   await browser.close();
 }
