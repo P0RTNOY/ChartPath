@@ -767,3 +767,29 @@ The architecture is not “implemented” until evidence covers at least:
 
 Update the status snapshot and `docs/RELEASE_READINESS.md` only from commands,
 screenshots, or manual journeys that were actually run.
+
+## Publication-candidate review boundary
+
+Publication review is a content-layer concern and remains independent of React/React Native. The
+portable candidate registry pins scenario, dataset, compiler, source, rubric, execution,
+accessibility, licensing, and evidence identities. Packet generation emits canonical JSONL plus a
+complete human-readable Markdown projection and verifies tracked packet/evidence/source bytes
+without trusting mutable caller claims.
+
+Detached Ed25519 attestations authenticate one exact review scope and material version. Production
+verification is rooted only in the repository-controlled trusted public-key registry; arbitrary
+registries are available solely to explicit test helpers. No private key or signing path belongs in
+the repository or learner application. Material changes invalidate packet hashes and prior review
+decisions, while strict supersession preserves an auditable, acyclic history.
+
+Release preflight is deliberately read-only and fail-closed: it recompiles candidate material,
+checks exact artifact bytes and source/evidence hashes, evaluates current authenticated reviews,
+enforces licensing/native/accessibility/source/UX gates, and confirms the ordinary learner catalog
+has not gained an unpublished candidate. Milestone 7 implements no mutation that can promote or
+publish a scenario.
+
+On iOS, persistence initialization calls the local native backup-policy module before opening the
+SQLite store. Standalone builds fail closed if the policy version is absent/stale or the whole
+`Documents/SQLite` directory does not read back as excluded from backup. Android uses
+`android:allowBackup=false`. These privacy controls do not replace append-only persistence,
+quarantine, migration, or lifecycle idempotency contracts.

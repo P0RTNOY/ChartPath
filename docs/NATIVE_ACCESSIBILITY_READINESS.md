@@ -1,12 +1,19 @@
 # Native and accessibility readiness
 
-Updated: 2026-08-25 (Asia/Jerusalem)
+Updated: 2026-08-26 (Asia/Jerusalem)
 
 This document defines the native-runtime and assistive-technology evidence required for curated
 scenarios and position management. It records what is actually available in the current local environment and
 keeps planned verification separate from completed results. It does not supersede the release
 decision in `docs/RELEASE_READINESS.md` and does not claim app-store, physical-device, VoiceOver, or
 TalkBack readiness.
+
+This document preserves the detailed Milestone 5 and 6 readiness history. The current Milestone 7
+environment, signing boundary, whole-SQLite backup-exclusion decision, exact-target commands, and
+open evidence gates are recorded in `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`. Milestone 7 added a
+standalone simulator build and backup-resource readback plus a signed physical-device installation;
+it did not complete the standalone candidate lifecycle, physical launch, VoiceOver, Android, or
+TalkBack passes. The historical Milestone 5 and 6 results below remain unchanged.
 
 ## Evidence taxonomy
 
@@ -156,8 +163,9 @@ debrief, complete the alternate management actions, or exercise assistive techno
 
 Run at least one deterministic trade-capable scenario and one no-trade scenario if both paths exist
 in the implemented candidate set. At each applicable checkpoint, record the session identity and
-visible state, terminate Expo Go with `xcrun simctl terminate booted host.exp.Exponent`, relaunch it,
-open the same experience URL, and verify the exact resume:
+visible state, terminate Expo Go with
+`xcrun simctl terminate 5A9AC632-0924-4BBF-ADF4-170831DC5A9E host.exp.Exponent`, relaunch it on
+that same exact UDID, open the same experience URL, and verify the exact resume:
 
 1. Scenario selected and Guided Analysis created.
 2. Partially completed rationale/analysis draft after an autosave boundary.
@@ -256,8 +264,10 @@ standalone build on at least one supported physical iPhone and one supported phy
 device. Record installation, cold launch, background/foreground and OS termination, SQLite resume,
 offline behavior, largest text, screen readers, gesture ergonomics, and the intended backup policy.
 
-Signing, store submission, distribution privacy forms, iOS backup exclusion, and a wider device/OS
-matrix remain separate release work. Nothing in this milestone closes those gates.
+Store submission, distribution privacy forms, a complete standalone lifecycle, physical-device
+runtime, and a wider device/OS matrix remain separate release work. The exact partial Milestone 7
+native results are described in `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`; nothing in this
+historical milestone closes those remaining runtime gates.
 
 ## Milestone 5 final evidence status
 

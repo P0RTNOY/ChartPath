@@ -69,12 +69,14 @@ pnpm --filter @chartpath/mobile export:web
 
 The production web export is verified end to end at phone and tablet viewports. Expo's iOS and
 Android Hermes bundles also export successfully. An iOS Expo Go simulator journey verifies native
-onboarding, lesson completion, device SQLite, and force-quit/reopen persistence; Android runtime,
-standalone/physical-device, and screen-reader runs remain explicit gates before any distribution.
+onboarding, lesson completion, device SQLite, and force-quit/reopen persistence; Milestone 7 adds a
+standalone simulator build/backup readback and a signed physical-device installation. Android
+runtime, complete standalone/physical-device lifecycles, and screen-reader runs remain explicit
+gates before any distribution.
 The Milestone 6 iOS simulator run establishes an internal management launch, native SQLite recovery,
 pending-action cold restore and one deterministic N+1 partial fill. It does not establish a terminal
-debrief, Android, VoiceOver, TalkBack, largest-OS-text, signed-build or physical-device readiness.
-The exact matrix is recorded in `docs/NATIVE_ACCESSIBILITY_READINESS.md`.
+debrief, Android, VoiceOver, TalkBack or physical-device runtime readiness. The exact current matrix
+is recorded in `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`.
 Reproducible screenshot evidence is under `docs/screenshots/`.
 
 ## Educational safety
@@ -93,3 +95,21 @@ Management QA is equally internal and fail-closed. Simulated P&L never changes t
 process assessment, and journal text stays local under the guest-first data model. No management
 variant has passed the external human source, rubric, execution, accessibility, Hebrew,
 financial-safety or publication gates.
+
+## Milestone 7 publication-candidate boundary
+
+Milestone 7 freezes one exact Long, Short, and No-trade candidate for external review. Deterministic
+machine/human packets, detached Ed25519 attestation verification, a repository-pinned production
+trust registry, and a side-effect-free promotion preflight are available through
+`pnpm scenarios:candidates`, `pnpm reviews:pack`, `pnpm reviews:verify`, and
+`pnpm release:preflight`. The production registry is intentionally empty, every required human
+scope is missing, redistribution remains prohibited by the immutable candidate material, and the
+ordinary learner catalog remains empty. Status is `PUBLICATION_CANDIDATE_READY`; publication is
+`NO-GO`.
+
+Native work now includes a standalone iOS simulator build and SQLite backup-exclusion readback plus
+a signed development build installed on the connected iPhone 15 Pro Max. The phone was locked at
+launch, and complete standalone candidate lifecycles, VoiceOver, Android, and TalkBack were not
+performed. These partial results do not make ChartPath native-release-ready. Exact evidence and
+limitations are in `docs/PUBLICATION_CANDIDATE_POLICY.md`,
+`docs/REVIEW_ATTESTATION_POLICY.md`, and `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`.

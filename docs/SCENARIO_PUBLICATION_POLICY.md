@@ -1,43 +1,46 @@
 # Scenario publication policy
 
-**Status:** fail-closed Milestone 5 policy; internal enforcement is implemented, while human review
-and release remain incomplete
+**Status:** fail-closed Milestone 7 policy; publication-candidate packets, detached-attestation
+verification and dry-run preflight are implemented, while every human, licensing and release gate
+remains incomplete
 
-**Applies to:** `ScenarioAuthoringManifestV1`, its compiled dataset, virtual exercise, historical
-replay, process rubric and optional paper-execution expectation
+**Applies to:** `ScenarioAuthoringManifestV1`, position-management variants, publication-candidate
+records, generated review packets, detached review attestations and dry-run release preflight
 
 Automated validity, deterministic output and a passing test suite are necessary publication
-evidence. They are not human approval, licensing permission or a release decision. At the current
-implementation stage every scenario-authoring candidate remains internal, no-credit and unavailable
-through the ordinary learner catalog.
+evidence. They are not human approval, licensing permission or a release decision. Three exact
+scenario versions are now publication candidates, but they remain no-credit and unavailable through
+the ordinary learner catalog.
 
 ## 1. Lifecycle
 
-The authoring ledger recognizes these states:
+The publication-candidate contract recognizes these release states:
 
-| State                   | Meaning                                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `draft`                 | Material is being authored and may be incomplete. It is not learner content.                                                                                             |
-| `auto-validated`        | Deterministic structural checks passed. Human and legal gates remain open.                                                                                               |
-| `human-review-required` | The artifact is ready for named human review but has no current complete approval. This is the state of the in-progress candidates.                                      |
-| `approved`              | A responsible human has recorded an approval against the exact material checksum and every required area is approved. This state alone does not distribute the scenario. |
-| `published`             | The exact immutable artifact has passed all content, data, execution, accessibility, safety and release gates and may enter an explicitly published registry.            |
-| `retired`               | No new learner assignment is allowed. Old pinned attempts and immutable identity are preserved.                                                                          |
+| State                   | Meaning                                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal-qa`           | Internal engineering material. It is not learner content and may remain incomplete.                                                           |
+| `publication-candidate` | Exact immutable scenario/dataset/review material selected for external review. It is still unpublished and no-credit.                         |
+| `approved`              | All eight authenticated review scopes and every independent evidence gate passed for the exact packet. Approval alone does not distribute it. |
+| `published`             | The exact approved artifact was deliberately entered into a published registry by an authorized release action.                               |
+| `retired`               | No new learner assignment is allowed. Old pinned attempts and immutable identity are preserved subject to the governing rights decision.      |
+
+The older authoring ledger may still use `draft`, `auto-validated` and `human-review-required` while
+material is prepared. `publication-candidate` is a separate composite state over exact base and,
+where applicable, management material; it is not a synonym for `human-review-required`, `approved`
+or `published`.
 
 The compiler reports structural issues separately from publication blockers. A candidate can be
 structurally valid and useful in internal QA while remaining deliberately non-publishable.
 
-The current `ScenarioLibraryReport.publishable` value is always `false` by contract. No implemented
-command changes lifecycle state, writes a reviewer record, or publishes a candidate.
+The current `ScenarioLibraryReport.publishable` value remains `false`. Milestone 7 adds an empty
+production reviewer-key registry, offline detached-Ed25519 verification and dry-run-only preflight.
+It does not add a promotion mutation, published-registry writer or release command. The verifier can
+authenticate a signature against configured public keys; it cannot establish a reviewer's identity,
+qualifications, independence or legal authority. Those remain external trust and release gates.
 
-Current enforcement is intentionally incomplete beyond the internal candidate boundary. In
-particular, nested runtime-schema validation is not exhaustive, and there is no published-registry
-promotion command, signed append-only ledger or retirement archive. Authentication is an explicit
-trust boundary: `compileScenario` accepts a set of reviewer-record IDs asserted by an external
-authenticated human-review authority. The compiler verifies membership in that asserted set; it does
-not authenticate a reviewer, contact an identity provider or prove that the external assertion is
-truthful. These are open implementation/release gates, not responsibilities that an author may
-satisfy by editing a literal.
+See [PUBLICATION_CANDIDATE_POLICY.md](./PUBLICATION_CANDIDATE_POLICY.md) for the selected versions
+and packet contract, and [REVIEW_ATTESTATION_POLICY.md](./REVIEW_ATTESTATION_POLICY.md) for the root
+of trust and signature rules.
 
 ## 2. Publication identities and fingerprints
 
@@ -54,9 +57,11 @@ The material-artifact checksum covers learner-facing and outcome-bearing materia
 - trade constraints, plan and expected execution evidence when present; and
 - synthetic-data licensing fields.
 
-The `reviewFingerprint` must equal the canonical material-artifact checksum. Each review record must
-pin that same checksum and contain a non-empty reviewer, parseable time, decision, scope and note.
-A checksum mismatch makes the review stale. A malformed record is a blocker.
+The legacy `reviewFingerprint` must equal the authoring material-artifact checksum. A publication
+candidate additionally pins a composite `materialSetChecksum` and a deterministic
+`reviewPacketChecksum`. A detached attestation pins both values plus the exact candidate, scenario
+and dataset identity. Any mismatch makes that attestation stale; malformed or unauthenticated
+records are invalid.
 
 Publication bookkeeping, per-area review-state projections and retirement metadata are excluded
 from the material checksum so that recording a review or retirement does not recursively change the
@@ -81,7 +86,8 @@ ID/version and detects duplicate immutable versions. This protection works over 
 in the supplied registry. The repository does not yet have an external append-only publication
 ledger, signature service or remote retention authority; deleting the old version from all inputs
 would evade that local comparison. Human release procedure and repository review must therefore
-enforce retention until a durable ledger exists.
+enforce retention. Detached attestation files provide portable signed decisions, but the repository
+still has no external append-only retention authority or published-artifact archive.
 
 ## 4. Retirement and replacement
 
@@ -96,34 +102,34 @@ Retirement means:
 - never silently repin or regrade an old attempt against the replacement; and
 - preserve the reason and responsible human decision in release records outside the learner bundle.
 
-Current candidates are active and unpublished. Native/session persistence already pins scenario and
-dataset identities, but a complete retired-artifact archival and distribution-removal workflow has
-not yet been implemented or exercised.
+The three selected records are in `publication-candidate`, not `approved` or `published`, and remain
+unpublished. Native/session persistence already pins scenario and dataset identities, but a complete
+retired-artifact archival and distribution-removal workflow has not yet been implemented or
+exercised.
 
 ## 5. Human-review boundary
 
 The manifest retains source, Hebrew, accessibility and financial-safety review-state projections.
-For an `approved` or `published` lifecycle, the publication ledger separately requires a current
-authenticated approval for all seven scopes: source, rubric, execution, accessibility, Hebrew,
-financial safety and publication. Every scope is required even when a no-trade scenario has no paper
-order, because the reviewer must explicitly approve that absence and the decision/execution
-boundary.
+The publication-candidate policy requires a current authenticated approval for all eight scopes:
+source, rubric, deterministic execution, accessibility, Hebrew, financial safety,
+licensing/redistribution and publication. Every scope is required even when a no-trade scenario has
+no paper order, because the execution reviewer must explicitly approve that absence and the
+decision/execution boundary. Licensing is not implied by source or publication approval.
 
 The coding agent and automated commands must never invent a reviewer identity, approval timestamp,
 approval note or legal decision. They may create schemas, pending states, validation evidence and
 blocker reports only. Automated future-leak validation is also not editorial approval.
 
-The schema can detect an empty reviewer-record ID, invalid time, empty note, stale checksum or record
-ID absent from the caller-supplied authenticated set. It cannot authenticate that ID itself or prove
-that a review was actually performed. Approval therefore requires an independent human authority and
-release evidence; source code containing a syntactically valid record or caller assertion is not
-sufficient by itself.
+Production verification uses the exact `review-attestation-v1` payload, canonical UTC timestamps,
+canonical JSON and a detached Ed25519 signature under `review-attestation-policy-v1`. It rejects
+unknown or revoked reviewers/keys, test registries, wrong scopes, stale identities/material,
+expired decisions and signature failure. The production registry is intentionally empty; no real
+approval currently exists.
 
-For each scope, current records are ordered by the instant returned from `Date.parse(reviewedAt)`, so
-equivalent offsets compare as the same moment. When an approval and `changes-requested` record share
-the exact instant, `changes-requested` wins deterministically. A later changes-requested decision
-supersedes an earlier approval; the newest current authenticated record for every scope must be
-`approved`.
+For each scope, valid decisions are ordered by canonical `reviewedAt`, then decision and finally
+attestation ID. `changes-requested` wins an equal-time tie and a later valid changes request becomes
+the current decision. An explicit supersession reference must identify an earlier valid decision
+for the same candidate and scope. Exact replay is a duplicate and grants no additional state.
 
 ## 6. Fail-closed gates
 
@@ -138,8 +144,8 @@ stale. The current validators cover:
 - cutoff consistency, blind mode and reveal-after-finalization;
 - aligned application decision, trade direction and supported entry order type;
 - deterministic execution status/evidence for trade candidates;
-- a current, externally asserted authenticated approval for all seven ledger scopes, with
-  changes-requested precedence, plus per-area review states;
+- current detached approvals for all eight scopes, with key/scope validation, staleness,
+  supersession and changes-requested precedence;
 - dataset/scenario/editorial/paper-execution publication status;
 - verified redistribution/market-data provenance when real data is ever proposed;
 - retirement/replacement consistency; and
@@ -148,17 +154,19 @@ stale. The current validators cover:
 Course credit is derived only when the closed historical publication gate has no blockers. Authors
 cannot set a credit flag. Published scenario status alone is insufficient.
 
-## 7. Known blockers for the in-progress candidates
+## 7. Known blockers for the publication candidates
 
-Every current candidate deliberately carries these unresolved conditions:
+The exact long, short and no-trade candidates are listed in
+[PUBLICATION_CANDIDATE_POLICY.md](./PUBLICATION_CANDIDATE_POLICY.md). Every one deliberately carries
+these unresolved conditions:
 
-- the scenario-authoring lifecycle is `human-review-required`, with no approval records;
-- source, accessibility, Hebrew and financial-safety review states are pending;
+- all eight externally authenticated review decisions are missing;
 - generated datasets and replay scenarios are internal rather than published;
-- the fixed synthetic license records publication permission as blocked and redistribution as
-  prohibited;
-- independent educational/editorial review has not been recorded; and
-- candidate material is internal QA and cannot grant course credit.
+- the fixed synthetic license records publication internal and redistribution prohibited;
+- source-adaptation and generated-data redistribution questions have no human/legal decision;
+- exact candidate native lifecycle and actual screen-reader/OS-accessibility evidence remain open;
+- browser screenshots are supporting evidence rather than native or accessibility approval; and
+- candidate material remains no-credit and absent from the ordinary learner catalog.
 
 Trade candidates additionally compile paper execution with internal—not published—execution status.
 That is a separate publication blocker even when their simulated outcomes reproduce exactly.
@@ -169,9 +177,10 @@ third independently reviewed full eleven-step literal no-trade rubric. It must r
 unless a responsible source reviewer closes that gap; the balanced candidate count is not permission
 to lower the standard.
 
-These blockers are expected policy evidence, not validator defects. The current report contains nine
-candidates, zero structural issues and 97 explicit publication blockers. Dataset, material and
-snapshot checksums belong in the machine-readable report and final handoff rather than this policy.
+These blockers are expected policy evidence, not validator defects. The nine-source-candidate and
+three-management-variant reports remain the complete QA inventory; the publication registry is a
+separate exact three-record projection. Candidate ancestry and checksums are recorded in the
+candidate policy and generated packets.
 
 ## 8. Internal QA versus the ordinary catalog
 
@@ -179,7 +188,7 @@ The fixed reviewed course catalog remains unchanged. Scenario candidates compile
 scenario registry and are combined with the legacy development fixture only through the explicit
 internal historical-content registry.
 
-Internal QA surfaces must:
+Internal QA and publication-candidate reviewer surfaces must:
 
 - identify themselves as internal, synthetic and no-credit;
 - resolve an exact scenario ID/version and dataset checksum;
@@ -190,9 +199,10 @@ Internal QA surfaces must:
 - keep the legacy no-trade fixture's contradictory hypothetical short mechanics isolated from the
   normal learner decision.
 
-Draft/internal candidates must not enter the general learner catalog, search, progression or
-recommendation surfaces. A future ordinary scenario library must query an explicitly published,
-credit-derived projection rather than merely importing the internal registry.
+Draft, internal and publication-candidate records must not enter the general learner catalog,
+search, progression or recommendation surfaces. The ordinary scenario library must continue to
+query an explicitly published, credit-derived projection rather than importing either candidate
+registry.
 
 ## 9. No-trade and process-first publication rule
 
@@ -206,23 +216,30 @@ publication reviewer must evaluate context, structure, levels, setup versus conf
 non-entry logic, invalidation, target, risk, consistency and uncertainty at the decision cutoff.
 Execution evidence may test the simulator and enrich a debrief; it is not the rubric answer.
 
-## 10. Publication procedure
+## 10. Review and future publication procedure
 
-For a future release candidate, a responsible human must:
+The implemented workflow stops at deterministic review and dry-run preflight:
 
-1. Review the exact machine-readable scenario report and material checksum.
-2. Verify educational references, original Hebrew wording, generated-chart independence and the
-   decision-time rubric.
-3. Verify dataset provenance/licensing and any distribution obligations.
-4. Review paper-execution assumptions separately from educational doctrine.
-5. Exercise blind-state accessibility and confirm that assistive text leaks no identity, answer or
-   outcome.
-6. Record current scoped approvals against the exact checksum without altering material afterward.
-7. Confirm all per-area review states and release-readiness evidence.
-8. Create a new immutable version if any material correction follows review.
-9. Move only the exact approved artifact into an explicitly published registry.
-10. Re-run repository, scenario, native, accessibility and release checks before distribution.
+1. Run `pnpm scenarios:candidates` to inspect the exact three-record no-credit registry.
+2. Run `pnpm reviews:pack` to verify evidence bytes and regenerate canonical JSON/Markdown packets.
+3. Have responsible external humans review the exact packet and sign only their authorized scopes
+   with private keys kept outside the repository and application.
+4. Add only independently reviewed public keys to the production trust registry; never add private
+   or test-fixture keys.
+5. Run `pnpm reviews:verify -- --candidate <id> --as-of <canonical-UTC-time>` against canonical
+   detached attestations.
+6. Run `pnpm release:preflight -- --dry-run` with the exact candidate/scenario/dataset identity.
+7. Preserve every missing, changes-requested, stale, native/accessibility and licensing blocker.
+8. If review changes material, create the required immutable version, regenerate packets and treat
+   prior attestations as stale.
+
+No current command performs steps beyond dry-run. A future real publication would additionally need
+separate user authorization, complete rights evidence, all native/accessibility evidence, a clean
+release verification, and an explicitly implemented published-registry mutation. It must move only
+the exact approved material and must not silently convert candidate state into learning credit.
 
 See [SCENARIO_AUTHORING.md](./SCENARIO_AUTHORING.md) for the authoring contract,
+[PUBLICATION_CANDIDATE_POLICY.md](./PUBLICATION_CANDIDATE_POLICY.md) for the three selected versions,
+[REVIEW_ATTESTATION_POLICY.md](./REVIEW_ATTESTATION_POLICY.md) for authenticated review decisions,
 [HISTORICAL_DATA_POLICY.md](./HISTORICAL_DATA_POLICY.md) for market-data rights, and
 [PAPER_EXECUTION_POLICY.md](./PAPER_EXECUTION_POLICY.md) for simulator assumptions.

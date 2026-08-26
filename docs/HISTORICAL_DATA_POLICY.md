@@ -125,3 +125,18 @@ receive a documented migration/release decision.
 
 The provider matrix is intentionally independent of educational source review. The full dual-source
 and publication contract is defined in [HISTORICAL_DATA_SCHEMA.md](./HISTORICAL_DATA_SCHEMA.md).
+
+## 6. Publication-candidate material identity
+
+Milestone 7 candidates continue to use ChartPath-generated synthetic candles; this does not by
+itself authorize publication. A candidate pins the exact dataset ID, semantic version, canonical
+SHA-256, generator version, seed, chart-spec checksum, and source-based educational material. For
+management-enabled Long and Short candidates, the seed reproduces only the immutable base dataset.
+The versioned future-only replacement recipe, its checksum, the last preserved candle, every
+replacement OHLC tuple, and the final dataset checksum are additional material identity.
+
+A reviewer packet or attestation over the base dataset is not authority for a modified management
+dataset. Any candle, recipe, source, rights, or redistribution change requires a new immutable
+dataset/scenario version where applicable, regenerated review material, and fresh legitimate human
+review. The current candidates retain `not-authorized` redistribution status and remain outside the
+ordinary learner catalog.

@@ -1,7 +1,8 @@
 # Scenario authoring and deterministic generation
 
-**Status:** Milestone 5 internal candidate contract complete; Milestone 6 adds locally verified
-schema-1 internal position-management extensions and strict external-input envelopes
+**Status:** Milestones 5–6 authoring and management contracts complete; Milestone 7 adds an exact
+three-record publication-candidate projection, deterministic review packets, detached-attestation
+verification and fail-closed dry-run preflight
 
 **Authoring schema:** `1`
 
@@ -52,9 +53,9 @@ licensing block is deliberately fixed to ChartPath-generated, internal, redistri
 data. Generalizing either area requires a later schema version and renewed validation; authors must
 not imply that those fields are currently free-form.
 
-Credit eligibility is not an author-controlled manifest flag. It is derived from the closed
-historical-content publication gate. An internal candidate therefore cannot opt itself into mastery
-or course credit.
+Credit eligibility is not an author-controlled manifest or publication-candidate flag. It is derived
+from the closed historical-content publication gate. Internal QA and `publication-candidate` records
+therefore cannot opt themselves into mastery or course credit.
 
 ## 2. Educational-source discipline
 
@@ -117,6 +118,10 @@ The available commands are:
 pnpm scenarios:validate
 pnpm scenarios:report
 pnpm scenarios:preview
+pnpm scenarios:candidates
+pnpm reviews:pack
+pnpm reviews:verify -- --candidate <candidate-id> --as-of <canonical-UTC-time>
+pnpm release:preflight -- --dry-run <exact-identity-arguments>
 ```
 
 - `scenarios:validate` prints a human-readable candidate summary and fails on an invalid library
@@ -125,6 +130,14 @@ pnpm scenarios:preview
   candidate blocker and execution-evidence label.
 - `scenarios:preview` emits the learner-safe blind projections used for inspection. It contains
   only candles and annotations permitted at the knowledge cutoff and neutral presentation fields.
+- `scenarios:candidates` emits the exact three-record publication-candidate projection and never
+  marks it publishable.
+- `reviews:pack` verifies referenced evidence bytes and writes deterministic canonical JSON and
+  human-readable Markdown under `review-packets`.
+- `reviews:verify` verifies detached Ed25519 review decisions for one exact packet. With the current
+  empty production trust registry, all eight scopes remain missing.
+- `release:preflight` implements only explicit `--dry-run`; it has no side effects and reports
+  deterministic `NO-GO` blockers.
 
 The preview command is a diagnostic projection, not proof against bundle or developer-tool
 inspection. Tests also scan the serialized preview for current answer-bearing identifiers, but the
@@ -230,7 +243,7 @@ Before proposing a candidate for human review:
 - if trading, constrain direction and supported market/limit/stop entry types coherently;
 - state expected execution evidence honestly, including ambiguity or an unfilled order;
 - regenerate and verify every checksum after a material change;
-- run all three scenario commands and repository checks; and
+- run the scenario, candidate, packet and repository checks appropriate to the material; and
 - leave every human review state pending until the responsible human actually records a decision.
 
 Publication, approval invalidation, retirement and the internal-QA boundary are normative in
@@ -250,7 +263,7 @@ Each enabled extension pins:
 - maximum open quantity, cumulative scale-in, soft-risk and hard-risk limits;
 - a schema-1 rubric ID, version, checksum and deterministic domain criteria;
 - exact authored QA action sequences, evidence labels and checksum-pinned state snapshots; and
-- a material artifact checksum, seven pending review scopes and learning credit `none`.
+- a material artifact checksum, seven legacy management review scopes and learning credit `none`.
 
 The current extension registry contains three internal variants derived from
 `internal-long-range-breakout` and `internal-short-double-top`. It covers partial/full exit,
@@ -277,3 +290,54 @@ input is rejected as a whole and never merged into trusted defaults. The closed,
 registry remains the only publishing source of truth. See
 [POSITION_MANAGEMENT_POLICY.md](./POSITION_MANAGEMENT_POLICY.md) and
 [TRADE_JOURNAL_POLICY.md](./TRADE_JOURNAL_POLICY.md).
+
+## 9. Publication-candidate composition and packet authoring
+
+`packages/content/src/scenarios/publication/candidates.ts` selects, without mutating the nine base
+manifests or three management variants, exactly:
+
+- `internal-long-range-breakout@2.1.0` with
+  `internal-long-range-breakout-dataset@2.0.0`, checksum
+  `sha256:f927f4758ad81c6bdc1b2da7c5d4948af21ea930a0094db2ac9d49ee69e7f7d2`;
+- `internal-short-double-top@2.0.0` with `internal-short-double-top-dataset@2.0.0`, checksum
+  `sha256:357d1c59b511573583f40ee0ec332d737485fae2917ec3a3b7bec3564326967d`;
+  and
+- `internal-no-trade-capstone-c@1.0.0` with
+  `internal-no-trade-capstone-c-dataset@1.0.0`, checksum
+  `sha256:c0b58867716179d9050c896988729457f3ddef8d083f4f103c3f7e7b49833aa2`.
+
+Selection is deterministic and independent of P&L. It prioritizes exact source support, stable
+identity, cutoff-safe replay, learner/grader separation and useful execution-policy evidence. The
+long/short management variants deliberately include adverse and ambiguous evidence rather than
+optimizing for a favorable future.
+
+A management publication candidate is composite. The packet must resolve the exact base
+`ScenarioAuthoringManifestV1`, base dataset/material checksum, exact management variant, changed
+dataset and management material/policy/permission. Seed-only regeneration is insufficient for the
+two dataset `2.0.0` records because their future-only candle replacements are also material. The
+base dataset's terminal execution snapshot is ancestry evidence, not the terminal management result
+for a modified candidate dataset.
+
+`ReviewPacketV1` records the exact composite identity, generator/compiler versions, replay cutoffs,
+learner Hebrew material, private reviewer decision/rubric/plan/cases, source provenance, current
+rights state, cutoff-safe chart alternative, evidence-file hashes, test references, component
+checksums and blockers. It uses `canonical-json-v1`; serialization has one trailing newline and no
+wall-clock generation field, so unchanged repository material is byte-identical.
+
+Packet authoring must not:
+
+- copy a source diagram or long source passage;
+- place private answer/rubric material in the learner projection;
+- call browser screenshots native or screen-reader evidence;
+- claim that generated data are licensed merely because ChartPath generated them;
+- omit an inherited or scope-specific blocker; or
+- edit a generated packet as a substitute for changing its authoritative material.
+
+All publication candidates require eight review scopes. The candidate wrapper adds an explicit
+licensing/redistribution scope to the seven legacy management scopes. The current licensing values
+remain human-decision-required, redistribution prohibited, publication internal and intended
+redistribution not authorized.
+
+The authoritative details are in
+[PUBLICATION_CANDIDATE_POLICY.md](./PUBLICATION_CANDIDATE_POLICY.md) and
+[REVIEW_ATTESTATION_POLICY.md](./REVIEW_ATTESTATION_POLICY.md).

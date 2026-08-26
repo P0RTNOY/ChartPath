@@ -178,3 +178,24 @@ The bounded native run did not continue to a terminal debrief and did not cover 
 OS text, increased contrast or a signed build. Android has no device, emulator or SDK. The paired
 physical iPhone did not have ChartPath/Expo installed and was not exercised. Those gates keep native
 distribution **NO-GO**.
+
+## Milestone 7: native accessibility and publication candidate
+
+Milestone 7 selects exactly three immutable review targets: Long
+`internal-long-range-breakout@2.1.0`, Short `internal-short-double-top@2.0.0`, and No-trade
+`internal-no-trade-capstone-c@1.0.0`. Selection is deterministic and independent of future outcome
+or P&L. Every candidate remains internal, unpublished, no-credit, source-pinned, checksum-pinned,
+and blocked on eight legitimate external review scopes plus an explicit redistribution decision.
+
+Implemented release foundations include deterministic JSONL/Markdown review packets, exact evidence
+hashes, a repository-controlled Ed25519 public-key trust boundary, detached review decisions,
+staleness/conflict/supersession handling, tracked-packet checks, and dry-run-only promotion preflight.
+There is no real promotion command and the ordinary catalog remains empty.
+
+The native tranche compiled and launched a standalone iOS simulator build, independently read
+`isExcludedFromBackup=true` from its `Documents/SQLite` directory, and inspected light, dark,
+largest-OS-text, and increased-contrast frames. A signed development build compiled and installed on
+the connected iPhone 15 Pro Max, but the locked device blocked launch. Complete standalone
+trade/no-trade/unfilled lifecycles, physical runtime, VoiceOver, Android, TalkBack, bold text,
+reduced transparency, and native reduced-motion checks remain open. Milestone status may be
+`PUBLICATION_CANDIDATE_READY`; publication and native distribution remain **NO-GO**.

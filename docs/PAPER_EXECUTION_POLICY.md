@@ -259,6 +259,13 @@ account/risk values, plan levels, immutable simulator events and pinned dataset/
 it contains no brokerage account, real holdings, credentials, order-route identifiers or live
 prices. No new telemetry, analytics, remote tutor or network recipient is introduced.
 
+On native targets, paper sessions share the single mutable SQLite store covered by the privacy-first
+whole-store backup-exclusion policy. Android is configured with `allowBackup=false`; the iOS native
+module and fail-closed adapter integration are source/configuration verified, but their resource
+value has not been read back in a standalone ChartPath runtime. Expo Go cannot supply that evidence.
+See `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`; no OS-backup recovery or native-distribution pass is
+claimed.
+
 Every learner-facing surface must state in understandable Hebrew that the feature is a historical
 educational simulation, uses simplified assumptions, gives no investment advice and does not
 predict future results. Interface language must not celebrate profit, shame a modeled loss, suggest

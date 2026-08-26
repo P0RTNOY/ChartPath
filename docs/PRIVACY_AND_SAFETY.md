@@ -1,9 +1,10 @@
 # Privacy, Security, and Financial Safety
 
-> Status snapshot: 2026-08-25. This document defines the policy and engineering
+> Status snapshot: 2026-08-26. This document defines the policy and engineering
 > requirements and now accompanies an implemented local beta. Evidence for controls,
 > test coverage, platform-backup behavior, and unresolved distribution gates is kept
-> in `docs/RELEASE_READINESS.md`; a requirement here is not evidence by itself.
+> in `docs/RELEASE_READINESS.md` and `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`; a
+> requirement here is not evidence by itself.
 
 ## Product safety position
 
@@ -47,19 +48,22 @@ ads, ad SDKs, cross-app tracking, public profiles, social feeds, or leaderboards
 
 ### Intended local data inventory
 
-| Data                                          | Purpose                                                      | Location                    | Retention/control                                      |
-| --------------------------------------------- | ------------------------------------------------------------ | --------------------------- | ------------------------------------------------------ |
-| Attempts and deterministic results            | Feedback, mastery, review, resume                            | Local SQLite                | Until in-app reset or app-data removal                 |
-| Hint and misconception history                | Better local feedback/review                                 | Local SQLite                | Until in-app reset or app-data removal                 |
-| Lesson/progress projections                   | Learning path and resume                                     | Local SQLite; rebuildable   | Until reset; rebuildable from attempts                 |
-| XP, streak, and daily activity                | Non-monetary learning motivation                             | Local SQLite                | Until reset                                            |
-| Theme, RTL, text, motion, daily-goal settings | Accessibility and preferences                                | Local app storage           | Until reset                                            |
-| Response duration                             | Optional local diagnostics; never a material mastery penalty | Local SQLite if implemented | Delete with attempts; do not upload by default         |
-| Content/schema versions                       | Migration and reproducibility                                | Local SQLite                | Retained with relevant attempts                        |
-| Guided-analysis drafts                        | Offline resume, replay integrity and final reflection        | Local SQLite                | Until explicit reset; finalized sessions are read-only |
-| Paper-execution sessions                      | Resume one fictional plan, events and deterministic debrief  | Local SQLite                | Until explicit reset/abandonment; attempts unaffected  |
-| Internal scenario sessions                    | Resume checksum-pinned synthetic QA analysis                 | Local SQLite                | Until explicit reset; no ordinary credit projection    |
-| Generated development candles                 | Exercise infrastructure validation only                      | Bundled application data    | Replaced only by a reviewed build; not learner data    |
+| Data                                          | Purpose                                                       | Location                    | Retention/control                                      |
+| --------------------------------------------- | ------------------------------------------------------------- | --------------------------- | ------------------------------------------------------ |
+| Attempts and deterministic results            | Feedback, mastery, review, resume                             | Local SQLite                | Until in-app reset or app-data removal                 |
+| Hint and misconception history                | Better local feedback/review                                  | Local SQLite                | Until in-app reset or app-data removal                 |
+| Lesson/progress projections                   | Learning path and resume                                      | Local SQLite; rebuildable   | Until reset; rebuildable from attempts                 |
+| XP, streak, and daily activity                | Non-monetary learning motivation                              | Local SQLite                | Until reset                                            |
+| Theme, RTL, text, motion, daily-goal settings | Accessibility and preferences                                 | Local SQLite on native      | Until reset                                            |
+| Response duration                             | Optional local diagnostics; never a material mastery penalty  | Local SQLite if implemented | Delete with attempts; do not upload by default         |
+| Content/schema versions                       | Migration and reproducibility                                 | Local SQLite                | Retained with relevant attempts                        |
+| Guided-analysis drafts                        | Offline resume, replay integrity and final reflection         | Local SQLite                | Until explicit reset; finalized sessions are read-only |
+| Paper-execution sessions                      | Resume one fictional plan, events and deterministic debrief   | Local SQLite                | Until explicit reset/abandonment; attempts unaffected  |
+| Position-management sessions                  | Resume fictional lots, actions, fills, accounting and debrief | Local SQLite                | Until explicit reset; ordinary attempts unaffected     |
+| Management-journal text and corrections       | Local process reflection and immutable correction history     | Local SQLite                | Until explicit reset; never upload by default          |
+| Quarantined/rejected records                  | Fail-closed recovery and diagnosis of invalid local payloads  | Local SQLite                | Until reset/recovery; never ordinary learner credit    |
+| Internal scenario sessions                    | Resume checksum-pinned synthetic QA analysis                  | Local SQLite                | Until explicit reset; no ordinary credit projection    |
+| Generated development candles                 | Exercise infrastructure validation only                       | Bundled application data    | Replaced only by a reviewed build; not learner data    |
 
 The app may generate a random installation-scoped identifier for database
 idempotency. It must not derive that ID from hardware identifiers or use it to track
@@ -72,11 +76,23 @@ backup behavior affect confidentiality. Release documentation must state whether
 the database is included in iCloud/Android backups and either configure the intended
 exclusion or accurately disclose that it may be part of the user's device backup.
 
-For the current candidate, Android manifest generation is configured with
-`allowBackup: false`. The iOS SQLite container has not yet been marked or verified as
-excluded from iCloud/device backup, so it may be included according to platform and
-user settings. That uncertainty is an explicit native-distribution NO-GO gate rather
-than a claim that local storage can never leave the device through OS backup.
+The current privacy-first decision excludes the complete mutable SQLite store rather than trying to
+split co-resident learner data into selectively backed-up classes. Android manifest generation is
+configured and asserted with `allowBackup: false`. The iOS source/configuration foundation sets and
+reads back `URLResourceValues.isExcludedFromBackup` on durable `Documents/SQLite` before opening the
+database and fails closed in a standalone build when the required module or policy is missing.
+
+This intentionally means OS backup/device migration is not a recovery path for attempts, progress,
+settings, analyses, paper/management sessions, journal text, quarantine records, or installation
+identity. Uninstall, app-data removal, device loss, or device replacement may lose them. Bundled
+synthetic datasets and curriculum are application assets, not mutable learner backup data. There is
+no account, cloud sync, telemetry, or remote recovery recipient.
+
+Configuration and unit tests pass, but a standalone ChartPath build has not been generated or run,
+and the actual iOS app-container resource value has not been read back at runtime. Expo Go cannot
+load the local backup-policy module and is not backup evidence. Until the exact runtime checks in
+`docs/NATIVE_ACCESSIBILITY_VERIFICATION.md` pass, backup behavior and native distribution remain
+**NO-GO** rather than a claim that local storage cannot leave the device through OS backup.
 
 ## No telemetry by default
 

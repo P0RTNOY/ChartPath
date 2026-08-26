@@ -165,3 +165,58 @@ TalkBack focus/speech, physical-device ergonomics or signed-build behavior. Sepa
 simulator captures of the open management screen, pending state before/after relaunch and post-fill
 timeline were inspected during the bounded native lifecycle; they are not a full native visual or
 accessibility matrix and are not committed as release screenshots.
+
+## Milestone 7 publication-candidate and native set
+
+`pnpm screenshots:publication` captures the explicit reviewer/QA boundary and the actual dry-run
+preflight report. The deterministic browser set is:
+
+- `m7-publication-candidate-selection-browser.png` (`390×844`) — opaque ordinary QA cards before
+  reveal; direction and publication identity remain hidden;
+- `m7-publication-candidate-long-decision-browser.png` (`390×844`) — exact selected Long
+  `internal-long-range-breakout@2.1.0`, dataset `2.0.0`, QA/no-publication labels and the real local
+  packet path;
+- `m7-publication-candidate-short-decision-browser.png` (`430×932`) — exact selected Short
+  `internal-short-double-top@2.0.0`, dataset `2.0.0`, full LTR identity and packet path without
+  clipping;
+- `m7-publication-candidate-long-reviewer-browser.png`,
+  `m7-publication-candidate-short-reviewer-browser.png`, and
+  `m7-publication-candidate-no-trade-reviewer-browser.png` (`390×844`) — explicit reveal-only
+  reviewer packet cards with exact material hash, canonical local packet path, source summary, and
+  eight required signed scopes;
+- `m7-publication-candidate-largest-text-reduced-motion-browser.png` (`390×844`) — largest in-app
+  text and application reduced-motion preference with required content reachable by scroll;
+- `m7-publication-candidate-dark-browser.png` (`390×844`) — dark contrast and non-color status
+  labels;
+- `m7-publication-candidate-tablet-browser.png` (`1024×768`) — responsive tablet composition; and
+- `m7-publication-preflight-no-go-blockers-browser.png` (`390×1967`) — real side-effect-free
+  `NO-GO` output with every blocker visible.
+
+The corrected Milestone 5 `scenario-blind-short-light-phone.png` (`390×844`) now comes from the
+actual `candidate-07` blind Double Top decision screen rather than an unrelated Short candidate. Its
+answer remains hidden and its exact scenario identity is asserted from persisted state during
+capture.
+
+All browser originals were inspected for Hebrew RTL order, LTR scenario/dataset/hash/path wrapping,
+no hidden identity before reveal, non-color state communication, contrast, text resizing, scroll
+reachability, and absence of horizontal clipping or overlays. They are browser evidence, not native
+or screen-reader passes.
+
+Four standalone iPhone 17 Pro / iOS 26.5 simulator captures are committed at `1206×2622`:
+
+- `m7-native-standalone-onboarding-light-simulator.png`;
+- `m7-native-standalone-onboarding-dark-simulator.png`;
+- `m7-native-standalone-onboarding-largest-text-simulator.png`; and
+- `m7-native-standalone-onboarding-increased-contrast-simulator.png`.
+
+Original-resolution inspection shows fully rendered Hebrew onboarding in light/dark modes, readable
+increased-contrast presentation, and OS largest text wrapping without horizontal clipping; the
+largest-text frame requires vertical scrolling for later content. These frames prove only the named
+standalone simulator layout states. The light capture was deliberately retaken after the development
+warning overlay was dismissed; no loading or failed-launch frame is presented as a pass.
+
+Milestone 7 did not produce valid native captures for an open position, pending management action,
+terminal debrief, unfilled debrief, or VoiceOver focus. The earlier browser and bounded Milestone 6
+simulator evidence remains supporting history and is not relabeled as a standalone M7 native pass.
+Android/emulator, TalkBack, and physical-device runtime screenshots are absent because those runs
+were not completed.

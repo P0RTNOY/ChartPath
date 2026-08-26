@@ -85,6 +85,13 @@ ChartPath requires no account, cloud sync, analytics, AI key or brokerage connec
 does not transmit journal content. Do not enter brokerage credentials, account numbers, tax data,
 personal identifiers or real trade instructions.
 
+Journal entries and corrections share the complete mutable SQLite store that the privacy-first
+native policy excludes from OS backup; no selective journal backup or remote recovery exists. This
+reduces unintended backup exposure but means uninstall, app-data removal, device loss, or device
+replacement may lose the journal. Android configuration is asserted with `allowBackup=false`. The
+iOS native exclusion source and adapter ordering are verified, but standalone runtime readback has
+not occurred and Expo Go cannot prove it. See `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`.
+
 Screens and exports must frame entries as observations and process evidence, never as personalized
 financial advice. Tickers, prices, quantities, dates, IDs and equations remain explicit LTR spans
 inside the Hebrew RTL interface. Accessibility alternatives must expose entry kind, order, cutoff,

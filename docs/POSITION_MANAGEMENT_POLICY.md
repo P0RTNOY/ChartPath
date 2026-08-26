@@ -153,6 +153,13 @@ journal prefix, fills, lots and accounting before replay continues. It must also
 no-credit QA path creates no attempt and changes no mastery, review, lesson progress, XP, streak or
 daily activity.
 
+Management sessions, lots, fills, actions, accounting, journal rows and quarantine records share
+the mutable native SQLite store. The privacy-first policy excludes that whole store from Android
+backup and, in a standalone iOS build, requires a native set-and-readback of the SQLite directory's
+backup-exclusion resource value before database open. The implementation/configuration checks pass,
+but standalone runtime readback and recovery remain open; Expo Go is not evidence for the local
+native module. See `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`.
+
 ## 7. Process assessment and educational boundary
 
 Every material submission writes an immutable action-rationale journal entry at cutoff N. The

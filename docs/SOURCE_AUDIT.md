@@ -258,6 +258,48 @@ These are product implications of the source, not direct quotations:
 - When an exercise uses leverage, shorting, options, futures, or perpetuals, show instrument-specific loss and execution cautions.
 - Localize currency examples without implying that taxes, broker rules, market hours, or order behavior are universal.
 
+## Milestone 7 publication-candidate source packet
+
+Milestone 7 selects three exact versions for external review; selection does not constitute a new
+source audit, copyright permission or editorial approval. The reviewed repository copy is
+`docs/sources/technical-analysis-he-digital 2.pdf`, SHA-256
+`25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`.
+
+| Candidate                            | Exact source ancestry                                                                                                                                     | Why selected without using P&L                                                                                                                                                                                |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal-long-range-breakout@2.1.0` | `u10-capstone-e01`; PDF 72–73 / printed 59–60, Chapter 19 case A / Figure 19.1; management rubric also uses `u10-capstone-e05`, PDF 76–79 / printed 63–66 | The capstone connects breakout evidence, planning, risk and target-as-estimate. The version adds adverse stop and explicit ambiguity evidence, so favorable future performance was not a selection criterion. |
+| `internal-short-double-top@2.0.0`    | `u05-reversal-e04`; PDF 41 / printed 28, Chapter 9 / Figure 9.1; management rubric also uses `u10-capstone-e05`, PDF 76–79 / printed 63–66                | It has an exact reviewed confirmation concept and is the only management-enabled short. Its management case closes after an adverse later gap rather than being selected for a target outcome.                |
+| `internal-no-trade-capstone-c@1.0.0` | `u10-capstone-e03`; PDF 74–75 / printed 61–62, Chapter 19 case C                                                                                          | It is the only current record explicitly tied to both a complete eleven-step rubric and a full no-trade conclusion. It creates no paper execution, so no future P&L can determine its selection.              |
+
+The packet uses original short Hebrew summaries and exact page/chapter/figure references. It must
+not reproduce source diagrams, tables, distinctive compositions or long passages. The synthetic
+chart-generator claim `chartGeometryCopied: false` and authoring claim `proseCopied: false` are
+facts asserted for review; they are not a legal conclusion or substitute for comparison by a
+responsible reviewer.
+
+The source itself states that all rights are reserved. The fact that the PDF is user-authored and
+that candidate candles are ChartPath-generated does not automatically authorize public application
+distribution, educational adaptation, screenshot distribution or a public synthetic-data license.
+Before any candidate can progress beyond review, a responsible human must decide and document:
+
+- who has authority to approve adaptation and redistribution of the source concepts and wording;
+- whether the packet and application use only original summaries and independently generated chart
+  geometry;
+- the permitted audiences, channels, territories and duration;
+- required attribution, notices, retention and withdrawal behavior;
+- the license for the generated candle datasets and derived screenshots; and
+- whether recording an authorized rights state requires a new immutable scenario/dataset material
+  version.
+
+Current publication-candidate material records source-adaptation and generated-data rights as
+`human-decision-required`, intended redistribution as `not-authorized`, manifest redistribution as
+`prohibited` and publication as `internal`. The eighth required signed review scope is `licensing`.
+No licensing attestation, written permission or final publication decision has been recorded.
+
+See [PUBLICATION_CANDIDATE_POLICY.md](./PUBLICATION_CANDIDATE_POLICY.md) for exact dataset and
+material checksums and [REVIEW_ATTESTATION_POLICY.md](./REVIEW_ATTESTATION_POLICY.md) for the
+independent review contract.
+
 ## Source references and what they support
 
 The bibliography is on PDF pp. 85–86 / book pp. 72–73.
