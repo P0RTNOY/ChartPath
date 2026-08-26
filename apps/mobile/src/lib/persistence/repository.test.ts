@@ -6,6 +6,7 @@ interface TestMatchers {
   toHaveLength(expected: number): void;
   toMatchObject(expected: unknown): void;
   toBeInstanceOf(expected: unknown): void;
+  toThrow(expected: unknown): void;
   readonly rejects: TestMatchers;
   readonly not: TestMatchers;
 }
@@ -98,11 +99,15 @@ jest.mock(
 import {
   AnalysisSessionConflictError,
   AttemptConflictError,
+  classifyPersistenceInitializationFailure,
+  PersistenceCorruptionError,
   UnsupportedPersistenceVersionError,
 } from './adapter';
 import { InMemoryPersistenceAdapter } from './in-memory-adapter';
 import { LocalStoragePersistenceAdapter } from './local-storage-adapter';
+import { RecoveryImportConflictError, RecoveryImportStalePlanError } from './recovery-import';
 import { LearningRepository } from './repository';
+import { createRecoveryPayload } from '../recovery/payload';
 import {
   ATTEMPT_RECORD_SCHEMA_VERSION,
   CURRENT_PERSISTENCE_SCHEMA_VERSION,
@@ -302,6 +307,25 @@ function creditedHistoricalAttempt(session: GuidedAnalysisSession): NewAttemptRe
 }
 
 describe('LearningRepository', () => {
+  it('classifies initialization failures without discarding their original cause', () => {
+    const newer = new UnsupportedPersistenceVersionError(99);
+    const corrupt = new PersistenceCorruptionError('invalid payload');
+    const transient = new Error('database temporarily unavailable');
+
+    expect(classifyPersistenceInitializationFailure(newer)).toMatchObject({
+      reason: 'unsupported-newer-schema',
+      cause: newer,
+    });
+    expect(classifyPersistenceInitializationFailure(corrupt)).toMatchObject({
+      reason: 'corrupt-store',
+      cause: corrupt,
+    });
+    expect(classifyPersistenceInitializationFailure(transient)).toMatchObject({
+      reason: 'transient',
+      cause: transient,
+    });
+  });
+
   it('persists a completed lesson across repository recreation and deduplicates retries', async () => {
     const adapter = new InMemoryPersistenceAdapter();
     const firstRepository = new LearningRepository(adapter, {
@@ -339,6 +363,165 @@ describe('LearningRepository', () => {
       completedLessonIds: ['lesson-market-structure'],
       attemptIds: ['attempt-1'],
     });
+  });
+
+  it('previews and atomically applies additive recovery with idempotent exact-ID replay', async () => {
+    const source = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    await source.appendAttempt(attemptRecord());
+    await source.updateSettings({ theme: 'dark', dailyGoalMinutes: 20 });
+    const payload = createRecoveryPayload(await source.load(), {
+      appVersion: '0.1.0',
+      bundleId: 'recovery-test-additive',
+      createdAt: CREATED_AT,
+      categories: ['settings', 'attempts'],
+    });
+
+    const adapter = new InMemoryPersistenceAdapter();
+    const target = new LearningRepository(adapter, {
+      contentVersion: 'catalog-1',
+      now: () => REOPENED_AT,
+    });
+    await target.updateSettings({
+      disclaimerVersionAccepted: 'disclaimer-local-only',
+      disclaimerAcceptedAt: REOPENED_AT,
+    });
+    const beforePreview = await adapter.dump();
+    const plan = await target.previewRecoveryImport(payload);
+
+    expect(await adapter.dump()).toBe(beforePreview);
+    expect(plan.canApply).toBe(true);
+    expect(plan.added).toMatchObject({ settings: 1, attempts: 1 });
+    const applied = await target.applyRecoveryImport(payload, {
+      selectedCategories: plan.selectedCategories,
+      expectedPlanToken: plan.planToken,
+    });
+    expect(applied.applied).toBe(true);
+    expect(applied.snapshot.attempts).toHaveLength(1);
+    expect(applied.snapshot.projections.totalXp).toBe(12);
+    expect(applied.snapshot.settings).toMatchObject({
+      theme: 'dark',
+      dailyGoalMinutes: 20,
+      disclaimerVersionAccepted: 'disclaimer-local-only',
+    });
+
+    const retryPlan = await target.previewRecoveryImport(payload);
+    const retried = await target.applyRecoveryImport(payload, {
+      selectedCategories: retryPlan.selectedCategories,
+      expectedPlanToken: retryPlan.planToken,
+    });
+    expect(retryPlan.selectedCategories).toEqual(['attempts']);
+    expect(retryPlan.unchanged).toMatchObject({ settings: 0, attempts: 1 });
+    expect(retried.applied).toBe(false);
+    expect(retried.snapshot.attempts).toHaveLength(1);
+  });
+
+  it('binds an explicit import-category selection and keeps settings off by default for existing learners', async () => {
+    const source = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    await source.appendAttempt(attemptRecord());
+    await source.updateSettings({ theme: 'dark', dailyGoalMinutes: 20 });
+    const payload = createRecoveryPayload(await source.load(), {
+      appVersion: '0.1.0',
+      bundleId: 'recovery-test-selection',
+      createdAt: CREATED_AT,
+      categories: ['settings', 'attempts'],
+    });
+
+    const target = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => REOPENED_AT,
+    });
+    await target.appendAttempt(attemptRecord('local-existing-attempt'));
+
+    const defaultPlan = await target.previewRecoveryImport(payload);
+    expect(defaultPlan.selectedCategories).toEqual(['attempts']);
+    expect(defaultPlan.incoming).toMatchObject({ settings: 0, attempts: 1 });
+    await expect(
+      target.applyRecoveryImport(payload, {
+        selectedCategories: ['settings'],
+        expectedPlanToken: defaultPlan.planToken,
+      }),
+    ).rejects.toBeInstanceOf(RecoveryImportStalePlanError);
+    const importedAttempts = await target.applyRecoveryImport(payload, {
+      selectedCategories: defaultPlan.selectedCategories,
+      expectedPlanToken: defaultPlan.planToken,
+    });
+    expect(importedAttempts.snapshot.attempts).toHaveLength(2);
+    expect(importedAttempts.snapshot.settings.theme).toBe('system');
+
+    const settingsPlan = await target.previewRecoveryImport(payload, {
+      selectedCategories: ['settings'],
+    });
+    expect(settingsPlan.selectedCategories).toEqual(['settings']);
+    const importedSettings = await target.applyRecoveryImport(payload, {
+      selectedCategories: settingsPlan.selectedCategories,
+      expectedPlanToken: settingsPlan.planToken,
+    });
+    expect(importedSettings.snapshot.settings).toMatchObject({
+      theme: 'dark',
+      dailyGoalMinutes: 20,
+    });
+    expect(importedSettings.snapshot.attempts).toHaveLength(2);
+
+    await expect(target.previewRecoveryImport(payload, { selectedCategories: [] })).rejects.toThrow(
+      'at least one',
+    );
+    await expect(
+      target.previewRecoveryImport(payload, { selectedCategories: ['analysis-sessions'] }),
+    ).rejects.toThrow('included');
+  });
+
+  it('rejects stable-ID conflicts and stale preview tokens without mutating local data', async () => {
+    const source = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: 'catalog-1',
+      now: () => CREATED_AT,
+    });
+    await source.appendAttempt(attemptRecord());
+    const payload = createRecoveryPayload(await source.load(), {
+      appVersion: '0.1.0',
+      bundleId: 'recovery-test-conflict',
+      createdAt: CREATED_AT,
+      categories: ['attempts'],
+    });
+
+    const conflictingAdapter = new InMemoryPersistenceAdapter();
+    const conflicting = new LearningRepository(conflictingAdapter, {
+      contentVersion: 'catalog-1',
+      now: () => REOPENED_AT,
+    });
+    await conflicting.appendAttempt({ ...attemptRecord(), xpAwarded: 99 });
+    const conflictPlan = await conflicting.previewRecoveryImport(payload);
+    const beforeConflict = await conflictingAdapter.dump();
+    expect(conflictPlan.canApply).toBe(false);
+    expect(conflictPlan.conflicts).toHaveLength(1);
+    await expect(
+      conflicting.applyRecoveryImport(payload, {
+        selectedCategories: conflictPlan.selectedCategories,
+        expectedPlanToken: conflictPlan.planToken,
+      }),
+    ).rejects.toBeInstanceOf(RecoveryImportConflictError);
+    expect(await conflictingAdapter.dump()).toBe(beforeConflict);
+
+    const staleAdapter = new InMemoryPersistenceAdapter();
+    const stale = new LearningRepository(staleAdapter, {
+      contentVersion: 'catalog-1',
+      now: () => REOPENED_AT,
+    });
+    const stalePlan = await stale.previewRecoveryImport(payload);
+    await stale.appendAttempt(attemptRecord('local-after-preview'));
+    const beforeStaleApply = await staleAdapter.dump();
+    await expect(
+      stale.applyRecoveryImport(payload, {
+        selectedCategories: stalePlan.selectedCategories,
+        expectedPlanToken: stalePlan.planToken,
+      }),
+    ).rejects.toBeInstanceOf(RecoveryImportStalePlanError);
+    expect(await staleAdapter.dump()).toBe(beforeStaleApply);
   });
 
   it('persists and reloads an independently answered capstone attempt', async () => {

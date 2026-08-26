@@ -1,7 +1,4 @@
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-
-import { canonicalSerialize, type Sha256Checksum } from '@chartpath/historical-data';
+import { canonicalSerialize, sha256Hex, type Sha256Checksum } from '@chartpath/historical-data';
 
 import { MAX_RECOVERY_ENVELOPE_BYTES } from './constants';
 import { RecoveryBundleError } from './types';
@@ -51,12 +48,13 @@ export function decodeCanonicalBase64(value: unknown, field: string): Uint8Array
 }
 
 export function recoveryChecksum(value: string | Uint8Array): Sha256Checksum {
-  const bytes = typeof value === 'string' ? utf8ToBytes(value) : value;
-  return `sha256:${bytesToHex(sha256(bytes))}`;
+  const text =
+    typeof value === 'string' ? value : new TextDecoder('utf-8', { fatal: true }).decode(value);
+  return `sha256:${sha256Hex(text)}`;
 }
 
 export function canonicalJsonBytes(value: unknown): Uint8Array {
-  return utf8ToBytes(`${canonicalSerialize(value)}\n`);
+  return new TextEncoder().encode(`${canonicalSerialize(value)}\n`);
 }
 
 export function canonicalJsonText(value: unknown): string {
@@ -72,7 +70,7 @@ export function decodeRecoveryText(value: Uint8Array | string): {
       'RECOVERY_SIZE_LIMIT_EXCEEDED',
       'Recovery bundle exceeds the supported byte limit.',
     );
-  const bytes = typeof value === 'string' ? utf8ToBytes(value) : new Uint8Array(value);
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value);
   if (bytes.byteLength > MAX_RECOVERY_ENVELOPE_BYTES)
     throw new RecoveryBundleError(
       'RECOVERY_SIZE_LIMIT_EXCEEDED',
@@ -94,5 +92,5 @@ export function decodeRecoveryText(value: Uint8Array | string): {
 }
 
 export function utf8(value: string): Uint8Array {
-  return utf8ToBytes(value);
+  return new TextEncoder().encode(value);
 }

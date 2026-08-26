@@ -50,6 +50,7 @@ import {
   AnalysisSessionConflictError,
   AnalysisSessionNotFoundError,
   AttemptConflictError,
+  classifyPersistenceInitializationFailure,
   createPlatformPersistenceAdapter,
   LearningRepository,
   PersistenceCorruptionError,
@@ -60,7 +61,10 @@ import {
   UnsupportedPersistenceVersionError,
   type LearnerSettingsPatch,
   type NewAttemptRecord,
+  type PersistenceInitializationFailure,
   type PersistenceSnapshot,
+  type ApplyRecoveryImportInput,
+  type PreviewRecoveryImportOptions,
 } from '@/lib/persistence';
 import { boundedAttemptTiming } from '@/data/attempt-timing';
 import {
@@ -75,6 +79,11 @@ import {
   type PaperExecutionReady,
 } from '@/data/paper-execution';
 import { resolvePositionManagementAvailability } from '@/data/position-management';
+import type { RecoveryPayloadV1 } from '@/lib/recovery/types';
+import type {
+  ApplyRecoveryImportResult,
+  RecoveryImportPlan,
+} from '@/lib/persistence/recovery-import';
 
 export const DISCLAIMER_VERSION = 'chartpath-education-he-2026-08';
 export const GUIDED_ANALYSIS_EXERCISE_ID = 'u10-capstone-e03';
@@ -106,6 +115,7 @@ export type AnalysisSessionRequest =
 export interface LearningContextValue {
   readonly status: 'loading' | 'ready' | 'error';
   readonly error: string | null;
+  readonly initializationFailure?: PersistenceInitializationFailure | null;
   readonly snapshot: PersistenceSnapshot | null;
   readonly updateSettings: (patch: LearnerSettingsPatch) => Promise<void>;
   readonly acceptDisclaimer: (dailyGoalMinutes: number) => Promise<void>;
@@ -199,6 +209,20 @@ export interface LearningContextValue {
   ) => Promise<PositionManagementSession>;
   /** Explicit recovery only removes selected quarantined drafts; attempt history is untouched. */
   readonly discardQuarantinedAnalysisSessions: (quarantineIds: readonly string[]) => Promise<void>;
+  readonly discardQuarantinedPaperExecutionSessions: (
+    quarantineIds: readonly string[],
+  ) => Promise<void>;
+  readonly discardQuarantinedPositionManagementSessions: (
+    quarantineIds: readonly string[],
+  ) => Promise<void>;
+  readonly previewRecoveryImport: (
+    payload: RecoveryPayloadV1,
+    options?: PreviewRecoveryImportOptions,
+  ) => Promise<RecoveryImportPlan>;
+  readonly applyRecoveryImport: (
+    payload: RecoveryPayloadV1,
+    input: ApplyRecoveryImportInput,
+  ) => Promise<ApplyRecoveryImportResult>;
   readonly resetData: () => Promise<void>;
   readonly reload: () => Promise<void>;
 }
@@ -473,6 +497,8 @@ export function LearningProvider({
   const historicalRegistry = historicalRegistryOverride ?? internalHistoricalContentRegistry;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [initializationFailure, setInitializationFailure] =
+    useState<PersistenceInitializationFailure | null>(null);
   const [snapshot, setSnapshot] = useState<PersistenceSnapshot | null>(null);
 
   const repository = useCallback((): LearningRepository => {
@@ -485,11 +511,13 @@ export function LearningProvider({
   const reload = useCallback(async () => {
     setStatus('loading');
     setError(null);
+    setInitializationFailure(null);
     try {
       const next = await repository().initialize();
       setSnapshot(next);
       setStatus('ready');
     } catch (reason) {
+      setInitializationFailure(classifyPersistenceInitializationFailure(reason));
       setError(errorMessage(reason));
       setStatus('error');
     }
@@ -502,10 +530,12 @@ export function LearningProvider({
       .then((next) => {
         if (!active) return;
         setSnapshot(next);
+        setInitializationFailure(null);
         setStatus('ready');
       })
       .catch((reason: unknown) => {
         if (!active) return;
+        setInitializationFailure(classifyPersistenceInitializationFailure(reason));
         setError(errorMessage(reason));
         setStatus('error');
       });
@@ -1541,10 +1571,58 @@ export function LearningProvider({
     [repository],
   );
 
+  const discardQuarantinedPaperExecutionSessions = useCallback(
+    async (quarantineIds: readonly string[]): Promise<void> => {
+      const recoveredAt = new Date().toISOString();
+      const next = await repository().discardQuarantinedPaperExecutionSessions(
+        quarantineIds,
+        recoveredAt,
+      );
+      setSnapshot(next);
+    },
+    [repository],
+  );
+
+  const discardQuarantinedPositionManagementSessions = useCallback(
+    async (quarantineIds: readonly string[]): Promise<void> => {
+      const recoveredAt = new Date().toISOString();
+      const next = await repository().discardQuarantinedPositionManagementSessions(
+        quarantineIds,
+        recoveredAt,
+      );
+      setSnapshot(next);
+    },
+    [repository],
+  );
+
+  const previewRecoveryImport = useCallback(
+    (
+      payload: RecoveryPayloadV1,
+      options?: PreviewRecoveryImportOptions,
+    ): Promise<RecoveryImportPlan> => repository().previewRecoveryImport(payload, options),
+    [repository],
+  );
+
+  const applyRecoveryImport = useCallback(
+    async (
+      payload: RecoveryPayloadV1,
+      input: ApplyRecoveryImportInput,
+    ): Promise<ApplyRecoveryImportResult> => {
+      const result = await repository().applyRecoveryImport(payload, input);
+      setSnapshot(result.snapshot);
+      setError(null);
+      setInitializationFailure(null);
+      setStatus('ready');
+      return result;
+    },
+    [repository],
+  );
+
   const resetData = useCallback(async () => {
     const next = await repository().reset();
     setSnapshot(next);
     setError(null);
+    setInitializationFailure(null);
     setStatus('ready');
   }, [repository]);
 
@@ -1552,6 +1630,7 @@ export function LearningProvider({
     () => ({
       status,
       error,
+      initializationFailure,
       snapshot,
       updateSettings,
       acceptDisclaimer,
@@ -1577,6 +1656,10 @@ export function LearningProvider({
       advancePositionManagementSession,
       completePositionManagementReplay,
       discardQuarantinedAnalysisSessions,
+      discardQuarantinedPaperExecutionSessions,
+      discardQuarantinedPositionManagementSessions,
+      previewRecoveryImport,
+      applyRecoveryImport,
       resetData,
       reload,
     }),
@@ -1584,6 +1667,7 @@ export function LearningProvider({
       abandonPaperExecutionSession,
       abandonAnalysisSession,
       acceptDisclaimer,
+      applyRecoveryImport,
       advancePositionManagementSession,
       advancePaperExecutionSession,
       cancelPendingPositionManagementAction,
@@ -1595,8 +1679,12 @@ export function LearningProvider({
       createOrResumePositionManagementSession,
       correctPositionManagementJournal,
       discardQuarantinedAnalysisSessions,
+      discardQuarantinedPaperExecutionSessions,
+      discardQuarantinedPositionManagementSessions,
       error,
       finalizeAnalysisSession,
+      initializationFailure,
+      previewRecoveryImport,
       reload,
       recordPositionManagementObservation,
       resetData,

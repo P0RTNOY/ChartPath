@@ -11,6 +11,8 @@ import {
   type PositionManagementSession,
   type ReviewState,
 } from '@chartpath/domain';
+import type { RecoveryPayloadV1 } from '../recovery/types';
+import { parseRecoveryPayload } from '../recovery/validation';
 
 import {
   AnalysisSessionConflictError,
@@ -24,6 +26,15 @@ import {
 } from './adapter';
 import { createEmptySnapshot, migratePersistence } from './migrations';
 import { localDateForTimestamp, replayAttempts } from './projections';
+import {
+  buildRecoveryImport,
+  RecoveryImportConflictError,
+  RecoveryImportStalePlanError,
+  type ApplyRecoveryImportInput,
+  type ApplyRecoveryImportResult,
+  type PreviewRecoveryImportOptions,
+  type RecoveryImportPlan,
+} from './recovery-import';
 import type {
   AppendAttemptResult,
   CreateOrResumePaperExecutionSessionResult,
@@ -457,6 +468,59 @@ export class LearningRepository {
 
   public async load(): Promise<PersistenceSnapshot> {
     return this.initialize();
+  }
+
+  /** Pure dry run over a serialized read. It never normalizes or rewrites the local store. */
+  public async previewRecoveryImport(
+    payload: RecoveryPayloadV1,
+    options: PreviewRecoveryImportOptions = {},
+  ): Promise<RecoveryImportPlan> {
+    await this.initializeAdapter();
+    const parsed = parseRecoveryPayload(payload);
+    const previewedAt = this.now();
+    const raw = await this.adapter.read();
+    const current = migratePersistence(raw, this.contentVersion, previewedAt).snapshot;
+    return buildRecoveryImport({
+      current,
+      payload: parsed,
+      importedAt: previewedAt,
+      selectedCategories: options.selectedCategories,
+    }).plan;
+  }
+
+  /**
+   * Strict additive recovery. Payload and plan are revalidated inside one adapter transaction;
+   * no recovery path receives deletion/migration authority.
+   */
+  public async applyRecoveryImport(
+    payload: RecoveryPayloadV1,
+    input: ApplyRecoveryImportInput,
+    importedAt: string = this.now(),
+  ): Promise<ApplyRecoveryImportResult> {
+    assertNonEmptyString(input.expectedPlanToken, 'expectedPlanToken');
+    assertUtcTimestamp(importedAt, 'importedAt');
+    await this.initializeAdapter();
+    return this.adapter.transact<ApplyRecoveryImportResult>((raw) => {
+      const parsed = parseRecoveryPayload(payload);
+      const current = migratePersistence(raw, this.contentVersion, importedAt).snapshot;
+      const built = buildRecoveryImport({
+        current,
+        payload: parsed,
+        importedAt,
+        selectedCategories: input.selectedCategories,
+      });
+      if (built.plan.planToken !== input.expectedPlanToken)
+        throw new RecoveryImportStalePlanError();
+      if (!built.plan.canApply) throw new RecoveryImportConflictError(built.plan.conflicts);
+      return {
+        nextValue: canonicalStringify(built.snapshot),
+        result: {
+          applied: built.plan.hasChanges,
+          plan: built.plan,
+          snapshot: cloneSnapshot(built.snapshot),
+        },
+      };
+    });
   }
 
   public async appendAttempt(record: NewAttemptRecord): Promise<AppendAttemptResult> {

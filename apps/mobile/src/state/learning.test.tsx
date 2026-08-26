@@ -23,7 +23,12 @@ import {
   type TradePlanInput,
 } from '@chartpath/domain';
 
-import { InMemoryPersistenceAdapter, LearningRepository } from '@/lib/persistence';
+import {
+  createEmptySnapshot,
+  InMemoryPersistenceAdapter,
+  LearningRepository,
+  type PersistenceAdapter,
+} from '@/lib/persistence';
 import { parsePositionManagementIntent } from '@/data/position-management';
 
 import {
@@ -1077,5 +1082,115 @@ describe('guided analysis learning integration', () => {
     });
     expect((await repository.load()).attempts).toEqual([]);
     await harness.view.unmount();
+  });
+
+  it('exposes explicit discard paths for every quarantined aggregate without touching attempts', async () => {
+    const at = '2026-08-26T08:00:00.000Z';
+    const base = createEmptySnapshot(contentVersion.id, at);
+    const adapter = new InMemoryPersistenceAdapter(
+      JSON.stringify({
+        ...base,
+        quarantinedAnalysisSessions: [
+          {
+            quarantineId: 'quarantine-analysis',
+            sessionId: 'analysis-damaged',
+            reason: 'damaged analysis',
+            payloadJson: '{}',
+            quarantinedAt: at,
+          },
+        ],
+        quarantinedPaperExecutionSessions: [
+          {
+            quarantineId: 'quarantine-paper',
+            sessionId: 'paper-damaged',
+            reason: 'damaged paper execution',
+            payloadJson: '{}',
+            quarantinedAt: at,
+          },
+        ],
+        quarantinedPositionManagementSessions: [
+          {
+            quarantineId: 'quarantine-management',
+            sessionId: 'management-damaged',
+            paperExecutionSessionId: 'paper-damaged',
+            reason: 'damaged position management',
+            payloadJson: '{}',
+            quarantinedAt: at,
+          },
+        ],
+      }),
+    );
+    const repository = new LearningRepository(adapter, { contentVersion: contentVersion.id });
+    const harness = await renderLearning(repository);
+
+    await act(async () => {
+      await harness.current().discardQuarantinedAnalysisSessions(['quarantine-analysis']);
+      await harness.current().discardQuarantinedPaperExecutionSessions(['quarantine-paper']);
+      await harness
+        .current()
+        .discardQuarantinedPositionManagementSessions(['quarantine-management']);
+    });
+
+    expect(harness.current().snapshot!.quarantinedAnalysisSessions).toEqual([]);
+    expect(harness.current().snapshot!.quarantinedPaperExecutionSessions).toEqual([]);
+    expect(harness.current().snapshot!.quarantinedPositionManagementSessions).toEqual([]);
+    expect(harness.current().snapshot!.attempts).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it('exposes typed unsupported, corrupt, and transient initialization failures', async () => {
+    const cases: readonly {
+      readonly repository: LearningRepository;
+      readonly expected: NonNullable<LearningContextValue['initializationFailure']>['reason'];
+    }[] = [
+      {
+        repository: new LearningRepository(
+          new InMemoryPersistenceAdapter(
+            JSON.stringify({ metadata: { schemaVersion: 999 } }),
+          ),
+          { contentVersion: contentVersion.id },
+        ),
+        expected: 'unsupported-newer-schema',
+      },
+      {
+        repository: new LearningRepository(new InMemoryPersistenceAdapter('{not-json'), {
+          contentVersion: contentVersion.id,
+        }),
+        expected: 'corrupt-store',
+      },
+      {
+        repository: new LearningRepository(
+          {
+            initialize: async () => {
+              throw new Error('database temporarily unavailable');
+            },
+            read: async () => null,
+            transact: async () => {
+              throw new Error('unreachable');
+            },
+            clear: async () => undefined,
+          } satisfies PersistenceAdapter,
+          { contentVersion: contentVersion.id },
+        ),
+        expected: 'transient',
+      },
+    ];
+
+    for (const item of cases) {
+      let learning: LearningContextValue | undefined;
+      function Probe() {
+        learning = useLearning();
+        return null;
+      }
+      const view = await render(
+        <LearningProvider repositoryOverride={item.repository}>
+          <Probe />
+        </LearningProvider>,
+      );
+      await waitFor(() => expect(learning?.status).toBe('error'));
+      expect(learning?.initializationFailure?.reason).toBe(item.expected);
+      expect(learning?.initializationFailure?.cause).toBeInstanceOf(Error);
+      await view.unmount();
+    }
   });
 });

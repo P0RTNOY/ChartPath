@@ -49,6 +49,52 @@ export class UnsupportedPersistenceVersionError extends Error {
   }
 }
 
+export type PersistenceInitializationFailureReason =
+  | 'unsupported-newer-schema'
+  | 'corrupt-store'
+  | 'transient';
+
+export interface PersistenceInitializationFailure {
+  readonly reason: PersistenceInitializationFailureReason;
+  readonly message: string;
+  readonly cause: unknown;
+}
+
+/**
+ * Classifies startup failures without weakening the underlying fail-closed behavior. Callers may
+ * offer an update, recovery, or retry path while retaining the original error as evidence.
+ */
+export function classifyPersistenceInitializationFailure(
+  error: unknown,
+): PersistenceInitializationFailure {
+  if (error instanceof UnsupportedPersistenceVersionError) {
+    return {
+      reason: 'unsupported-newer-schema',
+      message: error.message,
+      cause: error,
+    };
+  }
+  if (
+    error instanceof PersistenceCorruptionError ||
+    error instanceof AttemptConflictError ||
+    error instanceof AnalysisSessionConflictError ||
+    error instanceof PaperExecutionSessionConflictError ||
+    error instanceof PositionManagementSessionConflictError ||
+    error instanceof ManagementJournalConflictError
+  ) {
+    return {
+      reason: 'corrupt-store',
+      message: error instanceof Error ? error.message : 'Stored learning data is invalid.',
+      cause: error,
+    };
+  }
+  return {
+    reason: 'transient',
+    message: error instanceof Error ? error.message : 'Local learning data could not be loaded.',
+    cause: error,
+  };
+}
+
 export class AttemptConflictError extends Error {
   public constructor(public readonly attemptId: string) {
     super(`Attempt ${attemptId} already exists with different immutable data.`);
