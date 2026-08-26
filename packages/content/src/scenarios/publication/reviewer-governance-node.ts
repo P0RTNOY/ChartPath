@@ -8,6 +8,7 @@ import {
   isCanonicalUtcTimestamp,
   missingReviewerAuthorizationEvidence,
   parseReviewerOnboardingProposal,
+  parseReviewerPublicKeyMaterial,
   parseReviewerRevocationProposal,
   requiredReviewerAuthorizationEvidence,
   reviewerOnboardingProofBytes,
@@ -15,6 +16,7 @@ import {
   type ReviewerGovernanceStatusMatrixV1,
   type ReviewerOnboardingProposalV1,
   type ReviewerOnboardingValidationReportV1,
+  type ReviewerPublicKeyFingerprintReportV1,
   type ReviewerRevocationValidationReportV1,
 } from './reviewer-governance.js';
 import {
@@ -39,26 +41,66 @@ function validatedProductionRegistry(
   return parseTrustedReviewerRegistry(registry, 'production');
 }
 
+export function verifyReviewerPublicKeyFingerprint(
+  input: unknown,
+): ReviewerPublicKeyFingerprintReportV1 {
+  const parsed = parseReviewerPublicKeyMaterial(input);
+  if (!parsed.ok)
+    return Object.freeze({
+      schemaVersion: 1,
+      keyId: parsed.id,
+      algorithm: 'Ed25519',
+      structurallyValid: false,
+      canonicalPublicKey: false,
+      fingerprintMatches: false,
+      valid: false,
+      trustGranted: false,
+      issues: parsed.issues,
+    });
+  const material = parsed.value;
+  const issues: string[] = [];
+  let canonicalPublicKey = false;
+  let computedFingerprint: `sha256:${string}` | undefined;
+  try {
+    const der = Buffer.from(material.publicKeySpkiDerBase64, 'base64');
+    const publicKey = createPublicKey({ key: der, format: 'der', type: 'spki' });
+    const canonicalDer = publicKey.export({ format: 'der', type: 'spki' });
+    canonicalPublicKey = publicKey.asymmetricKeyType === 'ed25519' && canonicalDer.equals(der);
+    if (!canonicalPublicKey) issues.push('public key must be one canonical Ed25519 SPKI DER value');
+    computedFingerprint = `sha256:${createHash('sha256').update(der).digest('hex')}`;
+  } catch {
+    issues.push('public key is not valid canonical Ed25519 SPKI DER');
+  }
+  const fingerprintMatches = computedFingerprint === material.publicKeyFingerprint;
+  if (!fingerprintMatches) issues.push('public key fingerprint mismatch');
+  return Object.freeze({
+    schemaVersion: 1,
+    keyId: material.keyId,
+    algorithm: 'Ed25519',
+    structurallyValid: true,
+    canonicalPublicKey,
+    declaredFingerprint: material.publicKeyFingerprint,
+    ...(computedFingerprint ? { computedFingerprint } : {}),
+    fingerprintMatches,
+    valid: canonicalPublicKey && fingerprintMatches,
+    trustGranted: false,
+    issues: sortedUnique(issues),
+  });
+}
+
 function proposalPublicKeyValidation(proposal: ReviewerOnboardingProposalV1): {
   readonly canonical: boolean;
   readonly fingerprintValid: boolean;
   readonly proofValid: boolean;
   readonly issues: readonly string[];
 } {
-  const issues: string[] = [];
-  let canonical = false;
-  let fingerprintValid = false;
+  const fingerprint = verifyReviewerPublicKeyFingerprint(proposal.publicKey);
+  const issues = [...fingerprint.issues];
   let proofValid = false;
   try {
     const der = Buffer.from(proposal.publicKey.publicKeySpkiDerBase64, 'base64');
     const publicKey = createPublicKey({ key: der, format: 'der', type: 'spki' });
-    const canonicalDer = publicKey.export({ format: 'der', type: 'spki' });
-    canonical = publicKey.asymmetricKeyType === 'ed25519' && canonicalDer.equals(der);
-    if (!canonical) issues.push('public key must be one canonical Ed25519 SPKI DER value');
-    const fingerprint = `sha256:${createHash('sha256').update(der).digest('hex')}`;
-    fingerprintValid = fingerprint === proposal.publicKey.publicKeyFingerprint;
-    if (!fingerprintValid) issues.push('public key fingerprint mismatch');
-    if (canonical)
+    if (fingerprint.canonicalPublicKey)
       proofValid = verify(
         null,
         reviewerOnboardingProofBytes(proposal),
@@ -70,8 +112,8 @@ function proposalPublicKeyValidation(proposal: ReviewerOnboardingProposalV1): {
     issues.push('public key is not valid canonical Ed25519 SPKI DER');
   }
   return {
-    canonical,
-    fingerprintValid,
+    canonical: fingerprint.canonicalPublicKey,
+    fingerprintValid: fingerprint.fingerprintMatches,
     proofValid,
     issues: sortedUnique(issues),
   };

@@ -13,6 +13,7 @@ import {
 import { findRepositoryRoot, readCanonicalJson } from './node-io.js';
 import {
   createReviewerOnboardingProposal,
+  parseReviewerOnboardingProposal,
   parseReviewerOnboardingProposalMaterial,
   reviewerOnboardingMaterialProofBytes,
   reviewerRegistryChecksum,
@@ -22,6 +23,7 @@ import {
   listReviewerAuthorizationRequirements,
   validateReviewerOnboardingProposal,
   validateReviewerRevocationProposal,
+  verifyReviewerPublicKeyFingerprint,
 } from './reviewer-governance-node.js';
 import { PRODUCTION_TRUSTED_REVIEWER_REGISTRY } from './trusted-reviewers.js';
 import { PUBLICATION_REVIEW_SCOPES } from './types.js';
@@ -88,6 +90,7 @@ export async function runReviewerGovernanceCommand(
     '--material',
     '--proof',
     '--proposal',
+    '--public-key',
     '--onboarding-dir',
     '--revocation-dir',
   ]);
@@ -122,6 +125,47 @@ export async function runReviewerGovernanceCommand(
       signingBytesBase64: Buffer.from(reviewerOnboardingMaterialProofBytes(parsed.value)).toString(
         'base64',
       ),
+    };
+  }
+  if (action === 'verify-fingerprint') {
+    const publicKeyPath = argumentsMap.get('--public-key');
+    const proposalPath = argumentsMap.get('--proposal');
+    if (
+      (typeof publicKeyPath === 'string' && typeof proposalPath === 'string') ||
+      (typeof publicKeyPath !== 'string' && typeof proposalPath !== 'string')
+    )
+      throw new TypeError(
+        'Fingerprint verification requires exactly one of --public-key or --proposal.',
+      );
+    if (typeof publicKeyPath === 'string')
+      return {
+        schemaVersion: 1,
+        source: 'public-key-material',
+        fingerprint: verifyReviewerPublicKeyFingerprint(await io.readJson(publicKeyPath)),
+      };
+    const parsed = parseReviewerOnboardingProposal(await io.readJson(proposalPath as string));
+    if (!parsed.ok)
+      return {
+        schemaVersion: 1,
+        source: 'onboarding-proposal',
+        proposalId: parsed.id,
+        fingerprint: {
+          schemaVersion: 1,
+          keyId: 'invalid-key',
+          algorithm: 'Ed25519',
+          structurallyValid: false,
+          canonicalPublicKey: false,
+          fingerprintMatches: false,
+          valid: false,
+          trustGranted: false,
+          issues: parsed.issues,
+        },
+      };
+    return {
+      schemaVersion: 1,
+      source: 'onboarding-proposal',
+      proposalId: parsed.value.proposalId,
+      fingerprint: verifyReviewerPublicKeyFingerprint(parsed.value.publicKey),
     };
   }
   if (action === 'create-onboarding') {

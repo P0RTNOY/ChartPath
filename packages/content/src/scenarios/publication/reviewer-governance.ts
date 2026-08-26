@@ -31,6 +31,15 @@ export interface ReviewerScopeAuthorizationEvidenceV1 {
   readonly authorizationEvidence: readonly ReviewerEvidenceReferenceV1[];
 }
 
+export interface ReviewerPublicKeyMaterialV1 {
+  readonly keyId: string;
+  readonly algorithm: 'Ed25519';
+  readonly publicKeySpkiDerBase64: string;
+  readonly publicKeyFingerprint: Sha256Checksum;
+  readonly validFrom: string;
+  readonly validUntil?: string;
+}
+
 export interface ReviewerOnboardingProposalMaterialV1 {
   readonly schemaVersion: 1;
   readonly contractVersion: typeof REVIEWER_ONBOARDING_PROPOSAL_CONTRACT_VERSION;
@@ -39,14 +48,7 @@ export interface ReviewerOnboardingProposalMaterialV1 {
   readonly reviewerId: string;
   readonly reviewerKind: 'external-human';
   readonly requestedScopes: readonly PublicationReviewScope[];
-  readonly publicKey: {
-    readonly keyId: string;
-    readonly algorithm: 'Ed25519';
-    readonly publicKeySpkiDerBase64: string;
-    readonly publicKeyFingerprint: Sha256Checksum;
-    readonly validFrom: string;
-    readonly validUntil?: string;
-  };
+  readonly publicKey: ReviewerPublicKeyMaterialV1;
   readonly identityEvidence: readonly ReviewerEvidenceReferenceV1[];
   readonly independenceEvidence: readonly ReviewerEvidenceReferenceV1[];
   readonly scopeAuthorizationEvidence: readonly ReviewerScopeAuthorizationEvidenceV1[];
@@ -108,6 +110,20 @@ export interface ReviewerOnboardingValidationReportV1 {
   readonly requiredEvidence: readonly string[];
   readonly missingEvidence: readonly string[];
   readonly registryConflicts: readonly string[];
+  readonly issues: readonly string[];
+}
+
+export interface ReviewerPublicKeyFingerprintReportV1 {
+  readonly schemaVersion: 1;
+  readonly keyId: string;
+  readonly algorithm: 'Ed25519';
+  readonly structurallyValid: boolean;
+  readonly canonicalPublicKey: boolean;
+  readonly declaredFingerprint?: Sha256Checksum;
+  readonly computedFingerprint?: Sha256Checksum;
+  readonly fingerprintMatches: boolean;
+  readonly valid: boolean;
+  readonly trustGranted: false;
   readonly issues: readonly string[];
 }
 
@@ -267,6 +283,45 @@ function canonicalScopeTuple(value: readonly PublicationReviewScope[]): boolean 
   return positions.every((position, index) => index === 0 || position > positions[index - 1]!);
 }
 
+export function parseReviewerPublicKeyMaterial(
+  input: unknown,
+): ReviewerProposalParseResult<ReviewerPublicKeyMaterialV1> {
+  const issues: string[] = [];
+  const id = plainObject(input) && typeof input.keyId === 'string' ? input.keyId : 'invalid-key';
+  if (
+    !plainObject(input) ||
+    !exactKeys(
+      input,
+      ['keyId', 'algorithm', 'publicKeySpkiDerBase64', 'publicKeyFingerprint', 'validFrom'],
+      ['validUntil'],
+    )
+  )
+    return {
+      ok: false,
+      id,
+      issues: ['public key must be an exact Ed25519 public-key material object'],
+    };
+  if (typeof input.keyId !== 'string' || !IDENTIFIER.test(input.keyId))
+    issues.push('keyId is invalid');
+  if (input.algorithm !== 'Ed25519') issues.push('public key algorithm must be Ed25519');
+  if (!canonicalBase64(input.publicKeySpkiDerBase64))
+    issues.push('public key must use canonical Base64');
+  if (typeof input.publicKeyFingerprint !== 'string' || !CHECKSUM.test(input.publicKeyFingerprint))
+    issues.push('public key fingerprint is invalid');
+  if (!isCanonicalUtcTimestamp(input.validFrom)) issues.push('key validFrom is invalid');
+  if (input.validUntil !== undefined && !isCanonicalUtcTimestamp(input.validUntil))
+    issues.push('key validUntil is invalid');
+  if (
+    isCanonicalUtcTimestamp(input.validFrom) &&
+    isCanonicalUtcTimestamp(input.validUntil) &&
+    input.validUntil <= input.validFrom
+  )
+    issues.push('key validUntil must be later than validFrom');
+  return issues.length
+    ? { ok: false, id, issues: [...new Set(issues)].sort() }
+    : { ok: true, value: input as unknown as ReviewerPublicKeyMaterialV1 };
+}
+
 export function parseReviewerOnboardingProposal(
   input: unknown,
 ): ReviewerProposalParseResult<ReviewerOnboardingProposalV1> {
@@ -319,34 +374,8 @@ export function parseReviewerOnboardingProposal(
     !canonicalScopeTuple(requestedScopes)
   )
     issues.push('requestedScopes must be a non-empty canonical subset of publication scopes');
-  const key = input.publicKey;
-  if (
-    !plainObject(key) ||
-    !exactKeys(
-      key,
-      ['keyId', 'algorithm', 'publicKeySpkiDerBase64', 'publicKeyFingerprint', 'validFrom'],
-      ['validUntil'],
-    )
-  )
-    issues.push('publicKey must be an exact Ed25519 public-key proposal');
-  if (plainObject(key)) {
-    if (typeof key.keyId !== 'string' || !IDENTIFIER.test(key.keyId))
-      issues.push('keyId is invalid');
-    if (key.algorithm !== 'Ed25519') issues.push('public key algorithm must be Ed25519');
-    if (!canonicalBase64(key.publicKeySpkiDerBase64))
-      issues.push('public key must use canonical Base64');
-    if (typeof key.publicKeyFingerprint !== 'string' || !CHECKSUM.test(key.publicKeyFingerprint))
-      issues.push('public key fingerprint is invalid');
-    if (!isCanonicalUtcTimestamp(key.validFrom)) issues.push('key validFrom is invalid');
-    if (key.validUntil !== undefined && !isCanonicalUtcTimestamp(key.validUntil))
-      issues.push('key validUntil is invalid');
-    if (
-      isCanonicalUtcTimestamp(key.validFrom) &&
-      isCanonicalUtcTimestamp(key.validUntil) &&
-      key.validUntil <= key.validFrom
-    )
-      issues.push('key validUntil must be later than validFrom');
-  }
+  const parsedKey = parseReviewerPublicKeyMaterial(input.publicKey);
+  if (!parsedKey.ok) issues.push(...parsedKey.issues.map((issue) => `publicKey: ${issue}`));
   const identityEvidence = parseEvidenceArray(input.identityEvidence, 'identityEvidence', issues);
   const independenceEvidence = parseEvidenceArray(
     input.independenceEvidence,

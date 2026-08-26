@@ -21,6 +21,7 @@ import {
   listReviewerAuthorizationRequirements,
   validateReviewerOnboardingProposal,
   validateReviewerRevocationProposal,
+  verifyReviewerPublicKeyFingerprint,
 } from '../src/scenarios/publication/reviewer-governance-node.js';
 import { runReviewerGovernanceCommand } from '../src/scenarios/publication/reviewer-governance-cli.js';
 import { generateReviewerKeyMaterial } from '../src/scenarios/publication/reviewer-keygen-node.js';
@@ -213,6 +214,15 @@ describe('external reviewer governance proposals', () => {
 
   it('strictly rejects unknown fields, noncanonical scope order, fingerprints, and key conflicts', () => {
     const { proposal } = proposalFixture();
+    expect(verifyReviewerPublicKeyFingerprint(proposal.publicKey)).toMatchObject({
+      canonicalPublicKey: true,
+      declaredFingerprint: proposal.publicKey.publicKeyFingerprint,
+      computedFingerprint: proposal.publicKey.publicKeyFingerprint,
+      fingerprintMatches: true,
+      valid: true,
+      trustGranted: false,
+      issues: [],
+    });
     expect(parseReviewerOnboardingProposal({ ...proposal, trusted: true })).toMatchObject({
       ok: false,
     });
@@ -229,6 +239,12 @@ describe('external reviewer governance proposals', () => {
         asOf: AS_OF,
       }),
     ).toMatchObject({ status: 'invalid', fingerprintValid: false, trustGranted: false });
+    expect(verifyReviewerPublicKeyFingerprint(wrongFingerprint.publicKey)).toMatchObject({
+      fingerprintMatches: false,
+      valid: false,
+      trustGranted: false,
+      issues: ['public key fingerprint mismatch'],
+    });
     const registry = productionRegistry({ proposal });
     expect(validateReviewerOnboardingProposal({ proposal, registry, asOf: AS_OF })).toMatchObject({
       status: 'already-registered',
@@ -319,6 +335,7 @@ describe('external reviewer governance proposals', () => {
     const documents = new Map<string, unknown>([
       ['material.json', material],
       ['proof.json', possessionProof],
+      ['public-key.json', proposal.publicKey],
       ['proposal.json', proposal],
       ['revocation.json', revocation],
     ]);
@@ -345,6 +362,39 @@ describe('external reviewer governance proposals', () => {
     expect((prepared as { signingBytesBase64: string }).signingBytesBase64).toBe(
       Buffer.from(reviewerOnboardingProofBytes(proposal)).toString('base64'),
     );
+    const fingerprintFromKey = await runReviewerGovernanceCommand(
+      ['--action', 'verify-fingerprint', '--public-key', 'public-key.json'],
+      readers,
+    );
+    const fingerprintFromProposal = await runReviewerGovernanceCommand(
+      ['--action', 'verify-fingerprint', '--proposal', 'proposal.json'],
+      readers,
+    );
+    expect(fingerprintFromKey).toMatchObject({
+      source: 'public-key-material',
+      fingerprint: {
+        computedFingerprint: proposal.publicKey.publicKeyFingerprint,
+        fingerprintMatches: true,
+        valid: true,
+        trustGranted: false,
+      },
+    });
+    expect(fingerprintFromProposal).toMatchObject({
+      source: 'onboarding-proposal',
+      proposalId: proposal.proposalId,
+      fingerprint: {
+        computedFingerprint: proposal.publicKey.publicKeyFingerprint,
+        fingerprintMatches: true,
+        valid: true,
+        trustGranted: false,
+      },
+    });
+    expect(
+      await runReviewerGovernanceCommand(
+        ['--action', 'verify-fingerprint', '--proposal', 'proposal.json'],
+        readers,
+      ),
+    ).toEqual(fingerprintFromProposal);
     const created = await runReviewerGovernanceCommand(
       [
         '--action',

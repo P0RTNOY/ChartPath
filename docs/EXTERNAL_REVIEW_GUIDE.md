@@ -50,6 +50,33 @@ photographed, uploaded to an issue tracker or provided to the learner applicatio
 or otherwise reviewer-controlled key storage is preferred. Back up or escrow a key only under an
 explicitly authorized organizational policy.
 
+### Independent public-key fingerprint check
+
+Before comparing a fingerprint out of band, place only the proposed public-key material—key ID,
+algorithm, public SPKI DER Base64, declared fingerprint and validity bounds—in canonical JSON. The
+dedicated command reparses the SPKI, requires canonical Ed25519 DER, recomputes SHA-256 and reports
+both declared and computed values:
+
+```bash
+pnpm --filter @chartpath/content exec tsx \
+  src/scenarios/publication/reviewer-governance-cli.ts -- \
+  --action verify-fingerprint \
+  --public-key reviewer-public-key.canonical.json
+```
+
+The same check can extract public-key material from a complete proposal:
+
+```bash
+pnpm --filter @chartpath/content exec tsx \
+  src/scenarios/publication/reviewer-governance-cli.ts -- \
+  --action verify-fingerprint \
+  --proposal reviewer-onboarding-proposal.canonical.json
+```
+
+A successful result has `canonicalPublicKey:true`, `fingerprintMatches:true`, `valid:true` and
+`trustGranted:false`. Compare the computed fingerprint with the reviewer through an independently
+authenticated channel. A matching fingerprint proves neither identity nor authorization.
+
 ## 3. Proposal material
 
 An onboarding proposal is caller-supplied metadata for one `external-human`. It contains:
@@ -157,7 +184,7 @@ rotation receive the same review as initial onboarding. Registration does not cr
 the reviewer must separately review and sign each exact candidate packet under the review
 attestation policy.
 
-## 6. Revocation requests
+## 6. Non-mutating revocation-proposal validation
 
 A revocation proposal targets either a reviewer or one exact key. It records the requester,
 canonical proposal/effective times, a bounded reason, incident evidence references and independent
@@ -171,7 +198,9 @@ pnpm --filter @chartpath/content exec tsx \
   --as-of 2032-01-01T00:00:00.000Z
 ```
 
-A validated request does not change trust. The repository registry must be changed through the
+A validated request is only a deterministic human-review step: it does not revoke a reviewer or
+key, edit a file, change trust or invalidate an attestation by itself. Every command result carries
+`trustChanged:false`. The repository registry must be changed through the
 independently reviewed emergency or ordinary revocation process. Do not require a signature by a
 possibly compromised private key as the sole authority to revoke it. Pending credible revocation
 requests are shown explicitly in the status matrix and keep affected scope availability fail-closed.
