@@ -50,9 +50,27 @@ describe('fail-closed dry-run publication preflight', () => {
     expect(left).toMatchObject({
       mode: 'dry-run',
       eligible: false,
-      status: 'NO-GO',
+      status: 'PUBLICATION_NO_GO',
       sideEffects: [],
     });
+    expect(left.summaryStatuses).toEqual([
+      'MACHINE_GATES_CLOSED',
+      'NATIVE_VERIFICATION_PARTIAL',
+      'EXTERNAL_REVIEW_PENDING',
+      'INTERNAL_REVIEW_BUILD_READY',
+      'PUBLICATION_NO_GO',
+    ]);
+    expect(new Set(left.gates.map((gate) => gate.category))).toEqual(
+      new Set([
+        'machine',
+        'native-runtime',
+        'accessibility',
+        'physical-device',
+        'human-review',
+        'licensing',
+        'distribution',
+      ]),
+    );
     expect(left.blockers.map((blocker) => blocker.code)).toEqual(
       expect.arrayContaining([
         'REVIEW_SCOPE_MISSING',
@@ -98,9 +116,11 @@ describe('fail-closed dry-run publication preflight', () => {
     expect(
       report.blockers.filter((blocker) => blocker.code === 'PUBLICATION_ARTIFACT_INTEGRITY_FAILED'),
     ).toEqual([
-      expect.objectContaining({ detail: 'source PDF checksum mismatch' }),
       expect.objectContaining({
-        detail: 'tracked packet is stale review-packets/example/review-packet.md',
+        category: 'machine',
+        gateId: 'publication-artifact-integrity',
+        detail:
+          'source PDF checksum mismatch; tracked packet is stale review-packets/example/review-packet.md',
       }),
     ]);
   });
@@ -124,6 +144,13 @@ describe('fail-closed dry-run publication preflight', () => {
         accessibilityMatrixVerified: true,
         sourceAndHebrewReviewed: true,
         executionAndRubricSnapshotsVerified: true,
+        androidRuntimeLifecycleVerified: true,
+        voiceOverVerified: true,
+        talkBackVerified: true,
+        physicalIosVerified: true,
+        physicalAndroidVerified: true,
+        backupAndRecoveryVerified: true,
+        distributionSigningVerified: true,
       },
     });
     expect(report.eligible).toBe(false);

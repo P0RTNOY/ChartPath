@@ -4,7 +4,7 @@ export const PUBLICATION_CANDIDATE_SCHEMA_VERSION = 1 as const;
 export const REVIEW_PACKET_CONTRACT_VERSION = 'review-packet-v1' as const;
 export const REVIEW_ATTESTATION_CONTRACT_VERSION = 'review-attestation-v1' as const;
 export const REVIEW_ATTESTATION_POLICY_VERSION = 'review-attestation-policy-v1' as const;
-export const PUBLICATION_PREFLIGHT_POLICY_VERSION = 'publication-preflight-policy-v1' as const;
+export const PUBLICATION_PREFLIGHT_POLICY_VERSION = 'publication-preflight-policy-v2' as const;
 
 export const PUBLICATION_REVIEW_SCOPES = [
   'source',
@@ -287,16 +287,51 @@ export interface AttestationVerificationReportV1 {
   readonly issues: readonly string[];
 }
 
+export const PUBLICATION_GATE_CATEGORIES = [
+  'machine',
+  'native-runtime',
+  'accessibility',
+  'physical-device',
+  'human-review',
+  'licensing',
+  'distribution',
+] as const;
+
+export type PublicationGateCategory = (typeof PUBLICATION_GATE_CATEGORIES)[number];
+export type PublicationGateStatus = 'passed' | 'failed' | 'blocked' | 'not-run';
+export type PublicationPreflightSummaryStatus =
+  | 'MACHINE_GATES_CLOSED'
+  | 'MACHINE_GATES_OPEN'
+  | 'NATIVE_VERIFICATION_PARTIAL'
+  | 'EXTERNAL_REVIEW_PENDING'
+  | 'INTERNAL_REVIEW_BUILD_READY'
+  | 'PUBLICATION_NO_GO';
+
+export interface PublicationPreflightGateV2 {
+  readonly gateId: string;
+  readonly category: PublicationGateCategory;
+  readonly required: true;
+  readonly status: PublicationGateStatus;
+  readonly detail: string;
+}
+
 export interface PublicationPreflightReportV1 {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly policyVersion: typeof PUBLICATION_PREFLIGHT_POLICY_VERSION;
   readonly mode: 'dry-run';
   readonly candidateId: string;
   readonly asOf: string;
   readonly eligible: false;
-  readonly status: 'NO-GO';
+  readonly status: 'PUBLICATION_NO_GO';
+  readonly summaryStatuses: readonly PublicationPreflightSummaryStatus[];
   readonly reviewPacketChecksum: Sha256Checksum;
   readonly materialSetChecksum: Sha256Checksum;
-  readonly blockers: readonly { readonly code: string; readonly detail: string }[];
+  readonly gates: readonly PublicationPreflightGateV2[];
+  readonly blockers: readonly {
+    readonly code: string;
+    readonly category: PublicationGateCategory;
+    readonly gateId: string;
+    readonly detail: string;
+  }[];
   readonly sideEffects: readonly [];
 }
