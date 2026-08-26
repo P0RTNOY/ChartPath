@@ -1,0 +1,126 @@
+import { describe, expect, it } from 'vitest';
+
+import { publicationCandidateRegistry } from '../src/scenarios/publication/candidates.js';
+import { verifyProductionReviewAttestations } from '../src/scenarios/publication/attestation-node.js';
+import { runPublicationPreflight } from '../src/scenarios/publication/preflight.js';
+import { buildReviewPacket } from '../src/scenarios/publication/review-packet.js';
+import {
+  PUBLICATION_REVIEW_SCOPES,
+  REVIEW_ATTESTATION_POLICY_VERSION,
+  type AttestationVerificationReportV1,
+  type TrustedReviewerRegistryV1,
+} from '../src/scenarios/publication/types.js';
+
+const AS_OF = '2032-01-01T00:00:00.000Z';
+const candidate = publicationCandidateRegistry[0]!;
+const packet = buildReviewPacket(candidate);
+const emptyRegistry: TrustedReviewerRegistryV1 = {
+  schemaVersion: 1,
+  environment: 'production',
+  policyVersion: REVIEW_ATTESTATION_POLICY_VERSION,
+  reviewers: [],
+};
+const missingReviews = verifyProductionReviewAttestations({
+  candidate,
+  packet,
+  attestations: [],
+  registry: emptyRegistry,
+  asOf: AS_OF,
+});
+
+function preflight(overrides: Partial<Parameters<typeof runPublicationPreflight>[0]> = {}) {
+  return runPublicationPreflight({
+    candidateId: candidate.candidateId,
+    scenarioId: candidate.scenario.scenarioId,
+    scenarioVersion: candidate.scenario.scenarioVersion,
+    datasetId: candidate.dataset.datasetId,
+    datasetVersion: candidate.dataset.datasetVersion,
+    datasetChecksum: candidate.dataset.datasetChecksum,
+    asOf: AS_OF,
+    packet,
+    attestations: missingReviews,
+    evidence: {
+      licensingAndRedistributionAuthorized: false,
+      nativeLifecycleVerified: false,
+      accessibilityMatrixVerified: false,
+      sourceAndHebrewReviewed: false,
+      executionAndRubricSnapshotsVerified: false,
+    },
+    ...overrides,
+  });
+}
+
+describe('fail-closed dry-run publication preflight', () => {
+  it('returns a deterministic no-side-effect NO-GO with exact human and licensing blockers', () => {
+    const left = preflight();
+    const right = preflight();
+    expect(left).toEqual(right);
+    expect(left).toMatchObject({
+      mode: 'dry-run',
+      eligible: false,
+      status: 'NO-GO',
+      sideEffects: [],
+    });
+    expect(left.blockers.map((blocker) => blocker.code)).toEqual(
+      expect.arrayContaining([
+        'REVIEW_SCOPE_MISSING',
+        'LICENSING_EVIDENCE_MISSING',
+        'LICENSING_MATERIAL_CHANGE_REQUIRED',
+        'NATIVE_LIFECYCLE_EVIDENCE_MISSING',
+        'ACCESSIBILITY_EVIDENCE_MISSING',
+        'SOURCE_HEBREW_EVIDENCE_MISSING',
+        'EXECUTION_RUBRIC_EVIDENCE_MISSING',
+      ]),
+    );
+    expect(left.blockers.filter((blocker) => blocker.code === 'REVIEW_SCOPE_MISSING')).toHaveLength(
+      8,
+    );
+  });
+
+  it('rejects exact scenario and dataset mismatches and regenerated packet mutation', () => {
+    expect(preflight({ scenarioVersion: '9.9.9' }).blockers).toContainEqual(
+      expect.objectContaining({ code: 'SCENARIO_IDENTITY_MISMATCH' }),
+    );
+    expect(preflight({ datasetChecksum: `sha256:${'a'.repeat(64)}` }).blockers).toContainEqual(
+      expect.objectContaining({ code: 'DATASET_IDENTITY_MISMATCH' }),
+    );
+    const changedPacket = structuredClone(packet);
+    Object.assign(changedPacket.learnerMaterial, {
+      promptHe: `${changedPacket.learnerMaterial.promptHe} שינוי`,
+    });
+    expect(preflight({ packet: changedPacket }).blockers).toContainEqual(
+      expect.objectContaining({ code: 'REVIEW_PACKET_STALE' }),
+    );
+  });
+
+  it('remains fail-closed after synthetically complete review projections because rights material is internal', () => {
+    const approved: AttestationVerificationReportV1 = {
+      ...missingReviews,
+      complete: true,
+      scopes: PUBLICATION_REVIEW_SCOPES.map((scope) => ({
+        scope,
+        decision: 'approved',
+        attestationId: `external-${scope}`,
+      })),
+      issues: [],
+    };
+    const report = preflight({
+      attestations: approved,
+      evidence: {
+        licensingAndRedistributionAuthorized: true,
+        nativeLifecycleVerified: true,
+        accessibilityMatrixVerified: true,
+        sourceAndHebrewReviewed: true,
+        executionAndRubricSnapshotsVerified: true,
+      },
+    });
+    expect(report.eligible).toBe(false);
+    expect(report.blockers).toEqual([
+      expect.objectContaining({ code: 'LICENSING_MATERIAL_CHANGE_REQUIRED' }),
+    ]);
+  });
+
+  it('requires explicit canonical evaluation time', () => {
+    expect(() => preflight({ asOf: '2032-01-01T00:00:00Z' })).toThrow(/explicit canonical UTC/u);
+  });
+});
