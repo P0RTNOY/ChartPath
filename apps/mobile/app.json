@@ -39,7 +39,8 @@
             "image": "./assets/images/chartpath-icon.png"
           }
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
