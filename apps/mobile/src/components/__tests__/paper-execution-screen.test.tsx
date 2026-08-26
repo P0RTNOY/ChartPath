@@ -278,6 +278,7 @@ describe('PaperExecutionScreen', () => {
     );
 
     expect(screen.getByTestId('paper-execution-ticket')).toBeTruthy();
+    expect(screen.getByTestId('internal-qa-boundary')).toBeTruthy();
     expect(screen.getByText('הניתוח קבע: אין עסקה')).toBeTruthy();
     expect(screen.getByText(/מצב.*מכניקה היפותטית/)).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'הוראת שוק', selected: true })).toBeTruthy();

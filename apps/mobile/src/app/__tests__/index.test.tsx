@@ -1,36 +1,57 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import { ChartPathThemeProvider } from '@chartpath/ui';
 
 import IndexScreen from '../index';
 
-const mockResetData = jest.fn(async () => undefined);
+const mockPush = jest.fn();
+let mockFailureReason: 'corrupt-store' | 'unsupported-newer-schema' | 'transient' =
+  'corrupt-store';
 
-jest.mock('expo-router', () => ({ Redirect: () => null }));
+jest.mock('expo-router', () => ({
+  Redirect: () => null,
+  router: { push: (...args: unknown[]) => mockPush(...args) },
+}));
 jest.mock('@/state/learning', () => ({
   DISCLAIMER_VERSION: 'test-disclaimer',
   useLearning: () => ({
     status: 'error',
-    error: 'המסד המקומי פגום',
+    error: 'המסד המקומי לא נטען',
+    initializationFailure: { reason: mockFailureReason },
     snapshot: null,
     reload: jest.fn(),
-    resetData: mockResetData,
   }),
 }));
 
-describe('startup recovery', () => {
-  beforeEach(() => mockResetData.mockClear());
+describe('startup recovery routing', () => {
+  beforeEach(() => mockPush.mockClear());
 
-  it('requires confirmation and then resets a corrupt local snapshot', async () => {
+  it('routes a classified corrupt store to the dedicated recovery screen without inline reset', async () => {
+    mockFailureReason = 'corrupt-store';
     const screen = await render(
       <ChartPathThemeProvider direction="rtl" mode="light">
         <IndexScreen />
       </ChartPathThemeProvider>,
     );
 
-    await fireEvent.press(screen.getByRole('button', { name: 'איפוס נתונים פגומים' }));
-    expect(mockResetData).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByRole('button', { name: 'אישור מחיקה ואיפוס' }));
-    await waitFor(() => expect(mockResetData).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/איפוס נתונים פגומים|אישור מחיקה/)).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'פתיחת מרכז שחזור' }));
+    expect(mockPush).toHaveBeenCalledWith('/data-recovery');
   });
+
+  it.each(['unsupported-newer-schema', 'transient'] as const)(
+    'offers retry only for %s',
+    async (reason) => {
+      mockFailureReason = reason;
+      const screen = await render(
+        <ChartPathThemeProvider direction="rtl" mode="light">
+          <IndexScreen />
+        </ChartPathThemeProvider>,
+      );
+
+      expect(screen.getByRole('button', { name: 'נסו שוב' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'פתיחת מרכז שחזור' })).toBeNull();
+      expect(screen.queryByText(/איפוס|מחיקה/)).toBeNull();
+    },
+  );
 });

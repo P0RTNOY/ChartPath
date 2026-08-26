@@ -1,6 +1,14 @@
 import { ActivityIndicator, View } from 'react-native';
 
-import { Button, Card, Heading, Screen, UiText, useTheme } from '@chartpath/ui';
+import {
+  Button,
+  Card,
+  Heading,
+  Screen,
+  UiText,
+  useTheme,
+  type ButtonVariant,
+} from '@chartpath/ui';
 
 import { BrandMark } from './brand-mark';
 
@@ -26,11 +34,13 @@ export function ErrorState({
   onRetry,
   secondaryActionLabel,
   onSecondaryAction,
+  secondaryActionVariant = 'danger',
 }: {
   readonly message: string;
   readonly onRetry: () => void;
   readonly secondaryActionLabel?: string;
   readonly onSecondaryAction?: () => void;
+  readonly secondaryActionVariant?: ButtonVariant;
 }) {
   const theme = useTheme();
   return (
@@ -49,7 +59,7 @@ export function ErrorState({
           נסו שוב
         </Button>
         {secondaryActionLabel && onSecondaryAction ? (
-          <Button fullWidth onPress={onSecondaryAction} variant="danger">
+          <Button fullWidth onPress={onSecondaryAction} variant={secondaryActionVariant}>
             {secondaryActionLabel}
           </Button>
         ) : undefined}

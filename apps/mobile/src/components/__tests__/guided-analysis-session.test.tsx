@@ -16,7 +16,10 @@ import { ChartPathThemeProvider } from '@chartpath/ui';
 import { router } from 'expo-router';
 
 import type { LearningContextValue } from '@/state/learning';
-import { CURRENT_PERSISTENCE_SCHEMA_VERSION, type PersistenceSnapshot } from '@/lib/persistence';
+import {
+  CURRENT_PERSISTENCE_SCHEMA_VERSION,
+  type PersistenceSnapshot,
+} from '@/lib/persistence/types';
 
 let mockLearning: LearningContextValue;
 const mockRouterPush = jest.mocked(router.push);
@@ -266,6 +269,10 @@ function learningValue(current: GuidedAnalysisSession): LearningContextValue {
     advancePositionManagementSession: jest.fn(),
     completePositionManagementReplay: jest.fn(),
     discardQuarantinedAnalysisSessions: jest.fn(),
+    discardQuarantinedPaperExecutionSessions: jest.fn(),
+    discardQuarantinedPositionManagementSessions: jest.fn(),
+    previewRecoveryImport: jest.fn(),
+    applyRecoveryImport: jest.fn(),
     resetData: jest.fn(),
     reload: jest.fn(),
   };
@@ -415,6 +422,7 @@ describe('GuidedAnalysisSessionView', () => {
     const screen = await renderSession(current);
 
     expect(screen.getByTestId('historical-replay-reveal')).toBeTruthy();
+    expect(screen.getByTestId('internal-qa-boundary')).toBeTruthy();
     expect(screen.getByText(/Generated fixture 001/)).toBeTruthy();
     expect(screen.getByText(/2025-01-05/)).toBeTruthy();
     expect(screen.getByText('זהו תרשים היסטורי; הזהות והתוצאה הוסתרו עד לסיום.')).toBeTruthy();

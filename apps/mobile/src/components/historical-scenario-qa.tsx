@@ -1,10 +1,22 @@
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, Platform, Pressable, View } from 'react-native';
 
 import { Badge, Button, Card, Heading, LtrText, Screen, UiText, useTheme } from '@chartpath/ui';
 
 import { TopBar } from './top-bar';
 import type { BlindQaCandidateCard, RevealedQaCandidateDetail } from '@/data/scenario-qa';
+
+function focusAccessibleTarget(target: View | null): void {
+  if (!target) return;
+  if (Platform.OS === 'web') {
+    requestAnimationFrame(() =>
+      (target as unknown as { readonly focus?: () => void }).focus?.(),
+    );
+    return;
+  }
+  const handle = findNodeHandle(target);
+  if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+}
 
 export function HistoricalScenarioQa({
   cards,
@@ -24,6 +36,13 @@ export function HistoricalScenarioQa({
   const [entered, setEntered] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [detail, setDetail] = useState<RevealedQaCandidateDetail | null>(null);
+  const actionHeadingRef = useRef<View>(null);
+  const revealedHeadingRef = useRef<View>(null);
+
+  useEffect(() => {
+    const target = detail ? revealedHeadingRef.current : selectedKey ? actionHeadingRef.current : null;
+    focusAccessibleTarget(target);
+  }, [detail, selectedKey]);
 
   if (!entered) {
     return (
@@ -50,6 +69,7 @@ export function HistoricalScenarioQa({
               accessibilityLabel="אישור הבנת גבול QA פנימי"
               accessibilityRole="checkbox"
               accessibilityState={{ checked: acknowledged }}
+              aria-checked={acknowledged}
               onPress={() => setAcknowledged((value) => !value)}
               style={{
                 alignItems: 'center',
@@ -141,7 +161,18 @@ export function HistoricalScenarioQa({
         <Card accessibilityLabel="בחירת פעולה למועמד QA נבחר" variant="accent">
           <View style={{ gap: theme.spacing.sm }}>
             <Badge tone="warning">QA פנימי · סינתטי · ללא קרדיט</Badge>
-            <Heading level={2}>פתיחה עיוורת או חשיפת פרטי QA?</Heading>
+            <View
+              accessibilityLabel="מועמד QA נבחר. פתיחה עיוורת או חשיפת פרטי QA?"
+              accessibilityRole={Platform.OS === 'web' ? undefined : 'header'}
+              accessible={Platform.OS !== 'web'}
+              ref={actionHeadingRef}
+              tabIndex={-1}
+            >
+              <Heading level={2}>פתיחה עיוורת או חשיפת פרטי QA?</Heading>
+            </View>
+            <UiText accessibilityLiveRegion="polite" testID="scenario-qa-selection-announcement">
+              מועמד QA נבחר. התשובה עדיין מוסתרת.
+            </UiText>
             <UiText>
               פתיחה עיוורת אינה חושפת את זהות התרחיש או את התשובה. החשיפה היא פעולה נפרדת ותציג
               מזהים, החלטה צפויה, checksum, חסמי פרסום וראיות ביצוע.
@@ -185,7 +216,18 @@ export function HistoricalScenarioQa({
               {detail.publicationCandidate ? (
                 <Badge tone="warning">מועמד לפרסום · טרם פורסם</Badge>
               ) : undefined}
-              <Heading level={1}>{detail.titleHe}</Heading>
+              <View
+                accessibilityLabel={`פרטי QA נחשפו. ${detail.titleHe}`}
+                accessibilityRole={Platform.OS === 'web' ? undefined : 'header'}
+                accessible={Platform.OS !== 'web'}
+                ref={revealedHeadingRef}
+                tabIndex={-1}
+              >
+                <Heading level={1}>{detail.titleHe}</Heading>
+              </View>
+              <UiText accessibilityLiveRegion="polite" testID="scenario-qa-reveal-announcement">
+                פרטי QA ותשובת הבדיקה נחשפו.
+              </UiText>
               <UiText variant="label">{detail.decisionHe}</UiText>
               <UiText color="textMuted">רמת עבודה: {detail.difficultyHe}</UiText>
               <LtrText color="textMuted" variant="caption">
@@ -227,24 +269,64 @@ export function HistoricalScenarioQa({
                   {detail.publicationCandidate.materialSetChecksum}
                 </LtrText>
                 <UiText color="warning" variant="bodySmall">
-                  {`נדרשות ${detail.publicationCandidate.requiredReviewScopes.length} סקירות חתומות, כולל נגישות, עברית, בטיחות פיננסית ורישוי.`}
+                  נדרשות סקירות חתומות בכל ההיקפים הבאים:
                 </UiText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {detail.publicationCandidate.requiredReviewScopes.map((scope) => (
+                    <Badge key={scope} tone="neutral">
+                      <LtrText variant="caption">{scope}</LtrText>
+                    </Badge>
+                  ))}
+                </View>
               </View>
             </Card>
           ) : undefined}
 
-          <Card variant="outlined">
-            <View style={{ gap: 7 }}>
-              <Heading level={2}>מקור פדגוגי שנבדק</Heading>
-              <LtrText color="textMuted" variant="caption">
-                {detail.sourceIdentity}
-              </LtrText>
-              <UiText color="textMuted" variant="bodySmall">
-                {detail.sourceSectionHe}
-              </UiText>
-              <UiText>{detail.sourceRationaleHe}</UiText>
-            </View>
-          </Card>
+          {detail.publicationCandidate?.sourceProvenance.map((source, index) => (
+            <Card
+              key={source.provenanceId}
+              testID={`scenario-qa-source-provenance-${index + 1}`}
+              variant="outlined"
+            >
+              <View style={{ gap: 7 }}>
+                <Heading level={2}>
+                  {source.role === 'base-scenario'
+                    ? 'מקור תרחיש בסיס'
+                    : 'מקור דוקטרינת ניהול פוזיציה'}
+                </Heading>
+                <LtrText color="textMuted" style={{ flexShrink: 1 }} variant="caption">
+                  {`${source.sourceId} · ${source.pdfDocumentId}`}
+                </LtrText>
+                <LtrText color="textMuted" variant="caption">
+                  {`PDF ${source.physicalPages.start}–${source.physicalPages.end} · printed ${source.printedPages.start}–${source.printedPages.end}`}
+                </LtrText>
+                <UiText color="textMuted" variant="bodySmall">
+                  {`${source.chapter} · ${source.figureOrCase}`}
+                </UiText>
+                <UiText variant="label">{source.concept}</UiText>
+                <UiText>{source.originalSummaryHe}</UiText>
+                <LtrText color="textMuted" style={{ flexShrink: 1 }} variant="caption">
+                  {source.reviewedContentIds.join(' · ')}
+                </LtrText>
+                <Badge tone="warning">זכויות מקור: נדרשת החלטה אנושית</Badge>
+              </View>
+            </Card>
+          ))}
+
+          {!detail.publicationCandidate ? (
+            <Card variant="outlined">
+              <View style={{ gap: 7 }}>
+                <Heading level={2}>מקור פדגוגי שנבדק</Heading>
+                <LtrText color="textMuted" variant="caption">
+                  {detail.sourceIdentity}
+                </LtrText>
+                <UiText color="textMuted" variant="bodySmall">
+                  {detail.sourceSectionHe}
+                </UiText>
+                <UiText>{detail.sourceRationaleHe}</UiText>
+              </View>
+            </Card>
+          ) : undefined}
 
           <Card variant="outlined">
             <View style={{ gap: 7 }}>

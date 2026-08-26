@@ -264,14 +264,20 @@ export function GuidedAnalysisChart({
   };
 
   const identityMatches =
-    session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
-    (session.chart.kind === 'historical'
-      ? historicalResolution?.status === 'ready' && historicalView !== undefined
-      : session.chart.id === syntheticChart.spec.id &&
+    session.chart.kind === 'historical'
+      ? historicalResolution?.status === 'ready' &&
+        historicalView !== undefined &&
+        session.exerciseId === historicalResolution.content.educationalExercise.id &&
+        session.contentVersionId ===
+          historicalResolution.content.educationalExercise.contentVersionId &&
+        session.exerciseSchemaVersion ===
+          historicalResolution.content.educationalExercise.schemaVersion
+      : session.exerciseId === GUIDED_ANALYSIS_EXERCISE_ID &&
+        session.chart.id === syntheticChart.spec.id &&
         session.chart.seed === syntheticChart.spec.seed &&
         session.chart.generatorVersion === syntheticChart.spec.generatorVersion &&
         session.chart.candleCount === syntheticChart.candles.length &&
-        session.chart.decisionCandleIndex === syntheticChart.spec.decisionCandleIndex);
+        session.chart.decisionCandleIndex === syntheticChart.spec.decisionCandleIndex;
 
   if (!identityMatches) {
     return (

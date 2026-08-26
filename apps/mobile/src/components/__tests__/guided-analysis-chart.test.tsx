@@ -114,6 +114,25 @@ function historicalSession(
   };
 }
 
+function candidateHistoricalSession(): GuidedAnalysisSession {
+  const resolved = resolveHistoricalReplayScenario('internal-no-trade-capstone-c');
+  if (resolved.status !== 'ready') throw new Error('Candidate historical fixture is unavailable');
+  return {
+    ...session(),
+    exerciseId: resolved.content.educationalExercise.id,
+    contentVersionId: resolved.content.educationalExercise.contentVersionId,
+    exerciseSchemaVersion: resolved.content.educationalExercise.schemaVersion,
+    chart: resolved.chartIdentity,
+    replay: {
+      initialCursorCandleIndex: resolved.content.scenario.initialVisibleRange.endCandleIndex,
+      cursorCandleIndex: resolved.content.scenario.decisionCandleIndex,
+      maxCursorSeenCandleIndex: resolved.content.scenario.decisionCandleIndex,
+      decisionCandleIndex: resolved.content.scenario.decisionCandleIndex,
+      checkpoints: [],
+    },
+  };
+}
+
 describe('GuidedAnalysisChart', () => {
   it('labels the chart as an ungraded notebook and keeps its chronology explicitly LTR', async () => {
     const screen = await renderChart();
@@ -221,6 +240,14 @@ describe('GuidedAnalysisChart', () => {
     expect(JSON.stringify(screen.toJSON())).not.toMatch(
       /DEV-BLIND-001|Generated fixture 001|2025-01-05|github\.com|future fixture annotation/,
     );
+  });
+
+  it('accepts the exact virtual exercise identity for an internal candidate chart', async () => {
+    const screen = await renderChart({ value: candidateHistoricalSession() });
+
+    expect(screen.queryByTestId('guided-analysis-chart-notebook-incompatible')).toBeNull();
+    expect(screen.getByTestId('guided-analysis-chart-notebook-plot')).toBeTruthy();
+    expect(screen.getByText(/Replay.*היסטורי עיוור/)).toBeTruthy();
   });
 
   it('stamps historical geometry with its authorship cursor and resets to the persisted minimum', async () => {

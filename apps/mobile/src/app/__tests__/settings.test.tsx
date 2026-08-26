@@ -5,9 +5,10 @@ import { ChartPathThemeProvider } from '@chartpath/ui';
 import SettingsScreen from '../settings';
 
 const mockUpdateSettings = jest.fn(async () => undefined);
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), replace: jest.fn() },
+  router: { push: (...args: unknown[]) => mockPush(...args), replace: jest.fn() },
   usePathname: () => '/settings',
 }));
 jest.mock('@chartpath/content', () => ({ contentVersion: { id: 'test-content' } }), {
@@ -24,6 +25,9 @@ jest.mock('@/state/learning', () => ({
         textScale: 'system',
         dailyGoalMinutes: 10,
       },
+      quarantinedAnalysisSessions: [{ quarantineId: 'analysis-q' }],
+      quarantinedPaperExecutionSessions: [],
+      quarantinedPositionManagementSessions: [],
     },
     updateSettings: mockUpdateSettings,
     resetData: jest.fn(),
@@ -32,7 +36,10 @@ jest.mock('@/state/learning', () => ({
 }));
 
 describe('settings accessibility preferences', () => {
-  beforeEach(() => mockUpdateSettings.mockClear());
+  beforeEach(() => {
+    mockUpdateSettings.mockClear();
+    mockPush.mockClear();
+  });
 
   it('persists reduced-motion preference from the accessible switch', async () => {
     const screen = await render(
@@ -50,7 +57,24 @@ describe('settings accessibility preferences', () => {
         <SettingsScreen />
       </ChartPathThemeProvider>,
     );
-    expect(screen.getByText(/גיבוי האפליקציה מושבת/)).toBeTruthy();
-    expect(screen.getByText(/iCloud/)).toBeTruthy();
+    expect(screen.getByText(/מוחרג מגיבויי מערכת ההפעלה/)).toBeTruthy();
+    expect(screen.getByText(/אינם מסלול שחזור נתמך/)).toBeTruthy();
+    expect(screen.queryByText(/ייתכן.*iCloud/)).toBeNull();
+  });
+
+  it('wraps segmented controls and links the quarantine count to data recovery', async () => {
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <SettingsScreen />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByText(/1.*בהסגר/)).toBeTruthy();
+    expect(screen.getByLabelText('בחירת ערכת נושא').props.style).toMatchObject({
+      flexWrap: 'wrap',
+      width: '100%',
+    });
+    await fireEvent.press(screen.getByTestId('settings-recovery'));
+    expect(mockPush).toHaveBeenCalledWith('/data-recovery');
   });
 });

@@ -29,6 +29,7 @@ import { ErrorState, LoadingState } from './app-state';
 import { OhlcvChart, type ExecutionChartOverlay } from './ohlcv-chart';
 import { PaperPositionManagement } from './paper-position-management';
 import { TopBar } from './top-bar';
+import { InternalQaBoundaryBanner } from './internal-qa-boundary-banner';
 import {
   resolvePaperExecutionAnalysisSession,
   resolvePaperExecutionSession,
@@ -545,6 +546,7 @@ export function PaperExecutionScreen({
         testID="paper-execution-recovery"
       >
         <TopBar back subtitle="שחזור מוגן" title="תרגול הביצוע אינו זמין" />
+        <InternalQaBoundaryBanner accessMode={accessMode} />
         <Card variant="outlined">
           <Heading level={2}>המקור המוצמד לא אומת</Heading>
           <UiText color="textMuted">
@@ -686,6 +688,8 @@ export function PaperExecutionScreen({
       testID="paper-execution-screen"
     >
       <TopBar back subtitle="סימולציה דטרמיניסטית · ללא כסף אמיתי" title="ביצוע על נייר" />
+
+      <InternalQaBoundaryBanner accessMode={accessMode} />
 
       <Card variant="accent">
         <View style={{ gap: theme.spacing.sm }}>

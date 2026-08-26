@@ -1,6 +1,14 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Platform,
+  Pressable,
+  Switch,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { contentVersion } from '@chartpath/content';
 import { Badge, Button, Card, Heading, LtrText, UiText, useTheme } from '@chartpath/ui';
@@ -12,6 +20,18 @@ import { MainScreen } from '@/components/main-screen';
 import { TopBar } from '@/components/top-bar';
 import type { TextScalePreference, ThemePreference } from '@/lib/persistence';
 import { useLearning } from '@/state/learning';
+
+function focusAccessibleTarget(target: View | null): void {
+  if (!target) return;
+  if (Platform.OS === 'web') {
+    requestAnimationFrame(() =>
+      (target as unknown as { readonly focus?: () => void }).focus?.(),
+    );
+    return;
+  }
+  const handle = findNodeHandle(target);
+  if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+}
 
 function SettingRow({
   title,
@@ -26,8 +46,8 @@ function SettingRow({
   return (
     <View
       style={{
-        alignItems: 'center',
-        flexDirection: 'row',
+        alignItems: 'stretch',
+        flexDirection: 'column',
         gap: theme.spacing.md,
         minHeight: 58,
       }}
@@ -38,7 +58,7 @@ function SettingRow({
           {description}
         </UiText>
       </View>
-      {control}
+      <View style={{ alignSelf: 'stretch' }}>{control}</View>
     </View>
   );
 }
@@ -63,8 +83,10 @@ function Segmented<T extends string>({
         backgroundColor: theme.colors.surfaceMuted,
         borderRadius: 13,
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 3,
         padding: 3,
+        width: '100%',
       }}
     >
       {options.map((option) => {
@@ -81,6 +103,7 @@ function Segmented<T extends string>({
               borderRadius: 10,
               minHeight: 44,
               minWidth: 65,
+              flexGrow: 1,
               paddingHorizontal: 10,
               paddingVertical: 9,
             }}
@@ -98,9 +121,15 @@ function Segmented<T extends string>({
 export default function SettingsScreen() {
   const theme = useTheme();
   const learning = useLearning();
+  const { fontScale } = useWindowDimensions();
   const [confirmReset, setConfirmReset] = useState(false);
   const [working, setWorking] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const resetConfirmationRef = useRef<View>(null);
+  useEffect(() => {
+    if (!confirmReset) return;
+    focusAccessibleTarget(resetConfirmationRef.current);
+  }, [confirmReset]);
   const reset = async () => {
     setWorking(true);
     setResetError(null);
@@ -114,22 +143,27 @@ export default function SettingsScreen() {
     }
   };
   if (learning.status === 'loading') return <LoadingState />;
-  if (learning.status === 'error' || !learning.snapshot)
+  if (learning.status === 'error' || !learning.snapshot) {
+    const recoverable = learning.initializationFailure?.reason === 'corrupt-store';
     return (
       <ErrorState
-        message={resetError ?? learning.error ?? 'שגיאה בטעינת ההגדרות'}
+        message={learning.error ?? 'שגיאה בטעינת ההגדרות'}
         onRetry={() => void learning.reload()}
-        onSecondaryAction={() => {
-          if (!confirmReset) {
-            setConfirmReset(true);
-            return;
-          }
-          void reset();
-        }}
-        secondaryActionLabel={confirmReset ? 'אישור מחיקה ואיפוס' : 'איפוס נתונים פגומים'}
+        {...(recoverable
+          ? {
+              onSecondaryAction: () => router.push('/data-recovery' as Href),
+              secondaryActionLabel: 'פתיחת מרכז שחזור',
+              secondaryActionVariant: 'secondary' as const,
+            }
+          : {})}
       />
     );
+  }
   const settings = learning.snapshot.settings;
+  const quarantineCount =
+    learning.snapshot.quarantinedAnalysisSessions.length +
+    learning.snapshot.quarantinedPaperExecutionSessions.length +
+    learning.snapshot.quarantinedPositionManagementSessions.length;
   const update = async (patch: Parameters<typeof learning.updateSettings>[0]) => {
     setWorking(true);
     try {
@@ -141,6 +175,11 @@ export default function SettingsScreen() {
   return (
     <MainScreen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
       <TopBar subtitle="התאמה אישית, נגישות ונתונים" title="הגדרות" />
+      {fontScale >= 1.3 ? (
+        <UiText accessibilityLiveRegion="polite" color="textMuted" testID="large-text-layout">
+          פריסת טקסט גדול פעילה; פקדי הבחירה נפרסים בשורות לפי המקום הזמין.
+        </UiText>
+      ) : undefined}
       <Card>
         <View style={{ gap: theme.spacing.md }}>
           <Heading level={2}>תצוגה</Heading>
@@ -255,9 +294,27 @@ export default function SettingsScreen() {
             הניסיונות, ההתקדמות וההגדרות נשמרים מקומית במכשיר. אין חשבון ואין סנכרון ענן.
           </UiText>
           <UiText color="textMuted" variant="caption">
-            גיבוי האפליקציה מושבת ב־Android. ב־iOS ייתכן שנתוני הלימוד המקומיים ייכללו בגיבוי המכשיר
-            או iCloud, לפי הגדרות המערכת.
+            מאגר הלמידה מוחרג מגיבויי מערכת ההפעלה ב־Android וב־iOS, והגיבויים האלה אינם מסלול
+            שחזור נתמך. העברה נתמכת רק דרך קובץ שחזור מוצפן שנוצר ונשמר ביוזמתכם.
           </UiText>
+          <Card
+            onPress={() => router.push('/data-recovery' as Href)}
+            testID="settings-recovery"
+            variant="subtle"
+          >
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Heading level={3}>מרכז שחזור והסגר</Heading>
+                <Badge tone={quarantineCount ? 'warning' : 'neutral'}>
+                  {quarantineCount ? `${quarantineCount} בהסגר` : 'ההסגר ריק'}
+                </Badge>
+              </View>
+              <UiText color="textMuted" variant="bodySmall">
+                יצוא ויבוא מוצפנים, בחירת קטגוריות, צפייה בטיוטות מבודדות והסרה מפורשת של רשומות
+                מסומנות בלי למחוק ניסיונות או התקדמות.
+              </UiText>
+            </View>
+          </Card>
           {!confirmReset ? (
             <Button fullWidth onPress={() => setConfirmReset(true)} variant="danger">
               איפוס כל הנתונים
@@ -265,10 +322,21 @@ export default function SettingsScreen() {
           ) : (
             <Card variant="subtle">
               <View style={{ gap: 12 }}>
-                <UiText color="danger" variant="label">
-                  האיפוס ימחק מהמכשיר את כל הניסיונות וההתקדמות, ולא ניתן לבטל אותו.
+                <View
+                  accessibilityLabel="אישור איפוס כל הנתונים. האיפוס ימחק את כל הניסיונות וההתקדמות ולא ניתן לבטל אותו."
+                  accessibilityRole={Platform.OS === 'web' ? undefined : 'header'}
+                  accessible={Platform.OS !== 'web'}
+                  ref={resetConfirmationRef}
+                  tabIndex={-1}
+                >
+                  <UiText color="danger" variant="label">
+                    האיפוס ימחק מהמכשיר את כל הניסיונות וההתקדמות, ולא ניתן לבטל אותו.
+                  </UiText>
+                </View>
+                <UiText accessibilityLiveRegion="assertive" color="danger" variant="caption">
+                  נדרש אישור מפורש לפני המחיקה.
                 </UiText>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   <Button loading={working} onPress={() => void reset()} variant="danger">
                     מחיקה ואיפוס
                   </Button>
@@ -276,7 +344,11 @@ export default function SettingsScreen() {
                     ביטול
                   </Button>
                 </View>
-                {resetError ? <UiText color="danger">{resetError}</UiText> : undefined}
+                {resetError ? (
+                  <UiText accessibilityLiveRegion="assertive" color="danger">
+                    {resetError}
+                  </UiText>
+                ) : undefined}
               </View>
             </Card>
           )}

@@ -40,6 +40,36 @@ const secretDetail: RevealedQaCandidateDetail = {
       'licensing',
       'publication',
     ],
+    sourceProvenance: [
+      {
+        provenanceId: 'base-scenario:secret',
+        role: 'base-scenario',
+        sourceId: 'ta-he-v2',
+        pdfDocumentId: 'pdf-secret',
+        physicalPages: { start: 72, end: 73 },
+        printedPages: { start: 59, end: 60 },
+        chapter: 'פרק 19',
+        figureOrCase: 'איור 19.1',
+        reviewedContentIds: ['reviewed-secret'],
+        concept: 'מבנה מקור',
+        originalSummaryHe: 'סיכום מקור בסיס סודי',
+        sourcePdfRightsStatus: 'human-decision-required',
+      },
+      {
+        provenanceId: 'position-management-doctrine:secret',
+        role: 'position-management-doctrine',
+        sourceId: 'ta-he-v2',
+        pdfDocumentId: 'pdf-secret',
+        physicalPages: { start: 76, end: 79 },
+        printedPages: { start: 63, end: 66 },
+        chapter: 'פרק 20',
+        figureOrCase: 'עמוד 78',
+        reviewedContentIds: ['management-secret'],
+        concept: 'ניהול פוזיציה',
+        originalSummaryHe: 'סיכום דוקטרינת ניהול סודי',
+        sourcePdfRightsStatus: 'human-decision-required',
+      },
+    ],
   },
 };
 
@@ -63,11 +93,12 @@ describe('HistoricalScenarioQa', () => {
       </ChartPathThemeProvider>,
     );
     const deny =
-      /SECRET|כותרת סודית|תרחיש לונג|PDF 72|sha256|market-entry|target|publication-candidate-long/;
+      /SECRET|כותרת סודית|תרחיש לונג|PDF 72|PDF 76|management-secret|sha256|market-entry|target|publication-candidate-long/;
 
     expect(JSON.stringify(screen.toJSON())).not.toMatch(deny);
     expect(screen.getByTestId('scenario-qa-enter').props.accessibilityState.disabled).toBe(true);
     await fireEvent.press(screen.getByTestId('scenario-qa-ack'));
+    expect(screen.getByTestId('scenario-qa-ack').props.accessibilityState.checked).toBe(true);
     await fireEvent.press(screen.getByTestId('scenario-qa-enter'));
 
     expect(screen.getByTestId('scenario-qa-screen')).toBeTruthy();
@@ -75,6 +106,9 @@ describe('HistoricalScenarioQa', () => {
     expect(screen.getByTestId('scenario-qa-candidate-candidate-01').props.accessible).toBe(false);
     expect(JSON.stringify(screen.toJSON())).not.toMatch(deny);
     await fireEvent.press(screen.getByTestId('scenario-qa-select-candidate-01'));
+    expect(
+      screen.getByTestId('scenario-qa-selection-announcement').props.accessibilityLiveRegion,
+    ).toBe('polite');
     expect(revealDetail).not.toHaveBeenCalled();
     expect(JSON.stringify(screen.toJSON())).not.toMatch(deny);
 
@@ -86,10 +120,17 @@ describe('HistoricalScenarioQa', () => {
     await fireEvent.press(screen.getByTestId('scenario-qa-reveal-candidate-01'));
     expect(revealDetail).toHaveBeenCalledWith('candidate-01');
     expect(screen.getByTestId('scenario-qa-revealed-detail')).toBeTruthy();
+    expect(
+      screen.getByTestId('scenario-qa-reveal-announcement').props.accessibilityLiveRegion,
+    ).toBe('polite');
     expect(screen.getByText('כותרת סודית לונג')).toBeTruthy();
     expect(screen.getByText('SECRET-SCENARIO@1.0.0')).toBeTruthy();
     expect(screen.getByTestId('scenario-qa-blockers')).toBeTruthy();
     expect(screen.getByTestId('scenario-qa-review-packet')).toBeTruthy();
+    expect(screen.getByTestId('scenario-qa-source-provenance-1')).toBeTruthy();
+    expect(screen.getByTestId('scenario-qa-source-provenance-2')).toBeTruthy();
+    expect(screen.getByText('PDF 76–79 · printed 63–66')).toBeTruthy();
+    expect(screen.getByText('accessibility')).toBeTruthy();
     expect(screen.getByText('publication-candidate-long-v1')).toBeTruthy();
     expect(screen.getByText('חסם פרסום סודי')).toBeTruthy();
   });

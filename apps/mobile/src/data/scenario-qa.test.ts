@@ -69,7 +69,16 @@ describe('internal scenario QA projections', () => {
         requiredReviewScopes: expect.arrayContaining(['accessibility', 'licensing', 'publication']),
       });
       expect(detail?.publicationCandidate?.reviewPacketPath).toMatch(/review-packets\/.+\.jsonl$/);
+      expect(detail?.publicationCandidate?.sourceProvenance.length).toBeGreaterThan(0);
     }
+    expect(selected[1]?.publicationCandidate?.sourceProvenance).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'position-management-doctrine',
+          physicalPages: { start: 76, end: 79 },
+        }),
+      ]),
+    );
   });
 
   it('resolves identity only through the explicit QA action-boundary lookup', () => {

@@ -40,6 +40,7 @@ import {
 } from './capstone-interaction';
 import { GuidedAnalysisChart } from './guided-analysis-chart';
 import { TopBar } from './top-bar';
+import { InternalQaBoundaryBanner } from './internal-qa-boundary-banner';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 import { skillById } from '@/data/catalog';
 import { matchingAlternativeExplanation } from '@/data/feedback-answer-ids';
@@ -211,6 +212,7 @@ function GuidedDebrief({
     return (
       <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
         <TopBar back subtitle="תחקיר מוגן" title="המקור ההיסטורי אינו זמין" />
+        <InternalQaBoundaryBanner accessMode={accessMode} />
         <Card testID="historical-debrief-recovery" variant="outlined">
           <Heading level={3}>לא ניתן לאמת את העותק הקפוא</Heading>
           <UiText color="textMuted">
@@ -291,6 +293,8 @@ function GuidedDebrief({
       testID="guided-analysis-debrief"
     >
       <TopBar back subtitle="נשמר לקריאה בלבד" title="תחקיר תהליך מלא" />
+
+      <InternalQaBoundaryBanner accessMode={accessMode} />
 
       <Card variant="accent">
         <View style={{ gap: theme.spacing.md }}>
@@ -615,6 +619,7 @@ export function GuidedAnalysisSessionView({
     return (
       <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
         <TopBar back subtitle="טיוטה שננטשה" title="הניתוח אינו ניתן לעריכה" />
+        <InternalQaBoundaryBanner accessMode={accessMode} />
         <Card variant="outlined">
           <UiText>
             הטיוטה נשמרה בהיסטוריה אך אינה פתוחה לעריכה. אפשר להתחיל ניתוח חדש ממעבדת הגרפים.
@@ -653,6 +658,7 @@ export function GuidedAnalysisSessionView({
     return (
       <Screen contentContainerStyle={{ gap: theme.spacing.xl }} scroll>
         <TopBar back subtitle="נדרשת החלטת שחזור" title="גרסת הטיוטה אינה תואמת" />
+        <InternalQaBoundaryBanner accessMode={accessMode} />
         <Card variant="outlined">
           <UiText>
             הטיוטה נוצרה מול גרסת תוכן או גרף אחרת ולכן אינה נפתחת לעריכה אוטומטית. אפשר לשמור אותה
@@ -780,6 +786,8 @@ export function GuidedAnalysisSessionView({
         subtitle={historical ? 'Replay עיוור · עותק קפוא אומת' : 'תרחיש סינתטי · תהליך מקור־מגובה'}
         title="ניתוח מונחה"
       />
+
+      <InternalQaBoundaryBanner accessMode={accessMode} />
 
       {historical ? (
         <Card testID="historical-session-disclosure" variant="outlined">

@@ -22,6 +22,24 @@ export interface BlindQaCandidateCard {
   readonly readinessHe: string;
 }
 
+export interface QaSourceProvenance {
+  readonly provenanceId: string;
+  readonly role: 'base-scenario' | 'position-management-doctrine';
+  readonly sourceId: string;
+  readonly pdfDocumentId: string;
+  readonly physicalPages: { readonly start: number; readonly end: number };
+  readonly printedPages: {
+    readonly start: number | string;
+    readonly end: number | string;
+  };
+  readonly chapter: string;
+  readonly figureOrCase: string;
+  readonly reviewedContentIds: readonly string[];
+  readonly concept: string;
+  readonly originalSummaryHe: string;
+  readonly sourcePdfRightsStatus: 'human-decision-required';
+}
+
 export interface RevealedQaCandidateDetail {
   readonly qaKey: string;
   readonly titleHe: string;
@@ -46,6 +64,7 @@ export interface RevealedQaCandidateDetail {
     readonly materialSetChecksum: string;
     readonly reviewPacketPath: string;
     readonly requiredReviewScopes: readonly string[];
+    readonly sourceProvenance: readonly QaSourceProvenance[];
   };
 }
 
@@ -88,6 +107,7 @@ function publicationCandidateFor(
     materialSetChecksum: candidate.materialSetChecksum,
     reviewPacketPath: `review-packets/${candidate.candidateId}/review-packet.canonical.jsonl`,
     requiredReviewScopes: candidate.requiredReviewScopes,
+    sourceProvenance: candidate.sourceProvenance,
   };
 }
 
