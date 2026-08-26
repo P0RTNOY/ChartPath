@@ -11,6 +11,7 @@ import {
   qaScenarioIdentityForKey,
   revealedQaCandidateDetail,
 } from '@/data/scenario-qa';
+import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 import { useLearning } from '@/state/learning';
 import { Screen } from '@chartpath/ui';
 
@@ -20,7 +21,7 @@ export default function HistoricalScenarioQaRoute() {
   const [startingKey, setStartingKey] = useState<string>();
   const [startError, setStartError] = useState<string | null>(null);
   const developerFlag = Array.isArray(developer) ? developer[0] : developer;
-  if (!__DEV__ || developerFlag !== '1') {
+  if (!isInternalReviewerModeEnabled() || developerFlag !== '1') {
     return (
       <Screen testID="scenario-qa-unavailable">
         <TopBar back title="QA תרחישים" />

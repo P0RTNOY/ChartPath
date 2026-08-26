@@ -19,6 +19,8 @@
     "reviews:pack": "tsx src/scenarios/publication/review-pack-cli.ts",
     "reviews:check": "tsx src/scenarios/publication/review-pack-cli.ts --check",
     "reviews:verify": "tsx src/scenarios/publication/review-verify-cli.ts",
+    "reviewers:governance": "tsx src/scenarios/publication/reviewer-governance-cli.ts",
+    "reviewers:keygen": "tsx src/scenarios/publication/reviewer-keygen-cli.ts",
     "release:preflight": "tsx src/scenarios/publication/release-preflight-cli.ts",
     "identity:audit": "tsx src/scenarios/identity-cli.ts"
   },

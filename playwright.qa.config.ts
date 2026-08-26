@@ -28,7 +28,8 @@ export default defineConfig({
   webServer: process.env.CHARTPATH_QA_BASE_URL
     ? undefined
     : {
-        command: 'CI=1 pnpm --filter @chartpath/mobile exec expo start --web --port 4174 --clear',
+        command:
+          'CI=1 EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE=1 pnpm --filter @chartpath/mobile exec expo start --web --port 4174 --clear',
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

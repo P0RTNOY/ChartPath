@@ -54,9 +54,14 @@ const mockPush = jest.mocked(router.push);
 
 describe('HistoricalScenarioQaRoute', () => {
   beforeEach(() => {
+    process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE = '1';
     mockPush.mockClear();
     mockCreateOrResumeAnalysisSession.mockReset();
     mockPositionManagementJourneyForKey.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
   });
 
   it('builds a real exact-version open-paper management journey before routing', async () => {
@@ -119,6 +124,19 @@ describe('HistoricalScenarioQaRoute', () => {
 
   it('fails closed without the explicit developer route flag', async () => {
     mockDeveloper = undefined;
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <HistoricalScenarioQaRoute />
+      </ChartPathThemeProvider>,
+    );
+
+    expect(screen.getByTestId('scenario-qa-unavailable')).toBeTruthy();
+    expect(screen.queryByTestId('scenario-qa-gate')).toBeNull();
+  });
+
+  it('fails closed when the reviewer build flag is absent', async () => {
+    mockDeveloper = '1';
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
     const screen = await render(
       <ChartPathThemeProvider direction="rtl" mode="light">
         <HistoricalScenarioQaRoute />
