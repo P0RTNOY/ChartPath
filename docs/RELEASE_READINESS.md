@@ -1,34 +1,35 @@
 # ChartPath beta release readiness
 
-Updated: 2026-08-25 (Asia/Jerusalem)
+Updated: 2026-08-27 (Asia/Jerusalem)
 
 This record distinguishes the verified local beta from native distribution readiness. It does not
 claim app-store, production, or human-learning validation.
 
 ## Candidate identity
 
-| Field                                          | Value                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Product version                                | `0.1.0`                                                                                |
-| Content version                                | `2026.08-beta.1`                                                                       |
-| Content schema                                 | `1`                                                                                    |
-| Guided-session schema                          | `2`                                                                                    |
-| Persistence schema                             | Web/native payload `6`; native SQLite migrations `5`                                   |
-| Historical-data schema                         | `1`                                                                                    |
-| Paper-execution schema/policy                  | `1`; `paper-execution-policy-v1`; `paper-cost-model-v1`                                |
-| Position-management schema/policy              | `1`; `position-management-policy-v1`; automatic trailing disabled                      |
-| Branch                                         | `codex/position-management-journal`                                                    |
-| Milestone 6 implementation/evidence checkpoint | `7cb8dd2`; documentation commit and final clean HEAD are reported in the handoff       |
-| Milestone 3 implementation tip                 | `37ebb67`; final documentation is committed separately                                 |
-| Foundation commit                              | `f394380`                                                                              |
-| Catalog commit                                 | `1e194e0`                                                                              |
-| Mobile commit                                  | `f928497`                                                                              |
-| Journey-evidence commit                        | `3bc11d4`                                                                              |
-| Integrity-hardening commit                     | `dc992bd`                                                                              |
-| Source PDF SHA-256                             | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
-| Previously verified runtime                    | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
-| Bundle-verified targets                        | Expo iOS and Android Hermes bundles                                                    |
-| Decision                                       | **GO for the local web beta; NO-GO for native distribution**                           |
+| Field                             | Value                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| Product version                   | `0.1.0`                                                                                |
+| Content version                   | `2026.08-beta.1`                                                                       |
+| Content schema                    | `1`                                                                                    |
+| Guided-session schema             | `2`                                                                                    |
+| Persistence schema                | Web/native payload `6`; native SQLite migrations `5`                                   |
+| Historical-data schema            | `1`                                                                                    |
+| Paper-execution schema/policy     | `1`; `paper-execution-policy-v1`; `paper-cost-model-v1`                                |
+| Position-management schema/policy | `1`; `position-management-policy-v1`; automatic trailing disabled                      |
+| Branch                            | `codex/external-review-native-release-closure`                                         |
+| Milestone 8 base                  | `b8a0c8a7e202aa4c0fcd95e6858b635f19f126e1`                                             |
+| Milestone 8 final                 | Reported from the clean local-only branch HEAD in the handoff                          |
+| Milestone 3 implementation tip    | `37ebb67`; final documentation is committed separately                                 |
+| Foundation commit                 | `f394380`                                                                              |
+| Catalog commit                    | `1e194e0`                                                                              |
+| Mobile commit                     | `f928497`                                                                              |
+| Journey-evidence commit           | `3bc11d4`                                                                              |
+| Integrity-hardening commit        | `dc992bd`                                                                              |
+| Source PDF SHA-256                | `25554697f957169e5536da27a4441c97fea20a42a03efe54aa7113e5a8a25b33`                     |
+| Previously verified runtime       | Static Expo web export in Chromium plus Expo Go on an iPhone 17 Pro iOS 26.5 simulator |
+| Bundle-verified targets           | Expo iOS and Android Hermes bundles                                                    |
+| Decision                          | **Internal review build ready; publication and native distribution NO-GO**             |
 
 ## Verified product scope
 
@@ -60,15 +61,16 @@ claim app-store, production, or human-learning validation.
   development dataset with one recorded gap. It provides cutoff-only blind replay, exact local
   resume/recovery, post-finalization provenance reveal, and read-only history without ordinary
   attempt or projection credit.
-- The historical registry reports zero course-credit-eligible scenarios and four publication
+- The legacy development fixture reports zero course-credit eligibility and five publication
   blockers. No real candle, provider payload, provider key, or runtime market-data request is
   bundled or configured.
 - Milestone 4 defines a narrow local paper-execution simulation over an exact finalized historical
   analysis. It has one plan/order/position, deterministic events, explicit gap/cost/ambiguity
   assumptions and process-first debrief; it is not broker execution or a credited assessment.
 - Milestone 5 provides nine synthetic internal scenario candidates, an empty truthful ordinary
-  learner library, fail-closed seven-scope review and a developer-only QA surface. No candidate is
-  human-approved or published.
+  learner library, the then-seven-scope fail-closed review contract and a developer-only QA
+  surface. Licensing became the eighth required scope in Milestone 7. No candidate is human-approved
+  or published.
 - Milestone 6 provides three exact internal management variants over open paper handoffs. The pure
   aggregate supports N/N+1 full/partial exits, scale-in and manual stop/target replacements,
   explicit ambiguity, frozen-1R integer/FIFO accounting and an append-only journal. Automatic
@@ -266,7 +268,7 @@ roles do not replace a manual VoiceOver/TalkBack pass.
 | The required manual journey matrix was not fully executed by a human; complex interactions currently have automated component/domain evidence. | Automated correctness does not establish gesture ergonomics, comprehension, or end-to-end human usability.                                             | Execute and record all 11 journeys on phone, including chart gestures, review, capstone, and accessibility variants.                                 |
 | The Guided Analysis entry point rendered in Expo Go, but native input automation was unavailable in this environment.                          | The iOS bundle and Lab hub are native-rendered, but Guided pinch/pan and force-close/resume were not manually completed.                               | Complete a native Guided draft, force-quit/reopen it, and exercise pinch/pan on an interactable simulator or device.                                 |
 | Guided-analysis drafts are local-only and have no cloud synchronization.                                                                       | A device loss or explicit local-data reset removes unfinished sessions; this milestone only guarantees the supported local repository.                 | Treat any future account/sync work as a separate privacy, security and conflict-resolution project.                                                  |
-| The historical scenario is development-only, has zero course credit and retains four publication blockers.                                     | Focused engineering evidence does not establish redistribution rights, production publication, or independent educational approval.                    | Obtain explicit human licensing/procurement and editorial approval, then publish a new immutable dataset/scenario version only if every gate passes. |
+| The historical scenario is development-only, has zero course credit and retains five publication blockers.                                     | Focused engineering evidence does not establish redistribution rights, production publication, or independent educational approval.                    | Obtain explicit human licensing/procurement and editorial approval, then publish a new immutable dataset/scenario version only if every gate passes. |
 | Historical replay was inspected and exercised in browser phone/tablet profiles, not with native assistive technology.                          | Browser roles and screenshots cannot prove VoiceOver/TalkBack, native focus, gestures, lifecycle resume, or largest OS text.                           | Execute the full historical journey on native iOS and Android with screen readers, largest text, reduced motion and force-close/reopen.              |
 | No external learner study or editorial sign-off by a licensed financial educator was performed.                                                | The beta is technically and internally content-validated, not validated for learning outcomes or regulated use.                                        | Run a small beginner usability study and independent content/safety review before public distribution.                                               |
 | No store signing, privacy form, production deployment, or device matrix was requested.                                                         | This is a local beta, not a distributable release candidate.                                                                                           | Treat distribution as a separate explicitly authorized release project.                                                                              |
@@ -489,8 +491,9 @@ position and without hindsight regrading. Trade candidates enter paper execution
 exact finalized analysis and allowed direction/order type. All internal paths preserve zero ordinary
 attempt/mastery/review/lesson/XP/streak/activity mutation.
 
-Approved or published manifests require current approval in seven scopes—source, rubric, execution,
-accessibility, Hebrew, financial safety and publication—against the exact material checksum.
+Approved or published manifests now require current approval in eight scopes—source, rubric,
+execution, accessibility, Hebrew, financial safety, licensing and publication—against the exact
+material checksum.
 Reviewer-record IDs must be supplied by an external authenticated authority; the compiler cannot
 authenticate a human. Records are ordered by the instant from `Date.parse`, and
 `changes-requested` deterministically supersedes an earlier approval or wins an equal-instant tie.
@@ -522,7 +525,7 @@ The final uncontended repository check below is the authoritative Milestone 5 re
 | VoiceOver                          | **PENDING GATE.** No human VoiceOver focus/speech/action pass was performed for scenario selection, blind chart alternatives, decision, recovery or debrief.                                                                                                                                                                                                                      |
 | TalkBack                           | **PENDING GATE.** No Android runtime or human TalkBack pass was available.                                                                                                                                                                                                                                                                                                        |
 | Largest OS text / physical device  | **PENDING GATE.** Largest in-app text is covered in browser evidence; largest operating-system text, standalone builds and physical-device gestures/ergonomics were not exercised.                                                                                                                                                                                                |
-| Human publication/editorial review | **BLOCKED.** No externally authenticated seven-scope approval, distribution decision or published registry entry exists. Automated checks and synthetic ownership do not close these gates.                                                                                                                                                                                       |
+| Human publication/editorial review | **BLOCKED.** No externally authenticated eight-scope approval, distribution decision or published registry entry exists. Automated checks and synthetic ownership do not close these gates.                                                                                                                                                                                       |
 
 ### Visual evidence
 
@@ -707,3 +710,82 @@ The following gates remain open and keep native distribution `NO-GO`:
 The exact evidence boundary, screenshots and backup decision are documented in
 `NATIVE_ACCESSIBILITY_VERIFICATION.md`, `PUBLICATION_CANDIDATE_POLICY.md`,
 `REVIEW_ATTESTATION_POLICY.md`, and `screenshots/README.md`.
+
+## Milestone 8 external review and native release closure addendum
+
+Milestone 8 closes the repository-controlled release work without claiming external approval or
+distribution readiness. The exact status is
+`INTERNAL_REVIEW_BUILD_READY / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO`. No candidate was
+approved or published, no learner credit was enabled, no production trust registry was changed,
+and no branch, build, review packet or recovery bundle was uploaded.
+
+### Recovery and privacy boundary
+
+The app now has a user-controlled logical recovery format rather than opaque database backup.
+Bundles use scrypt (`N=32768`, `r=8`, `p=1`, 32-byte key) and AES-256-GCM with a 16-byte random salt,
+12-byte random nonce, 16-byte tag and canonical authenticated header. Passwords are NFC-normalized,
+must contain at least 15 Unicode code points and are bounded to 1,024 UTF-8 bytes. Wrong-password
+and tamper failures share the same authentication result. Internal no-credit QA state is excluded.
+
+Portable settings and append-only attempts are the default categories. Analysis and paper history
+are opt-in. Management/journal and quarantine data require an additional sensitive-data consent.
+Import is strict and dry-run-first: it reports counts and conflicts, binds confirmation to the exact
+preview token and selection, validates graph ancestry, commits all selected records additively in
+one transaction, aborts on conflict, and rebuilds progress projections from attempts. It never
+restores acceptance of the educational disclaimer. Native opaque-backup exclusion remains a
+separate requirement: iOS excludes `Documents/SQLite`, while Android declares
+`android:allowBackup=false`.
+
+### Identity, review and publication boundary
+
+The identity audit covers 60 records across canonical datasets, learner/private projections,
+scenario and management material, publication material, review packets, future patches and exact
+artifact bytes. It is valid with no issues and report checksum
+`sha256:ba7499f4977af92a78211f9c890ec6ea898776f2f747a524ac0b6b9ddcc67bd0`. The historical
+canonical dataset remains pinned to
+`sha256:07907f75988d2aba5f27d6c73bc596ad9f896452f37a8ba9a240b8ae285a144e` over 20,964 canonical
+bytes. Distinct checksum domains are deliberately non-interchangeable, and material changes require
+a new immutable version and new review records.
+
+Reviewer-key tooling can generate an Ed25519 onboarding proposal only to a new absolute path
+outside the repository with mode `0600`, without overwrite and without emitting private material.
+Fingerprint verification recomputes the canonical SPKI SHA-256 and never grants trust. Onboarding
+and revocation commands produce non-mutating proposals only. The repository-controlled production
+registry remains empty and cannot be overridden by a caller, so all eight review scopes remain
+missing for Long, Short and No-trade. The licensing brief records evidence and unresolved questions
+but makes no legal conclusion; the current immutable material still prohibits redistribution.
+
+### Milestone 8 final evidence
+
+| Gate                           | Recorded result                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Historical/scenario validation | **PASS.** Historical: 96 candles, one recorded gap, five intentional publication blockers. Scenario library: nine candidates (3/3/3), zero structural errors, 97 blockers; three management variants / 13 cases / 39 blockers; combined 136; 12 datasets / 13 scenarios / zero credit.                                                                                                                               |
+| Identity audit                 | **PASS.** 60 records, no issues, deterministic report checksum shown above.                                                                                                                                                                                                                                                                                                                                          |
+| Review packets                 | **PASS FOR REPRODUCIBILITY.** Two consecutive generations were byte-identical. Exact packet verification reports no signed records and all eight scopes missing for every candidate, which is the required fail-closed state.                                                                                                                                                                                        |
+| Publication preflight          | **EXPECTED NO-GO.** Policy `publication-preflight-policy-v2`: 30 categorized gates, 22 blockers, `sideEffects:[]`, `PUBLICATION_NO_GO`. Machine gates are closed; native, external review, licensing and distribution categories remain open.                                                                                                                                                                        |
+| Reports                        | **PASS.** Scenario report SHA-256 `3dab3ae2721c14906ef480644ecfc3e5eee7a677cede196380340876406fea31` (47,380 bytes); preview SHA-256 `a131a72e4f56a856f06198caa75664f8e1509aaaa3739af0fa730921e6cd15ef` (160,582 bytes).                                                                                                                                                                                             |
+| Full `pnpm check`              | **PASS.** Formatting, lint, all workspace typechecks, 67 suites / 704 tests and content/packet validation passed: UI 15, domain 211, historical-data 98, chart-engine 57, content 98 and mobile 225. The two known non-failing overlapping React `act()` warnings remained.                                                                                                                                          |
+| Production browser E2E         | **PASS.** 26/26 across declared phone/tablet projects, zero retries.                                                                                                                                                                                                                                                                                                                                                 |
+| Development QA E2E             | **PASS.** 49 passed and one intentional tablet duplicate skipped, zero failures/retries. The configuration is compile-time development-only plus explicit route and in-app acknowledgement gates.                                                                                                                                                                                                                    |
+| Web export                     | **PASS.** 57 routes including `/data-recovery`; 79 files / 5,456,516 bytes; tree checksum `f067745ac9d44745b560d6076011302432d61e4ab4c726be75495e044491d964`.                                                                                                                                                                                                                                                        |
+| Reviewer web export            | **PASS AS LOCAL DEVELOPMENT EVIDENCE.** 57 routes; 87 files / 7,487,753 bytes; tree checksum `c8e4441a4bda9b448391bbc2af309718a60ebe7705b126632e64480d6ac7f622`. It is not a production build or approval surface.                                                                                                                                                                                                   |
+| iOS export                     | **PASS AS BUNDLE EVIDENCE.** 1,963 modules; 23 assets; 25 files / 5,954,685 bytes; tree checksum `167210811266baf2f1be07ce3c7a9fad2afc4d5ea7be8b670bb728370965b6fe`.                                                                                                                                                                                                                                                 |
+| Android export                 | **PASS AS BUNDLE EVIDENCE.** 2,052 modules; 27 assets; 29 files / 7,128,143 bytes; tree checksum `a333c722f6fd04e6f55dab58f06b4adfb293d032d2933770dbb954f18235dac7`.                                                                                                                                                                                                                                                 |
+| Standalone iOS Release build   | **PARTIAL NATIVE PASS.** Exact iPhone 17 Pro / iOS 26.5 simulator: arm64 build, install and launch passed; recovery route rendered and was inspected; `Documents/SQLite` backup-exclusion metadata was read back. App bundle: 92 files / 51,580 KiB, digest `71dd294e8b32ee9ece4ebec410653b7c00e7cbce2095e00d1c73f42dcb187a7d`. Full recovery and candidate lifecycles, OS-setting matrix and VoiceOver remain open. |
+| Browser visual evidence        | **PASS WITHIN DECLARED SCOPE.** Sixteen original-resolution captures were inspected: 14 phone (`390×844`), one tablet (`1024×768`) and one full preflight report (`390×2825`). They cover recovery, tamper rejection, sensitive consent, light/dark/large/reduced-motion, reviewer gates/packet, blind charts and preflight.                                                                                         |
+
+Expo/browser commands retained the known `NO_COLOR`/`FORCE_COLOR` warning. The local reviewer
+development export also emitted Expo Router development static-render warnings naming `__root`, but
+completed successfully. CocoaPods/native dependency warnings, standalone runtime results and the
+authoritative final `pnpm check` are recorded in `NATIVE_RELEASE_CLOSURE.md` and the clean-HEAD
+handoff.
+
+### Remaining release gates
+
+The exact physical iPhone is installed but locked; unlock it, keep it awake and authorize one
+bounded launch/relaunch window. A human must perform the VoiceOver matrix on that exact iOS runtime.
+An independently authorized ChartPath Android runtime and human TalkBack pass are still required;
+the unrelated Shiftty SDK/AVD was not touched. Human reviewers must be assigned and independently
+trusted, then sign all eight checksum-bound scopes. Licensing/redistribution requires a human rights
+decision and, if authorized, new immutable material plus regenerated packets and reviews.
+Distribution signing, upload and store submission remain separate, unauthorized actions.

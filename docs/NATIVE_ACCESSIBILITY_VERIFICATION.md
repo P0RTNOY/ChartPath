@@ -95,9 +95,17 @@ simulator runtime-resource-value check. A terminate/relaunch readback tied to a 
 lifecycle and an independent physical-device readback were not completed, so cross-launch,
 physical-device backup behavior, OS restore behavior, and distribution entitlements remain open.
 
+Milestone 8 retains this exclusion and adds a supported user-controlled encrypted logical recovery
+bundle. This does not copy SQLite/WAL files or enable opaque OS backup. Export defaults to portable
+settings and attempts, requires explicit selection for histories and additional privacy consent for
+journal/quarantine material, and filters internal no-credit QA. Import is dry-run-first,
+category-selective, additive, transactional, idempotent and fail-closed. Exact architecture and
+post-Milestone 8 evidence are recorded in `RECOVERY_POLICY.md` and
+`NATIVE_RELEASE_CLOSURE.md`.
+
 ## Current native and accessibility evidence
 
-| Required journey                                        | Actual 2026-08-26 status                                                                                                                                                                     |
+| Required journey                                        | Actual 2026-08-27 status                                                                                                                                                                     |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Prior pending action across terminate/relaunch          | **Limited pass from Milestone 6 only.** Expo Go on the exact iPhone 17 Pro simulator restored one pending partial exit and filled it exactly once on N+1; this was not a standalone M7 build |
 | M7 standalone route smoke                               | **PASS, bounded.** The generated ChartPath app launched on the exact simulator and rendered Hebrew onboarding; it did not execute a candidate lifecycle                                      |

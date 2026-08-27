@@ -758,7 +758,7 @@ The architecture is not “implemented” until evidence covers at least:
 - schema upgrades preserving attempts and progress across an actual restart;
 - content validation for every published record;
 - deterministic scenario generation, exact source/dataset/rubric/execution snapshot validation,
-  seven-scope authenticated review gating, an empty ordinary catalog for unpublished candidates and
+  eight-scope authenticated review gating, an empty ordinary catalog for unpublished candidates and
   a separately labelled internal QA report;
 - RTL/LTR, screen-reader, touch-target, contrast, and reduced-motion behavior; and
 - critical offline app journeys with no network, AI key, or cloud credentials.
@@ -793,3 +793,31 @@ SQLite store. Standalone builds fail closed if the policy version is absent/stal
 `Documents/SQLite` directory does not read back as excluded from backup. Android uses
 `android:allowBackup=false`. These privacy controls do not replace append-only persistence,
 quarantine, migration, or lifecycle idempotency contracts.
+
+## Recovery and reviewer-governance closure
+
+Recovery is a logical application-layer protocol, not a database backup. `RecoveryPayloadV1`
+projects explicitly selected portable categories from the authoritative snapshot, removes derived
+projections and internal no-credit QA state, and is encrypted inside `RecoveryEnvelopeV1` with a
+single versioned cryptographic suite. Envelope parsing, payload parsing, stable-ID graph checks and
+size limits all fail closed before mutation.
+
+The repository owns the two-phase import boundary. Preview reads a snapshot without normalizing or
+writing, returns a category selection and checksum-bound plan token, and reports exact additions,
+no-ops and conflicts. Apply rereads and revalidates the encrypted payload's logical material inside
+one adapter transaction, recomputes the selected plan, rejects stale tokens/conflicts, merges only
+new exact records, and rebuilds projections from attempts. The import path receives no deletion or
+migration exception. Settings selection never restores disclaimer acceptance.
+
+Reviewer governance remains content-layer Node tooling. A possession proof authenticates control
+of an Ed25519 private key but does not establish identity, qualification, independence,
+authorization, approval, or trust. Production verification is pinned to the checked-in registry;
+onboarding/fingerprint/revocation commands are read-only proposal checks. Only an independently
+reviewed registry change can establish trust, and only separate exact candidate attestations can
+close review scopes.
+
+The mobile reviewer route is compiled open only for an explicit development reviewer
+configuration, still requires route and acknowledgement gates, and always uses internal no-credit
+access. Production export and the ordinary learner catalog remain closed. Release preflight v2
+emits deterministic gates across machine, native-runtime, accessibility, physical-device,
+human-review, licensing and distribution categories and has no mutation capability.

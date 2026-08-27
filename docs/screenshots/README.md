@@ -220,3 +220,55 @@ terminal debrief, unfilled debrief, or VoiceOver focus. The earlier browser and 
 simulator evidence remains supporting history and is not relabeled as a standalone M7 native pass.
 Android/emulator, TalkBack, and physical-device runtime screenshots are absent because those runs
 were not completed.
+
+## Milestone 8 recovery and external-review set
+
+`pnpm screenshots:m8` captures the supported encrypted-recovery path from the production web
+export and the explicitly enabled development reviewer surface from a separate QA server. The
+original-resolution set is:
+
+- `m8-recovery-privacy-phone-browser.png` and
+  `m8-recovery-export-default-phone-browser.png` (`390×844`) — backup exclusion, local-only
+  recovery, portable default categories, and the password boundary;
+- `m8-recovery-import-dry-run-phone-browser.png` and
+  `m8-recovery-import-explicit-confirmation-phone-browser.png` (`390×844`) — exact category/count
+  preview with no write, followed by the separate additive-import confirmation;
+- `m8-recovery-tamper-rejected-phone-browser.png` (`390×844`) — authenticated failure with no
+  preview or apply control;
+- `m8-recovery-journal-opt-in-internal-excluded-browser.png` (`390×844`) — explicit sensitive-data
+  consent while the internal no-credit QA management record remains excluded;
+- `m8-recovery-largest-text-reduced-motion-browser.png` and
+  `m8-recovery-dark-phone-browser.png` (`390×844`) — largest in-app text/reduced motion and dark
+  appearance;
+- `m8-recovery-import-tablet-browser.png` (`1024×768`) — wide dry-run composition;
+- `m8-reviewer-acknowledgement-gate-browser.png`, `m8-reviewer-long-packet-browser.png`,
+  `m8-reviewer-short-packet-browser.png`, and `m8-reviewer-no-trade-packet-browser.png`
+  (`390×844`) — the development-only acknowledgement/reveal boundary and all three exact packet
+  identities;
+- `m8-accessible-blind-chart-candidate-04-browser.png` and
+  `m8-accessible-blind-chart-candidate-07-browser.png` (`390×844`) — visible-only 48-candle chart
+  projections for no-trade and Short candidates, with identity/outcome/future metadata still
+  hidden; and
+- `m8-publication-preflight-categorized-no-go-browser.png` (`390×2825`) — the real deterministic
+  preflight rendered by category, including passed machine gates and every still-open external or
+  native gate.
+
+Every image was inspected at its original resolution for Hebrew RTL hierarchy, LTR identifiers and
+hashes, clipping, wrapping, non-color status, dark contrast, large-text reachability, phone/tablet
+composition, explicit confirmation, visible-only chart chronology, internal-reviewer isolation,
+and truthful `PUBLICATION_NO_GO` wording. The set contains no plaintext recovery payload or
+password, private reviewer key, fabricated approval, hidden grader material, or ordinary learner
+candidate entry.
+
+`m8-native-ios-recovery-light.png` is a separate `1206×2622` standalone arm64 Release-build capture
+from the exact iPhone 17 Pro / iOS 26.5 simulator. Its SHA-256 is
+`4a07a19a2fa993fc28ff820aef0266b03dbf3294fb3d1a5696c3a89f48138829`. Original-resolution
+inspection confirms that the post-Milestone 8 app launched and the Hebrew RTL recovery route
+rendered in light mode without a development overlay or horizontal clipping. It is one route frame,
+not proof of encrypted export/import, file sharing, a completed recovery lifecycle, screen-reader
+speech/focus, OS accessibility settings, physical-device behavior, signing or distribution.
+
+The other Milestone 8 images are deterministic browser presentation/accessibility-query artifacts.
+They do not establish native file sharing/import, standalone SQLite recovery, OS-level text
+settings, physical-device ergonomics, VoiceOver/TalkBack speech or focus, distribution signing,
+upload, or publication.

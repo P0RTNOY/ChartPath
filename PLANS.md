@@ -199,3 +199,29 @@ the connected iPhone 15 Pro Max, but the locked device blocked launch. Complete 
 trade/no-trade/unfilled lifecycles, physical runtime, VoiceOver, Android, TalkBack, bold text,
 reduced transparency, and native reduced-motion checks remain open. Milestone status may be
 `PUBLICATION_CANDIDATE_READY`; publication and native distribution remain **NO-GO**.
+
+## Milestone 8: external review, recovery, and native release closure
+
+Milestone 8 closes the machine-resolvable identity, recovery, reviewer-onboarding, reviewer-build,
+and release-preflight gaps without publishing content or granting credit. The identity report keeps
+dataset, learner, grader, scenario, management, rubric, candidate, patch, packet and exact artifact
+byte hashes in non-interchangeable domains and retains the canonical historical pin.
+
+Recovery uses a versioned canonical payload under scrypt and AES-256-GCM. It exports only selected
+logical records, excludes internal no-credit QA, requires explicit sensitive-category consent,
+previews conflicts without mutation, merges exact stable identities once inside the repository
+transaction, and rebuilds projections from append-only attempts. Full opaque OS backup stays
+disabled; accounts/cloud synchronization remain future work.
+
+Reviewer governance now supports external key generation outside the repository, exact fingerprint
+verification, evidence-bound onboarding proposals, non-mutating revocation proposals, and required
+and missing-scope matrices. Trust still requires an independently reviewed repository change; the
+production registry remains empty. The internal reviewer configuration is development-only,
+explicitly enabled, no-credit, and absent from the ordinary learner catalog.
+
+Final publication status must remain
+`INTERNAL_REVIEW_BUILD_READY / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO` until legitimate human
+reviews, licensing authorization, the remaining native lifecycles, physical-device runtime,
+VoiceOver, and an authorized Android/TalkBack pass are completed. Milestone 9 should consume real
+external review feedback and authorized device evidence, create new immutable material versions
+when review changes bytes, and still require separate authorization before any distribution.

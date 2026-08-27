@@ -173,3 +173,21 @@ synthetically complete review projection.
 
 No production attestation currently exists. The empty production registry and eight missing scope
 decisions are intentional, honest blockers.
+
+## 8. Reviewer onboarding and key registration
+
+`docs/EXTERNAL_REVIEW_GUIDE.md` defines the proposal workflow preceding a production registry
+change. Deterministic tooling can generate a private key only to a new absolute path outside the
+repository with mode `0600`, print public metadata only, verify the exact Ed25519 SPKI fingerprint,
+validate checksum-pinned authorization evidence, and show proposal/revocation status by scope.
+
+These operations do not dynamically trust caller-supplied keys. Production commands remain bound
+to `PRODUCTION_TRUSTED_REVIEWER_REGISTRY`; test registries and test-fixture identities remain
+rejected. Possession proof is not identity, qualification or authorization. Registration requires
+an explicit independently reviewed repository change, and registration alone is not a candidate
+review decision.
+
+Revocation tooling validates a proposal and highlights pending risk, but never edits trust. A real
+revocation requires a reviewed registry change and cannot depend solely on a possibly compromised
+private key. Material candidate or packet changes continue to invalidate exact prior attestations
+regardless of reviewer registration state.

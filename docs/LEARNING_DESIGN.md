@@ -606,7 +606,7 @@ reviewed exercise records.
 
 The installed development scenario uses 96 ChartPath-generated hourly candles with one explicitly
 recorded gap. It is synthetic, development-only and non-publishable. Registry validation derives
-zero course-credit eligibility and four publication blockers: neither scenario nor dataset is
+zero course-credit eligibility and five publication blockers: neither scenario nor dataset is
 published, redistribution permission is not verified, and human editorial review is missing. These
 are deliberate gates, not warnings that an author or UI may override.
 
@@ -705,7 +705,7 @@ none determine mastery by profit/loss.
 The ordinary learner scenario library includes only published, reviewed, blocker-free content. It is
 currently empty. The balanced synthetic candidate set is available solely in a conspicuous internal
 QA surface, grants no course credit and does not affect mastery, review, lesson progress, XP or
-streaks. Automated structural validation cannot substitute for seven-scope independent human
+streaks. Automated structural validation cannot substitute for eight-scope independent human
 review. See `docs/SCENARIO_AUTHORING.md` and `docs/SCENARIO_PUBLICATION_POLICY.md`.
 
 ## 19. Verified evidence and tunable decisions

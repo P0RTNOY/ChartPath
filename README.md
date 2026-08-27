@@ -113,3 +113,25 @@ launch, and complete standalone candidate lifecycles, VoiceOver, Android, and Ta
 performed. These partial results do not make ChartPath native-release-ready. Exact evidence and
 limitations are in `docs/PUBLICATION_CANDIDATE_POLICY.md`,
 `docs/REVIEW_ATTESTATION_POLICY.md`, and `docs/NATIVE_ACCESSIBILITY_VERIFICATION.md`.
+
+## Milestone 8 recovery and external-review boundary
+
+Milestone 8 adds a mandatory password-encrypted, user-controlled logical recovery bundle while
+retaining complete native backup exclusion. Export defaults to portable settings and attempts;
+simulated histories are optional, and management/journal plus quarantine material require explicit
+sensitive-data consent. Import is dry-run-first, category-selective, additive, conflict-reporting,
+transactional and idempotent. It never copies SQLite/WAL files, internal no-credit QA records,
+reproducible datasets, or private grader material. See `docs/RECOVERY_POLICY.md`.
+
+External-review onboarding is proposal-only. Reviewer private keys must remain outside the
+repository; public-key fingerprints, qualification/authorization evidence, onboarding proposals,
+revocation proposals, and all eight candidate scopes can be checked deterministically. The
+production registry remains empty and cannot be overridden by production commands. See
+`docs/EXTERNAL_REVIEW_GUIDE.md` and `docs/LICENSING_REVIEW_BRIEF.md`.
+
+The candidate route now requires an explicit development reviewer-build flag in addition to its
+route flag and acknowledgement gate. It remains no-credit and absent from production/ordinary
+catalogs. Preflight reports category-specific machine, native, accessibility, physical-device,
+human-review, licensing and distribution gates. The truthful status is
+`INTERNAL_REVIEW_BUILD_READY / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO`; exact evidence and
+remaining human/device actions are in `docs/NATIVE_RELEASE_CLOSURE.md`.

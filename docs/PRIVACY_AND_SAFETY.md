@@ -484,7 +484,7 @@ No beta-readiness claim is valid until the release record contains evidence for:
   ambiguity tests; active-state reload without duplicate events; explicit fictional-data copy; zero
   attempt/projection mutation; and non-color visual plus accessible event-state evidence;
 - for curated scenarios, private-grading/learner-projection separation, deterministic snapshot and
-  source pins, empty ordinary selection while unpublished, explicit internal QA gating, seven-scope
+  source pins, empty ordinary selection while unpublished, explicit internal QA gating, eight-scope
   externally authenticated human approval, stale-review invalidation and correct no-trade with no
   order or hindsight grading;
 - Hebrew RTL plus LTR numbers/formulas, screen reader, large text, contrast, and
@@ -495,3 +495,25 @@ No beta-readiness claim is valid until the release record contains evidence for:
   (expected: none for the initial offline beta).
 
 Any item without evidence remains **unverified**, not implicitly complete.
+
+## Encrypted user-controlled recovery
+
+Native opaque backup remains excluded because one mutable SQLite store contains progress,
+simulated histories, journal text and quarantine evidence with shared transactional invariants.
+ChartPath instead offers a local logical export/import bundle protected by mandatory scrypt and
+AES-256-GCM. There is no plaintext mode, password storage, recovery escrow, account, cloud sync,
+automatic upload, analytics or telemetry.
+
+Portable settings and attempts are the default export. Analysis and paper histories require
+selection. Position-management/journal and quarantine records require an additional explicit
+sensitive-data acknowledgement. Internal no-credit QA, private grader content, reproducible
+datasets/caches, database/WAL files, paths and device identifiers are excluded. The encrypted file
+still contains private learning data; the learner controls its destination and password, and a
+forgotten password cannot be recovered by ChartPath.
+
+Import decrypts and validates before showing a dry run, lets the learner select included
+categories, reports stable-ID conflicts without dumping free text, and performs no write before a
+separate confirmation. Existing immutable content is never silently overwritten, append-only
+history is never rewritten, conflicts and unsupported versions abort without partial restore, and
+derived learning state is rebuilt from attempts. Destructive local-data deletion remains a
+separate, explicitly confirmed action.

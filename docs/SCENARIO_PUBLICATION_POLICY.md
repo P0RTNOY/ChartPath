@@ -243,3 +243,22 @@ See [SCENARIO_AUTHORING.md](./SCENARIO_AUTHORING.md) for the authoring contract,
 [REVIEW_ATTESTATION_POLICY.md](./REVIEW_ATTESTATION_POLICY.md) for authenticated review decisions,
 [HISTORICAL_DATA_POLICY.md](./HISTORICAL_DATA_POLICY.md) for market-data rights, and
 [PAPER_EXECUTION_POLICY.md](./PAPER_EXECUTION_POLICY.md) for simulator assumptions.
+
+## 11. Milestone 8 reviewer and preflight closure
+
+Reviewer onboarding is now an auditable proposal workflow. Public-key material, exact Ed25519
+fingerprints, opaque checksum-pinned identity/independence/qualification/authorization evidence,
+scope requests and possession proofs can be validated without mutating trust. Private keys must be
+created and retained outside the repository. A valid proposal remains
+`proof-verified-human-review-required` with `trustGranted:false`; a valid revocation proposal
+remains `trustChanged:false` until an independently reviewed production-registry change occurs.
+
+The internal reviewer build is not publication. It requires an explicit development configuration,
+keeps candidate identity and answer material behind acknowledgement/reveal actions, uses only
+`qa-internal` no-credit access, and never exposes candidates through ordinary learner selection.
+
+Preflight policy v2 classifies machine, native-runtime, accessibility, physical-device,
+human-review, licensing and distribution gates. Passing machine gates can produce
+`MACHINE_GATES_CLOSED` and `INTERNAL_REVIEW_BUILD_READY`; it cannot remove missing human, rights,
+device or distribution gates. While those remain open the only valid aggregate includes
+`EXTERNAL_REVIEW_PENDING` and `PUBLICATION_NO_GO`.
