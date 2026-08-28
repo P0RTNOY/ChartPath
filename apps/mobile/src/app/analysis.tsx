@@ -4,6 +4,10 @@ import { GuidedAnalysisSessionView } from '@/components/guided-analysis-session'
 import { ErrorState, LoadingState } from '@/components/app-state';
 import { useLearning } from '@/state/learning';
 import { historicalSessionRouteAccessAllowed } from '@/data/historical-replay';
+import {
+  isInternalQaDeepLinkAllowed,
+  isInternalReviewerModeEnabled,
+} from '@/lib/internal-reviewer-mode';
 
 export default function AnalysisScreen() {
   const { sessionId, qa } = useLocalSearchParams<{
@@ -34,17 +38,19 @@ export default function AnalysisScreen() {
     );
   }
   const qaRequested = qaValue === '1';
+  const reviewerModeEnabled = isInternalReviewerModeEnabled();
   if (
+    !isInternalQaDeepLinkAllowed(qaRequested) ||
     !historicalSessionRouteAccessAllowed(session, {
       qaRequested,
-      developmentMode: __DEV__,
+      developmentMode: reviewerModeEnabled,
     })
   ) {
     return (
       <ErrorState
         message={
-          qaRequested && !__DEV__
-            ? 'גישה לסשן QA פנימי אינה זמינה בגרסת ייצור.'
+          qaRequested && !reviewerModeEnabled
+            ? 'גישה לסשן QA פנימי זמינה רק בבניית פיתוח עם מצב הסוקרים הפנימי פעיל.'
             : 'סשן פנימי, לא־מפורסם או ללא קרדיט זמין רק מגבול QA מפורש בגרסת פיתוח.'
         }
         onRetry={() => void learning.reload()}

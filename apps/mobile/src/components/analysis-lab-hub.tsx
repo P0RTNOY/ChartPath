@@ -22,6 +22,7 @@ import {
   historicalSessionRequiresQa,
   resolveHistoricalAnalysisSession,
 } from '@/data/historical-replay';
+import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 import { GUIDED_ANALYSIS_EXERCISE_ID, useLearning } from '@/state/learning';
 
 function progress(session: GuidedAnalysisSession): number {
@@ -35,7 +36,7 @@ function sessionDate(value: string): string {
 }
 
 export function AnalysisLabHub({
-  developmentMode = __DEV__,
+  developmentMode = isInternalReviewerModeEnabled(),
 }: {
   readonly developmentMode?: boolean;
 } = {}) {

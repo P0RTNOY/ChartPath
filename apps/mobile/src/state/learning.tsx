@@ -45,6 +45,7 @@ import {
   type PositionManagementSession,
   type TradePlanInput,
 } from '@chartpath/domain';
+import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 
 import {
   AnalysisSessionConflictError,
@@ -486,15 +487,19 @@ export interface LearningProviderProps {
   readonly repositoryOverride?: LearningRepository;
   /** Test-only immutable registry seam; production uses the bundled canonical registry. */
   readonly historicalRegistryOverride?: HistoricalContentRegistry;
+  /** Test-only reviewer-build seam; production always resolves the compile-time reviewer gate. */
+  readonly internalReviewerModeOverride?: boolean;
 }
 
 export function LearningProvider({
   children,
   repositoryOverride,
   historicalRegistryOverride,
+  internalReviewerModeOverride,
 }: LearningProviderProps) {
   const repositoryRef = useRef<LearningRepository | null>(repositoryOverride ?? null);
   const historicalRegistry = historicalRegistryOverride ?? internalHistoricalContentRegistry;
+  const internalReviewerMode = internalReviewerModeOverride ?? isInternalReviewerModeEnabled();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [initializationFailure, setInitializationFailure] =
@@ -634,7 +639,7 @@ export function LearningProvider({
             resolved.content.learningCredit === 'none' ||
             resolved.content.scenario.publicationStatus !== 'published' ||
             resolved.content.scenario.editorial.status !== 'published';
-          if (internalOnly && (request.accessMode !== 'qa-internal' || !__DEV__)) {
+          if (internalOnly && (request.accessMode !== 'qa-internal' || !internalReviewerMode)) {
             throw new Error(
               'התרחיש אינו זמין במסלול הלמידה הרגיל (internal-scenario-restricted). יש לפתוח אותו רק מגבול QA מפורש בגרסת פיתוח.',
             );
@@ -648,7 +653,7 @@ export function LearningProvider({
         throw localizedGuidedAnalysisError(reason);
       }
     },
-    [historicalRegistry, repository],
+    [historicalRegistry, internalReviewerMode, repository],
   );
 
   const saveAnalysisSession = useCallback(
@@ -899,13 +904,14 @@ export function LearningProvider({
         historicalRegistry,
         {
           accessMode,
+          internalReviewerMode,
           ...(proposedDirection === undefined ? {} : { proposedDirection }),
         },
       );
       if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
       return { session, resolved, loaded };
     },
-    [historicalRegistry, repository],
+    [historicalRegistry, internalReviewerMode, repository],
   );
 
   const createOrResumePaperExecutionSession = useCallback(
@@ -922,6 +928,7 @@ export function LearningProvider({
         if (!analysis) throw new AnalysisSessionNotFoundError(analysisSessionId);
         const resolved = resolvePaperExecutionAnalysisSession(analysis, historicalRegistry, {
           accessMode,
+          internalReviewerMode,
           proposedDirection: plan.direction,
         });
         if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
@@ -946,7 +953,7 @@ export function LearningProvider({
           created.session,
           created.snapshot.analysisSessions,
           historicalRegistry,
-          { accessMode },
+          { accessMode, internalReviewerMode },
         );
         if (rebound.status !== 'ready') throw unavailablePaperExecutionError(rebound);
         setSnapshot(created.snapshot);
@@ -955,7 +962,7 @@ export function LearningProvider({
         throw localizedPaperExecutionError(reason);
       }
     },
-    [historicalRegistry, repository],
+    [historicalRegistry, internalReviewerMode, repository],
   );
 
   const savePaperExecutionPlan = useCallback(
@@ -1226,12 +1233,12 @@ export function LearningProvider({
         session.handoff,
         loaded.analysisSessions,
         historicalRegistry,
-        { accessMode },
+        { accessMode, internalReviewerMode },
       );
       if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
       return { session, resolved, loaded };
     },
-    [historicalRegistry, repository],
+    [historicalRegistry, internalReviewerMode, repository],
   );
 
   const createOrResumePositionManagementSession = useCallback(
@@ -1249,7 +1256,7 @@ export function LearningProvider({
             existing.handoff,
             loaded.analysisSessions,
             historicalRegistry,
-            { accessMode },
+            { accessMode, internalReviewerMode },
           );
           if (rebound.status !== 'ready') throw unavailablePaperExecutionError(rebound);
           const availability = resolvePositionManagementAvailability(existing.handoff);
@@ -1279,7 +1286,7 @@ export function LearningProvider({
           paper,
           loaded.analysisSessions,
           historicalRegistry,
-          { accessMode },
+          { accessMode, internalReviewerMode },
         );
         if (resolved.status !== 'ready') throw unavailablePaperExecutionError(resolved);
         if (paper.status !== 'open' || paper.position?.status !== 'open') {
@@ -1309,7 +1316,7 @@ export function LearningProvider({
         throw localizedPaperExecutionError(reason);
       }
     },
-    [historicalRegistry, repository],
+    [historicalRegistry, internalReviewerMode, repository],
   );
 
   const savePositionManagementDraft = useCallback(

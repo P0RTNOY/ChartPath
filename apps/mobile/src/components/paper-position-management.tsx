@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import type { OhlcvCandle, PositionManagementSession } from '@chartpath/domain';
-import { Badge, Button, Card, Heading, UiText, useReducedMotion, useTheme } from '@chartpath/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Heading,
+  LtrText,
+  UiText,
+  useReducedMotion,
+  useTheme,
+} from '@chartpath/ui';
 
 import { ManagementDebriefCard } from './management-debrief-card';
 import { ManagementTimeline } from './management-timeline';
@@ -219,6 +228,13 @@ export function PaperPositionManagement({
             <Badge tone="neutral">ללא קרדיט</Badge>
           </View>
           <Heading level={2}>ניהול פוזיציה מדומה</Heading>
+          <LtrText
+            color="textMuted"
+            testID={`paper-management-processed-candle-${session.lastProcessedCandleIndex}`}
+            variant="caption"
+          >
+            {`processed candle #${session.lastProcessedCandleIndex}`}
+          </LtrText>
           <UiText>
             פעולות ניהול, מילויים ועלויות הן הנחות דטרמיניסטיות לצורכי למידה. הן אינן כלל מסחר או
             המלצה.

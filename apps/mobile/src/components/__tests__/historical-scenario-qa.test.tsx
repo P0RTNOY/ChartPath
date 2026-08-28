@@ -134,4 +134,37 @@ describe('HistoricalScenarioQa', () => {
     expect(screen.getByText('publication-candidate-long-v1')).toBeTruthy();
     expect(screen.getByText('חסם פרסום סודי')).toBeTruthy();
   });
+
+  it('keeps the management shortcut and exposes a separately identified full lifecycle action', async () => {
+    const onStart = jest.fn();
+    const onStartFullLifecycle = jest.fn();
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <HistoricalScenarioQa
+          cards={[
+            {
+              qaKey: 'candidate-11',
+              ordinal: 11,
+              readinessHe: 'הידור מבני הושלם — עדיין לא אושר לפרסום',
+            },
+          ]}
+          fullLifecycleQaKeys={['candidate-11']}
+          onStart={onStart}
+          onStartFullLifecycle={onStartFullLifecycle}
+          revealDetail={jest.fn()}
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('scenario-qa-ack'));
+    await fireEvent.press(screen.getByTestId('scenario-qa-enter'));
+    await fireEvent.press(screen.getByTestId('scenario-qa-select-candidate-11'));
+
+    await fireEvent.press(screen.getByTestId('scenario-qa-start-candidate-11'));
+    expect(onStart).toHaveBeenCalledWith('candidate-11');
+    expect(onStartFullLifecycle).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('scenario-qa-start-full-lifecycle-candidate-11'));
+    expect(onStartFullLifecycle).toHaveBeenCalledWith('candidate-11');
+  });
 });

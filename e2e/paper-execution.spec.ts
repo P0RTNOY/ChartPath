@@ -17,7 +17,7 @@ test('production export keeps hypothetical paper mechanics behind the explicit d
   await page.goto('/paper-execution?analysisSessionId=missing-session&qa=1');
 
   await expect(page.getByRole('heading', { name: 'לא הצלחנו לטעון את הנתונים' })).toBeVisible();
-  await expect(page.getByText(/סשן ביצוע או ניהול.*אינו זמין בגרסת ייצור/)).toBeVisible();
+  await expect(page.getByText(/סשן ביצוע או ניהול.*מצב הסוקרים הפנימי פעיל/)).toBeVisible();
   await expect(page.getByTestId('paper-execution-screen')).toHaveCount(0);
   await expect(page.getByTestId('paper-execution-ticket')).toHaveCount(0);
 });

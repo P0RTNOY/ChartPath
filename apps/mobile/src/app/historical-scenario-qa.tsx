@@ -15,6 +15,8 @@ import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 import { useLearning } from '@/state/learning';
 import { Screen } from '@chartpath/ui';
 
+const FULL_LIFECYCLE_QA_KEYS = ['candidate-11', 'candidate-12'] as const;
+
 export default function HistoricalScenarioQaRoute() {
   const learning = useLearning();
   const { developer } = useLocalSearchParams<{ developer?: string | string[] }>();
@@ -33,6 +35,30 @@ export default function HistoricalScenarioQaRoute() {
     );
   }
 
+  const finalizedSessionFor = (identity: {
+    readonly scenarioId: string;
+    readonly scenarioVersion: string;
+  }) => {
+    const linkedAnalysisSessionIds = new Set(
+      learning.snapshot?.paperExecutionSessions.map((paper) => paper.source.analysisSessionId) ??
+        [],
+    );
+    return learning.snapshot?.analysisSessions
+      .filter(
+        (candidate) =>
+          candidate.status === 'finalized' &&
+          candidate.chart.kind === 'historical' &&
+          candidate.chart.scenarioId === identity.scenarioId &&
+          candidate.chart.scenarioVersion === identity.scenarioVersion,
+      )
+      .sort((left, right) => {
+        const linkedDifference =
+          Number(linkedAnalysisSessionIds.has(right.sessionId)) -
+          Number(linkedAnalysisSessionIds.has(left.sessionId));
+        return linkedDifference || right.updatedAt.localeCompare(left.updatedAt);
+      })[0];
+  };
+
   const start = async (qaKey: string) => {
     const identity = qaScenarioIdentityForKey(qaKey);
     const managementJourney = positionManagementQaJourneyForKey(qaKey);
@@ -43,6 +69,13 @@ export default function HistoricalScenarioQaRoute() {
     setStartingKey(qaKey);
     setStartError(null);
     try {
+      const finalizedSession = managementJourney ? undefined : finalizedSessionFor(identity);
+      if (finalizedSession) {
+        router.push(
+          `/analysis?sessionId=${encodeURIComponent(finalizedSession.sessionId)}&qa=1` as Href,
+        );
+        return;
+      }
       let session = await learning.createOrResumeAnalysisSession({
         kind: 'historical',
         scenarioId: identity.scenarioId,
@@ -90,10 +123,48 @@ export default function HistoricalScenarioQaRoute() {
     }
   };
 
+  const startFullLifecycle = async (qaKey: string) => {
+    if (!FULL_LIFECYCLE_QA_KEYS.includes(qaKey as (typeof FULL_LIFECYCLE_QA_KEYS)[number])) {
+      setStartError('המסלול המלא אינו זמין למועמד QA זה.');
+      return;
+    }
+    const identity = qaScenarioIdentityForKey(qaKey);
+    if (!identity) {
+      setStartError('מועמד ה־QA אינו זמין עוד ברישום הפנימי.');
+      return;
+    }
+    setStartingKey(qaKey);
+    setStartError(null);
+    try {
+      const finalizedSession = finalizedSessionFor(identity);
+      if (finalizedSession) {
+        router.push(
+          `/analysis?sessionId=${encodeURIComponent(finalizedSession.sessionId)}&qa=1` as Href,
+        );
+        return;
+      }
+      const session = await learning.createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: identity.scenarioId,
+        scenarioVersion: identity.scenarioVersion,
+        accessMode: 'qa-internal',
+      });
+      router.push(`/analysis?sessionId=${encodeURIComponent(session.sessionId)}&qa=1` as Href);
+    } catch (reason) {
+      setStartError(
+        reason instanceof Error ? reason.message : 'לא הצלחנו לפתוח את מסלול ה־QA המלא.',
+      );
+    } finally {
+      setStartingKey(undefined);
+    }
+  };
+
   return (
     <HistoricalScenarioQa
       cards={blindQaCandidateCards()}
+      fullLifecycleQaKeys={FULL_LIFECYCLE_QA_KEYS}
       onStart={(qaKey) => void start(qaKey)}
+      onStartFullLifecycle={(qaKey) => void startFullLifecycle(qaKey)}
       revealDetail={revealedQaCandidateDetail}
       startError={startError}
       startingKey={startingKey}

@@ -113,6 +113,7 @@ export default function OnboardingScreen() {
             fullWidth
             onPress={() => setStep(1)}
             size="large"
+            testID="onboarding-continue-guest"
           >
             המשך כאורח
           </Button>
@@ -157,6 +158,7 @@ export default function OnboardingScreen() {
             accessibilityState={{ checked: accepted }}
             onPress={() => setAccepted((value) => !value)}
             style={{ alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 48 }}
+            testID="onboarding-disclaimer-ack"
           >
             <View
               style={{
@@ -182,7 +184,13 @@ export default function OnboardingScreen() {
             <Button onPress={() => setStep(0)} variant="ghost">
               חזרה
             </Button>
-            <Button disabled={!accepted} fullWidth onPress={() => setStep(2)} style={{ flex: 1 }}>
+            <Button
+              disabled={!accepted}
+              fullWidth
+              onPress={() => setStep(2)}
+              style={{ flex: 1 }}
+              testID="onboarding-continue-goal"
+            >
               המשך
             </Button>
           </View>
@@ -231,6 +239,7 @@ export default function OnboardingScreen() {
                     minWidth: 112,
                     padding: 14,
                   }}
+                  testID={`onboarding-goal-${minutes}`}
                 >
                   <LtrText
                     align="center"
@@ -264,7 +273,13 @@ export default function OnboardingScreen() {
             <Button disabled={saving} onPress={() => setStep(1)} variant="ghost">
               חזרה
             </Button>
-            <Button fullWidth loading={saving} onPress={() => void finish()} style={{ flex: 1 }}>
+            <Button
+              fullWidth
+              loading={saving}
+              onPress={() => void finish()}
+              style={{ flex: 1 }}
+              testID="onboarding-finish"
+            >
               בנו לי מסלול
             </Button>
           </View>

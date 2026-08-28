@@ -1,7 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
-import { generateChart, learnerAnnotationsVisibleAt } from '@chartpath/chart-engine';
+import {
+  createChartViewport,
+  generateChart,
+  learnerAnnotationsVisibleAt,
+  panChartViewport,
+  projectVisibleCandles,
+  zoomChartViewport,
+  type ChartViewport,
+} from '@chartpath/chart-engine';
 import { exercises } from '@chartpath/content';
 import { createReplayKnowledgeView, type ReplayKnowledgeView } from '@chartpath/historical-data';
 import {
@@ -34,6 +42,7 @@ import { resolveHistoricalAnalysisSession } from '@/data/historical-replay';
 
 const GUIDED_ANALYSIS_EXERCISE_ID = 'u10-capstone-e03';
 const FIXED_REPLAY_GROUP_SIZE = 4;
+const MIN_VIEWPORT_CANDLES = 12;
 
 const toolChoices: readonly { readonly tool: ChartTool; readonly label: string }[] = [
   { tool: { kind: 'inspect' }, label: 'בדיקה' },
@@ -58,6 +67,11 @@ interface LocalDraftState {
   readonly sessionId: string;
   readonly sourceAnnotationsKey: string;
   readonly draft: AnalysisDraft;
+}
+
+interface LocalViewportState {
+  readonly sessionId: string;
+  readonly viewport: ChartViewport;
 }
 
 function canonicalChart(): GeneratedChart {
@@ -205,17 +219,45 @@ export function GuidedAnalysisChart({
       annotations: [],
     };
   }, [chart, cursor, session.chart.kind]);
+  const currentBounds = useMemo(
+    () =>
+      projectVisibleCandles(visibleChart.candles, {
+        cutoffCandleIndex: cursor,
+        minVisibleCandles: MIN_VIEWPORT_CANDLES,
+      }).bounds,
+    [cursor, visibleChart.candles],
+  );
+  if (!currentBounds) throw new Error('The guided-analysis chart has no visible candles');
+  const initialViewport = useMemo(
+    () => createChartViewport(currentBounds),
+    // A newly mounted session begins with its complete current knowledge window.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session.sessionId],
+  );
+  const [localViewport, setLocalViewport] = useState<LocalViewportState>(() => ({
+    sessionId: session.sessionId,
+    viewport: initialViewport,
+  }));
+  const requestedViewport =
+    localViewport.sessionId === session.sessionId ? localViewport.viewport : initialViewport;
+  const cutoffSafeViewport = createChartViewport(currentBounds, requestedViewport);
+  const viewportBounds = projectVisibleCandles(visibleChart.candles, {
+    cutoffCandleIndex: cursor,
+    startCandleIndex: cutoffSafeViewport.startIndex,
+    endCandleIndex: cutoffSafeViewport.endIndex,
+    minVisibleCandles: MIN_VIEWPORT_CANDLES,
+  }).bounds;
+  const displayViewport: ChartViewport = viewportBounds
+    ? {
+        ...cutoffSafeViewport,
+        minPrice: viewportBounds.minPrice,
+        maxPrice: viewportBounds.maxPrice,
+      }
+    : cutoffSafeViewport;
   const selectedCandle = findCandle(visibleChart, selectedCandleIndex);
   const priceFrame = useMemo(
-    () =>
-      visibleChart.candles.reduce(
-        (frame, candle) => ({
-          low: Math.min(frame.low, candle.low),
-          high: Math.max(frame.high, candle.high),
-        }),
-        { low: Number.POSITIVE_INFINITY, high: Number.NEGATIVE_INFINITY },
-      ),
-    [visibleChart.candles],
+    () => ({ low: displayViewport.minPrice, high: displayViewport.maxPrice }),
+    [displayViewport.maxPrice, displayViewport.minPrice],
   );
   const preciseCandle = Number(candleInput);
   const precisePrice = Number(priceInput.trim().replace(',', '.'));
@@ -226,6 +268,8 @@ export function GuidedAnalysisChart({
     precisePrice >= priceFrame.low &&
     precisePrice <= priceFrame.high;
   const compact = availableWidth !== undefined && availableWidth < 420;
+  const viewportCandleCount = displayViewport.endIndex - displayViewport.startIndex + 1;
+  const availableCandleCount = currentBounds.maxIndex - currentBounds.minIndex + 1;
 
   const nextAnnotationId = () => {
     annotationSequence.current += 1;
@@ -261,6 +305,25 @@ export function GuidedAnalysisChart({
     if (bounded !== cursor) onReplayCursorChange(bounded);
     setSelectedCandleIndex(undefined);
     setCrosshair(undefined);
+  };
+
+  const panViewport = (delta: number) => {
+    setLocalViewport({
+      sessionId: session.sessionId,
+      viewport: panChartViewport(displayViewport, delta, currentBounds),
+    });
+  };
+
+  const zoomViewport = (factor: number) => {
+    setLocalViewport({
+      sessionId: session.sessionId,
+      viewport: zoomChartViewport(
+        displayViewport,
+        factor,
+        selectedCandleIndex ?? (displayViewport.startIndex + displayViewport.endIndex) / 2,
+        currentBounds,
+      ),
+    });
   };
 
   const identityMatches =
@@ -371,6 +434,7 @@ export function GuidedAnalysisChart({
           showAnnotations={false}
           testID={`${testID}-plot`}
           ticker={chartTicker}
+          viewport={displayViewport}
         />
       </View>
 
@@ -391,9 +455,60 @@ export function GuidedAnalysisChart({
         <View style={{ gap: theme.spacing.sm }}>
           <UiText variant="label">ניווט נגיש וקלט מדויק</UiText>
           <UiText color="textMuted" variant="caption">
-            ציר הזמן ונתוני OHLCV מוצגים משמאל לימין. אין ניגון אוטומטי.
+            ציר הזמן ונתוני OHLCV מוצגים משמאל לימין. אפשר להזיז ולהגדיל באמצעות הכפתורים; החלון
+            לעולם אינו עובר את גבול החשיפה הנוכחי. אין ניגון אוטומטי.
             {reducedMotion ? ' מצב תנועה מופחת פעיל; המעבר בין נקודות החשיפה מיידי.' : ''}
           </UiText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Button
+              accessibilityLabel="הזזת גרף המחברת לנרות מוקדמים"
+              disabled={displayViewport.startIndex <= currentBounds.minIndex}
+              onPress={() => panViewport(-4)}
+              size="compact"
+              testID={`${testID}-pan-earlier`}
+              variant="ghost"
+            >
+              מוקדם
+            </Button>
+            <Button
+              accessibilityLabel="הזזת גרף המחברת לנרות מאוחרים"
+              disabled={displayViewport.endIndex >= currentBounds.maxIndex}
+              onPress={() => panViewport(4)}
+              size="compact"
+              testID={`${testID}-pan-later`}
+              variant="ghost"
+            >
+              מאוחר
+            </Button>
+            <Button
+              accessibilityLabel="הגדלת גרף המחברת"
+              disabled={viewportCandleCount <= Math.min(MIN_VIEWPORT_CANDLES, availableCandleCount)}
+              onPress={() => zoomViewport(1.35)}
+              size="compact"
+              testID={`${testID}-zoom-in`}
+              variant="ghost"
+            >
+              הגדלה +
+            </Button>
+            <Button
+              accessibilityLabel="הקטנת גרף המחברת"
+              disabled={viewportCandleCount >= availableCandleCount}
+              onPress={() => zoomViewport(0.75)}
+              size="compact"
+              testID={`${testID}-zoom-out`}
+              variant="ghost"
+            >
+              הקטנה −
+            </Button>
+            <LtrText
+              accessibilityLiveRegion="polite"
+              color="textMuted"
+              testID={`${testID}-viewport-range`}
+              variant="caption"
+            >
+              {`#${displayViewport.startIndex}–#${displayViewport.endIndex}`}
+            </LtrText>
+          </View>
           <Button
             disabled={readOnly}
             onPress={() => setShowPreciseInput((visible) => !visible)}

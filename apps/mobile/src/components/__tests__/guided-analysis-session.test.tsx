@@ -295,6 +295,10 @@ function renderSession(current: GuidedAnalysisSession) {
 }
 
 describe('GuidedAnalysisSessionView', () => {
+  beforeEach(() => {
+    process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE = '1';
+  });
+
   it('accepts the persisted full source count even when the decision cutoff is earlier', async () => {
     const current = session();
     expect(current.chart.candleCount).toBe(current.chart.decisionCandleIndex + 1);
@@ -406,6 +410,7 @@ describe('GuidedAnalysisSessionView', () => {
       const debrief = await renderSession(finalizedSession(candidate.session));
       expect(debrief.getByText(candidate.candidate.scenario.revealedTitleHebrew)).toBeTruthy();
       if (application === 'no-trade') {
+        expect(debrief.getByTestId('guided-analysis-no-trade-terminal')).toBeTruthy();
         expect(debrief.queryByTestId('paper-execution-launch-card')).toBeNull();
       } else {
         expect(debrief.getByTestId('paper-execution-launch-card')).toBeTruthy();
@@ -431,6 +436,7 @@ describe('GuidedAnalysisSessionView', () => {
     expect(screen.getByText('אין כאן המלצה עדכנית לקנייה, מכירה או פעולה.')).toBeTruthy();
     expect(screen.getByTestId('historical-no-credit')).toBeTruthy();
     expect(screen.queryByTestId('paper-execution-launch-card')).toBeNull();
+    expect(screen.getByTestId('guided-analysis-no-trade-terminal')).toBeTruthy();
     expect(screen.queryByTestId('paper-execution-launch')).toBeNull();
     expect(screen.getByText(/״אין עסקה״ היא תשובת תהליך מלאה/)).toBeTruthy();
     expect(screen.queryByText('מיומנויות שהודגמו')).toBeNull();

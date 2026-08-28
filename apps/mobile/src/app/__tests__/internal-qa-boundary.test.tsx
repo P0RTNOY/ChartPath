@@ -49,11 +49,13 @@ const originalDevelopmentMode = __DEV__;
 describe('production persisted QA route boundary', () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = false;
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
     mockPaperProps.mockClear();
   });
 
   afterEach(() => {
     (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = originalDevelopmentMode;
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
   });
 
   it('keeps a valid persisted internal analysis hidden for ordinary and qa=1 production URLs', async () => {
@@ -75,7 +77,7 @@ describe('production persisted QA route boundary', () => {
       </ChartPathThemeProvider>,
     );
     expect(qa.queryByTestId('authorized-analysis')).toBeNull();
-    expect(qa.getByText(/אינה זמינה בגרסת ייצור/)).toBeTruthy();
+    expect(qa.getByText(/מצב הסוקרים הפנימי פעיל/)).toBeTruthy();
   });
 
   it('keeps ordinary synthetic analysis available in production', async () => {
@@ -97,7 +99,57 @@ describe('production persisted QA route boundary', () => {
       </ChartPathThemeProvider>,
     );
     expect(screen.queryByTestId('authorized-paper')).toBeNull();
-    expect(screen.getByText(/אינו זמין בגרסת ייצור/)).toBeTruthy();
+    expect(screen.getByText(/מצב הסוקרים הפנימי פעיל/)).toBeTruthy();
     expect(mockPaperProps).not.toHaveBeenCalled();
+  });
+
+  it('rejects persisted qa=1 analysis and paper deep links in development without the reviewer flag', async () => {
+    (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = true;
+    mockSessions = [internalSession];
+    mockParams = { sessionId: internalSession.sessionId, qa: '1' };
+    const analysis = await render(
+      <ChartPathThemeProvider mode="light">
+        <AnalysisScreen />
+      </ChartPathThemeProvider>,
+    );
+    expect(analysis.queryByTestId('authorized-analysis')).toBeNull();
+    expect(analysis.getByText(/מצב הסוקרים הפנימי פעיל/)).toBeTruthy();
+    await analysis.unmount();
+
+    mockParams = { analysisSessionId: internalSession.sessionId, qa: '1' };
+    const paper = await render(
+      <ChartPathThemeProvider mode="light">
+        <PaperExecutionRoute />
+      </ChartPathThemeProvider>,
+    );
+    expect(paper.queryByTestId('authorized-paper')).toBeNull();
+    expect(paper.getByText(/מצב הסוקרים הפנימי פעיל/)).toBeTruthy();
+    expect(mockPaperProps).not.toHaveBeenCalled();
+  });
+
+  it('allows persisted qa=1 deep links only when development and reviewer gates are both active', async () => {
+    (globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = true;
+    process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE = '1';
+    mockSessions = [internalSession];
+    mockParams = { sessionId: internalSession.sessionId, qa: '1' };
+    const analysis = await render(
+      <ChartPathThemeProvider mode="light">
+        <AnalysisScreen />
+      </ChartPathThemeProvider>,
+    );
+    expect(analysis.getByTestId('authorized-analysis')).toBeTruthy();
+    await analysis.unmount();
+
+    mockParams = { analysisSessionId: internalSession.sessionId, qa: '1' };
+    const paper = await render(
+      <ChartPathThemeProvider mode="light">
+        <PaperExecutionRoute />
+      </ChartPathThemeProvider>,
+    );
+    expect(paper.getByTestId('authorized-paper')).toBeTruthy();
+    expect(mockPaperProps).toHaveBeenCalledWith({
+      accessMode: 'qa-internal',
+      analysisSessionId: internalSession.sessionId,
+    });
   });
 });

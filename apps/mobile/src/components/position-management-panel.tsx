@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { Button, Card, Heading, LtrText, UiText, useTheme } from '@chartpath/ui';
 
@@ -37,35 +37,37 @@ function Choice({
 }) {
   const theme = useTheme();
   return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole={role}
-      accessibilityState={{ checked, disabled, selected: role === 'radio' ? checked : undefined }}
-      disabled={disabled}
-      onPress={onPress}
-      style={{
-        alignItems: 'center',
-        backgroundColor: checked ? theme.colors.primarySoft : theme.colors.surface,
-        borderColor: checked ? theme.colors.primary : theme.colors.borderStrong,
-        borderRadius: theme.radii.md,
-        borderWidth: checked ? 2 : 1,
-        flexDirection: 'row',
-        flexGrow: role === 'radio' ? 1 : 0,
-        gap: 8,
-        minHeight: 48,
-        minWidth: role === 'radio' ? 150 : 44,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-      }}
-      testID={testID}
-    >
-      <LtrText color={checked ? 'primary' : 'textMuted'} variant="label">
-        {role === 'radio' ? (checked ? '◉' : '○') : checked ? '☑' : '☐'}
-      </LtrText>
-      <UiText style={{ flexShrink: 1 }} variant="bodySmall">
-        {label}
-      </UiText>
-    </Pressable>
+    <>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole={role}
+        accessibilityState={{ checked, disabled, selected: role === 'radio' ? checked : undefined }}
+        disabled={disabled}
+        onPress={onPress}
+        style={{
+          alignItems: 'center',
+          backgroundColor: checked ? theme.colors.primarySoft : theme.colors.surface,
+          borderColor: checked ? theme.colors.primary : theme.colors.borderStrong,
+          borderRadius: theme.radii.md,
+          borderWidth: checked ? 2 : 1,
+          flexDirection: 'row',
+          flexGrow: role === 'radio' ? 1 : 0,
+          gap: 8,
+          minHeight: 48,
+          minWidth: role === 'radio' ? 150 : 44,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+        }}
+        testID={testID}
+      >
+        <LtrText color={checked ? 'primary' : 'textMuted'} variant="label">
+          {role === 'radio' ? (checked ? '◉' : '○') : checked ? '☑' : '☐'}
+        </LtrText>
+        <UiText style={{ flexShrink: 1 }} variant="bodySmall">
+          {label}
+        </UiText>
+      </Pressable>
+    </>
   );
 }
 
@@ -83,12 +85,14 @@ function ManagementInput({
   readonly value: string;
 }) {
   const theme = useTheme();
+  const accessoryId = `${testID}-keyboard-accessory`;
   return (
     <View style={{ gap: 6 }}>
       <UiText variant="label">{label}</UiText>
       <TextInput
         accessibilityLabel={label}
         keyboardType={multiline ? 'default' : 'decimal-pad'}
+        inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         maxLength={multiline ? 500 : 32}
         multiline={multiline}
         onChangeText={onChange}
@@ -109,6 +113,23 @@ function ManagementInput({
         testID={testID}
         value={value}
       />
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={accessoryId}>
+          <View
+            style={{
+              alignItems: 'flex-end',
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
+              borderTopWidth: 1,
+              padding: 6,
+            }}
+          >
+            <Button onPress={Keyboard.dismiss} testID={`${testID}-keyboard-done`} variant="ghost">
+              סיום עריכה
+            </Button>
+          </View>
+        </InputAccessoryView>
+      ) : undefined}
     </View>
   );
 }

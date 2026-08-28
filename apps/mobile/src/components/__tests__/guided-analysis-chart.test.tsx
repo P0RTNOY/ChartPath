@@ -250,6 +250,27 @@ describe('GuidedAnalysisChart', () => {
     expect(screen.getByText(/Replay.*היסטורי עיוור/)).toBeTruthy();
   });
 
+  it('offers cutoff-safe accessible viewport controls on an exact candidate chart', async () => {
+    const value = candidateHistoricalSession();
+    const cutoff = value.replay.cursorCandleIndex;
+    const screen = await renderChart({ value });
+
+    expect(screen.getByTestId('guided-analysis-chart-notebook-pan-earlier')).toBeTruthy();
+    expect(screen.getByTestId('guided-analysis-chart-notebook-pan-later')).toBeTruthy();
+    expect(screen.getByTestId('guided-analysis-chart-notebook-zoom-in')).toBeTruthy();
+    expect(screen.getByTestId('guided-analysis-chart-notebook-zoom-out')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('guided-analysis-chart-notebook-zoom-in'));
+    await fireEvent.press(screen.getByTestId('guided-analysis-chart-notebook-pan-later'));
+
+    const range = screen.getByTestId('guided-analysis-chart-notebook-viewport-range');
+    const displayedEnd = Number(String(range.props.children).split('–#')[1]);
+    expect(displayedEnd).toBeLessThanOrEqual(cutoff);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'הצגת נתוני הנרות' }));
+    expect(screen.queryByLabelText(new RegExp(`נר רציף ${cutoff + 2}:`))).toBeNull();
+  });
+
   it('stamps historical geometry with its authorship cursor and resets to the persisted minimum', async () => {
     const resolved = resolveHistoricalReplayScenario('blind-generated-development-scenario');
     if (resolved.status !== 'ready') throw new Error('Historical test fixture is unavailable');

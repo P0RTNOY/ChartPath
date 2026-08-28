@@ -65,12 +65,33 @@ const counts = {
 };
 const payload = {
   bundleId: 'recovery-test',
+  createdAt: '2026-08-28T08:30:00.000Z',
   payloadChecksum: `sha256:${'a'.repeat(64)}`,
+  source: {
+    appVersion: '0.1.0',
+    contentVersion: 'chartpath-content-v8',
+    persistenceSchemaVersion: 6,
+    projectorVersion: 1,
+  },
   includedCategories: ['settings', 'attempts', 'position-management-sessions'],
   privacy: {
     containsPositionManagementAndJournalText: true,
     containsQuarantinePayloads: false,
   },
+};
+
+const importPlan = {
+  bundleId: 'recovery-test',
+  payloadChecksum: payload.payloadChecksum,
+  currentSnapshotChecksum: `sha256:${'c'.repeat(64)}`,
+  planToken: `sha256:${'d'.repeat(64)}`,
+  selectedCategories: ['attempts', 'position-management-sessions'],
+  incoming: counts,
+  added: counts,
+  unchanged: { ...counts, settings: 0 as const, attempts: 0, positionManagementSessions: 0 },
+  conflicts: [],
+  canApply: true,
+  hasChanges: true,
 };
 
 describe('RecoveryBundlePanel', () => {
@@ -99,20 +120,8 @@ describe('RecoveryBundlePanel', () => {
       ],
     });
     mockDecryptRecoveryBundle.mockResolvedValue({ payload });
-    mockPreviewRecoveryImport.mockResolvedValue({
-      bundleId: 'recovery-test',
-      payloadChecksum: payload.payloadChecksum,
-      currentSnapshotChecksum: `sha256:${'c'.repeat(64)}`,
-      planToken: `sha256:${'d'.repeat(64)}`,
-      selectedCategories: ['attempts', 'position-management-sessions'],
-      incoming: counts,
-      added: counts,
-      unchanged: { ...counts, settings: 0, attempts: 0, positionManagementSessions: 0 },
-      conflicts: [],
-      canApply: true,
-      hasChanges: true,
-    });
-    mockApplyRecoveryImport.mockResolvedValue({ applied: true });
+    mockPreviewRecoveryImport.mockResolvedValue(importPlan);
+    mockApplyRecoveryImport.mockResolvedValue({ applied: true, plan: importPlan });
   });
 
   function renderPanel() {
@@ -173,6 +182,31 @@ describe('RecoveryBundlePanel', () => {
 
     await waitFor(() => expect(mockPreviewRecoveryImport).toHaveBeenCalledWith(payload));
     expect(screen.getByTestId('recovery-import-summary')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-identity')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-bundle-id').props.children).toBe('recovery-test');
+    expect(screen.getByTestId('recovery-import-created-at').props.children).toBe(
+      '2026-08-28T08:30:00.000Z',
+    );
+    expect(screen.getByTestId('recovery-import-source-app-version').props.children).toBe('0.1.0');
+    expect(screen.getByTestId('recovery-import-source-content-version').props.children).toBe(
+      'chartpath-content-v8',
+    );
+    expect(screen.getByTestId('recovery-import-source-persistence-schema').props.children).toBe(6);
+    expect(screen.getByTestId('recovery-import-source-projector-version').props.children).toBe(1);
+    expect(screen.getByTestId('recovery-import-payload-checksum').props.children).toBe(
+      `sha256:${'a'.repeat(64)}`,
+    );
+    expect(screen.getByTestId('recovery-import-current-snapshot-checksum').props.children).toBe(
+      `sha256:${'c'.repeat(64)}`,
+    );
+    expect(screen.getByTestId('recovery-import-plan-token').props.children).toBe(
+      `sha256:${'d'.repeat(64)}`,
+    );
+    expect(screen.getByTestId('recovery-import-counts-incoming')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-counts-added')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-counts-unchanged')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-conflict-count').props.children).toBe(0);
+    expect(screen.getByTestId('recovery-import-missing-ancestry-count').props.children).toBe(0);
     expect(
       screen.getByTestId('recovery-import-category-settings').props.accessibilityState.checked,
     ).toBe(false);
@@ -189,6 +223,14 @@ describe('RecoveryBundlePanel', () => {
     await fireEvent.press(screen.getByTestId('recovery-import-request-confirm'));
     expect(screen.getByTestId('recovery-import-confirmation')).toBeTruthy();
     expect(mockApplyRecoveryImport).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('recovery-import-cancel'));
+    expect(screen.queryByTestId('recovery-import-confirmation')).toBeNull();
+    expect(screen.getByTestId('recovery-bundle-message').props.children).toContain(
+      'אישור היבוא בוטל',
+    );
+    expect(mockApplyRecoveryImport).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('recovery-import-request-confirm'));
     await fireEvent.press(screen.getByTestId('recovery-import-apply'));
 
     await waitFor(() =>
@@ -197,6 +239,38 @@ describe('RecoveryBundlePanel', () => {
         expectedPlanToken: `sha256:${'d'.repeat(64)}`,
       }),
     );
-    expect(screen.getByText(/היבוא הושלם/)).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-result')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-result-status')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-result-added')).toBeTruthy();
+    expect(screen.getByTestId('recovery-import-result-unchanged')).toBeTruthy();
+  });
+
+  it('keeps missing ancestry fail closed and exposes its exact blocking count', async () => {
+    mockPreviewRecoveryImport.mockResolvedValue({
+      ...importPlan,
+      conflicts: [
+        {
+          category: 'paper-execution-sessions',
+          stableId: 'paper-without-analysis',
+          code: 'missing-ancestry',
+          message: 'Paper execution has no exact finalized analysis.',
+        },
+      ],
+      canApply: false,
+    });
+    const screen = await renderPanel();
+    await fireEvent.press(screen.getByTestId('recovery-import-pick'));
+    await fireEvent.changeText(
+      screen.getByTestId('recovery-import-password'),
+      'a-secure-password-123',
+    );
+    await fireEvent.press(screen.getByTestId('recovery-import-preview'));
+
+    await waitFor(() => expect(screen.getByTestId('recovery-import-summary')).toBeTruthy());
+    expect(screen.getByTestId('recovery-import-conflict-count').props.children).toBe(1);
+    expect(screen.getByTestId('recovery-import-missing-ancestry-count').props.children).toBe(1);
+    expect(screen.getByTestId('recovery-import-conflict-1')).toBeTruthy();
+    expect(screen.queryByTestId('recovery-import-request-confirm')).toBeNull();
+    expect(mockApplyRecoveryImport).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,11 @@ export function ManagementDebriefCard({
   const theme = useTheme();
   return (
     <View style={{ gap: theme.spacing.md }} testID="paper-management-debrief">
-      <Card variant="accent">
+      <Card
+        accessibilityLabel="תחקיר ניהול דטרמיניסטי"
+        testID="paper-management-debrief-marker"
+        variant="accent"
+      >
         <View style={{ gap: 8 }}>
           <Badge tone="neutral">תחקיר ניהול — התהליך אינו ציון רווח</Badge>
           <Heading level={2}>תחקיר ניהול דטרמיניסטי</Heading>

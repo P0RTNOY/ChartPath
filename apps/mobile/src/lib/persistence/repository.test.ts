@@ -393,6 +393,10 @@ describe('LearningRepository', () => {
 
     expect(await adapter.dump()).toBe(beforePreview);
     expect(plan.canApply).toBe(true);
+    expect(plan.bundleId).toBe('recovery-test-additive');
+    expect(plan.payloadChecksum).toBe(payload.payloadChecksum);
+    expect(/^sha256:[0-9a-f]{64}$/u.test(plan.currentSnapshotChecksum)).toBe(true);
+    expect(/^sha256:[0-9a-f]{64}$/u.test(plan.planToken)).toBe(true);
     expect(plan.added).toMatchObject({ settings: 1, attempts: 1 });
     const applied = await target.applyRecoveryImport(payload, {
       selectedCategories: plan.selectedCategories,

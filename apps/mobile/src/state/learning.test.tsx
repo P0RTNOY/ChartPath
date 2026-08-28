@@ -50,6 +50,7 @@ const QA_HYPOTHETICAL = 'qa-hypothetical-mechanics' as const;
 async function renderLearning(
   repository: LearningRepository,
   registry?: HistoricalContentRegistry,
+  internalReviewerMode = true,
 ): Promise<{
   readonly current: () => LearningContextValue;
   readonly view: Awaited<ReturnType<typeof render>>;
@@ -62,7 +63,11 @@ async function renderLearning(
   let view!: Awaited<ReturnType<typeof render>>;
   await act(async () => {
     view = await render(
-      <LearningProvider repositoryOverride={repository} historicalRegistryOverride={registry}>
+      <LearningProvider
+        repositoryOverride={repository}
+        historicalRegistryOverride={registry}
+        internalReviewerModeOverride={internalReviewerMode}
+      >
         <Probe />
       </LearningProvider>,
     );
@@ -202,6 +207,25 @@ describe('guided analysis learning integration', () => {
         kind: 'historical',
         scenarioId: candidate.scenario.scenarioId,
         scenarioVersion: candidate.scenario.scenarioVersion,
+      }),
+    ).rejects.toThrow(/internal-scenario-restricted/);
+    expect((await repository.load()).analysisSessions).toEqual([]);
+    await harness.view.unmount();
+  });
+
+  it('rejects internal QA allocation in a development build without the reviewer flag', async () => {
+    const repository = new LearningRepository(new InMemoryPersistenceAdapter(), {
+      contentVersion: contentVersion.id,
+    });
+    const harness = await renderLearning(repository, undefined, false);
+    const candidate = scenarioCandidateRegistry[0]!;
+
+    await expect(
+      harness.current().createOrResumeAnalysisSession({
+        kind: 'historical',
+        scenarioId: candidate.scenario.scenarioId,
+        scenarioVersion: candidate.scenario.scenarioVersion,
+        accessMode: 'qa-internal',
       }),
     ).rejects.toThrow(/internal-scenario-restricted/);
     expect((await repository.load()).analysisSessions).toEqual([]);

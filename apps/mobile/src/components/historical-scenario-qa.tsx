@@ -19,15 +19,19 @@ function focusAccessibleTarget(target: View | null): void {
 export function HistoricalScenarioQa({
   cards,
   onStart,
+  onStartFullLifecycle,
   revealDetail,
   startError,
   startingKey,
+  fullLifecycleQaKeys = [],
 }: {
   readonly cards: readonly BlindQaCandidateCard[];
   readonly onStart: (qaKey: string) => void;
+  readonly onStartFullLifecycle?: (qaKey: string) => void;
   readonly revealDetail: (qaKey: string) => RevealedQaCandidateDetail | undefined;
   readonly startError?: string | null;
   readonly startingKey?: string;
+  readonly fullLifecycleQaKeys?: readonly string[];
 }) {
   const theme = useTheme();
   const [acknowledged, setAcknowledged] = useState(false);
@@ -36,6 +40,7 @@ export function HistoricalScenarioQa({
   const [detail, setDetail] = useState<RevealedQaCandidateDetail | null>(null);
   const actionHeadingRef = useRef<View>(null);
   const revealedHeadingRef = useRef<View>(null);
+  const fullLifecycleAvailable = selectedKey !== null && fullLifecycleQaKeys.includes(selectedKey);
 
   useEffect(() => {
     const target = detail
@@ -189,14 +194,30 @@ export function HistoricalScenarioQa({
                 חזרה לרשימה העיוורת
               </Button>
               <Button
-                accessibilityLabel="פתיחת מועמד QA נבחר לתרגול עיוור ללא קרדיט"
+                accessibilityLabel={
+                  fullLifecycleAvailable
+                    ? 'פתיחת קיצור ניהול ממוקד למועמד QA נבחר ללא קרדיט'
+                    : 'פתיחת מועמד QA נבחר לתרגול עיוור ללא קרדיט'
+                }
                 disabled={startingKey !== undefined}
                 loading={startingKey === selectedKey}
                 onPress={() => onStart(selectedKey)}
                 testID={`scenario-qa-start-${selectedKey}`}
               >
-                פתיחה עיוורת ללא קרדיט
+                {fullLifecycleAvailable ? 'פתיחת קיצור ניהול ממוקד' : 'פתיחה עיוורת ללא קרדיט'}
               </Button>
+              {fullLifecycleAvailable && onStartFullLifecycle ? (
+                <Button
+                  accessibilityLabel="התחלת מסלול QA מלא בניתוח מונחה ללא קרדיט"
+                  disabled={startingKey !== undefined}
+                  loading={startingKey === selectedKey}
+                  onPress={() => onStartFullLifecycle(selectedKey)}
+                  testID={`scenario-qa-start-full-lifecycle-${selectedKey}`}
+                  variant="secondary"
+                >
+                  התחלת מסלול מלא בניתוח מונחה
+                </Button>
+              ) : undefined}
               <Button
                 accessibilityLabel="חשיפת פרטי מועמד QA ותשובת הבדיקה"
                 onPress={() => setDetail(revealDetail(selectedKey) ?? null)}

@@ -22,7 +22,10 @@ import {
   resolvePaperExecutionSession,
 } from './paper-execution';
 
-const QA_HYPOTHETICAL = { accessMode: 'qa-hypothetical-mechanics' } as const;
+const QA_HYPOTHETICAL = {
+  accessMode: 'qa-hypothetical-mechanics',
+  internalReviewerMode: true,
+} as const;
 
 type Mutable<T> = T extends readonly (infer Item)[]
   ? Mutable<Item>[]

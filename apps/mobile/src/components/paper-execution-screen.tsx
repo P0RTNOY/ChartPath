@@ -1,7 +1,22 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, useWindowDimensions, View } from 'react-native';
+import {
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  Pressable,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
+import {
+  createChartViewport,
+  panChartViewport,
+  projectVisibleCandles,
+  zoomChartViewport,
+  type ChartViewport,
+} from '@chartpath/chart-engine';
 import {
   createTradePlan,
   type EntryOrderType,
@@ -43,6 +58,8 @@ import {
 } from '@/data/position-management';
 
 type NumericField = 'entry' | 'stop' | 'target' | 'account' | 'risk' | 'quantity';
+
+const MIN_EXECUTION_VIEWPORT_CANDLES = 12;
 
 interface TicketFields {
   readonly orderType: EntryOrderType;
@@ -208,6 +225,150 @@ function chartAtCursor(resolution: PaperExecutionReady, cursor: number): Generat
   };
 }
 
+function PaperExecutionChart({
+  chart,
+  cursor,
+  executionOverlays,
+  ticker,
+  viewportKey,
+}: {
+  readonly chart: GeneratedChart;
+  readonly cursor: number;
+  readonly executionOverlays: readonly ExecutionChartOverlay[];
+  readonly ticker: string;
+  readonly viewportKey: string;
+}) {
+  const theme = useTheme();
+  const bounds = useMemo(
+    () =>
+      projectVisibleCandles(chart.candles, {
+        cutoffCandleIndex: cursor,
+        minVisibleCandles: MIN_EXECUTION_VIEWPORT_CANDLES,
+      }).bounds,
+    [chart.candles, cursor],
+  );
+  if (!bounds) throw new Error('The paper-execution chart has no visible candles');
+  const initialViewport = useMemo(
+    () => createChartViewport(bounds),
+    // Exact execution identity is stable while its cutoff advances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewportKey],
+  );
+  const [localViewport, setLocalViewport] = useState<{
+    readonly viewportKey: string;
+    readonly viewport: ChartViewport;
+  }>(() => ({ viewportKey, viewport: initialViewport }));
+  const requestedViewport =
+    localViewport.viewportKey === viewportKey ? localViewport.viewport : initialViewport;
+  const cutoffSafeViewport = createChartViewport(bounds, requestedViewport);
+  const viewportBounds = projectVisibleCandles(chart.candles, {
+    cutoffCandleIndex: cursor,
+    startCandleIndex: cutoffSafeViewport.startIndex,
+    endCandleIndex: cutoffSafeViewport.endIndex,
+    minVisibleCandles: MIN_EXECUTION_VIEWPORT_CANDLES,
+  }).bounds;
+  const displayViewport: ChartViewport = viewportBounds
+    ? {
+        ...cutoffSafeViewport,
+        minPrice: viewportBounds.minPrice,
+        maxPrice: viewportBounds.maxPrice,
+      }
+    : cutoffSafeViewport;
+  const visibleCount = displayViewport.endIndex - displayViewport.startIndex + 1;
+  const availableCount = bounds.maxIndex - bounds.minIndex + 1;
+  const updateViewport = (viewport: ChartViewport) => setLocalViewport({ viewportKey, viewport });
+
+  return (
+    <View style={{ gap: theme.spacing.sm }} testID="paper-execution-chart-viewport">
+      <OhlcvChart
+        allowAccessibleDataTable
+        chart={chart}
+        cutoffCandleIndex={cursor}
+        executionOverlays={executionOverlays}
+        testID="paper-execution-chart"
+        ticker={ticker}
+        viewport={displayViewport}
+      />
+      <Card padding="sm" variant="subtle">
+        <View style={{ gap: theme.spacing.sm }}>
+          <UiText variant="label">ניווט נגיש בגרף הביצוע</UiText>
+          <UiText color="textMuted" variant="caption">
+            הכפתורים משנים רק את החלון המוצג ואינם חושפים נרות מעבר לנר המעובד האחרון.
+          </UiText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Button
+              accessibilityLabel="הזזת גרף הביצוע לנרות מוקדמים"
+              disabled={displayViewport.startIndex <= bounds.minIndex}
+              onPress={() => updateViewport(panChartViewport(displayViewport, -4, bounds))}
+              size="compact"
+              testID="paper-chart-pan-earlier"
+              variant="ghost"
+            >
+              מוקדם
+            </Button>
+            <Button
+              accessibilityLabel="הזזת גרף הביצוע לנרות מאוחרים"
+              disabled={displayViewport.endIndex >= bounds.maxIndex}
+              onPress={() => updateViewport(panChartViewport(displayViewport, 4, bounds))}
+              size="compact"
+              testID="paper-chart-pan-later"
+              variant="ghost"
+            >
+              מאוחר
+            </Button>
+            <Button
+              accessibilityLabel="הגדלת גרף הביצוע"
+              disabled={visibleCount <= Math.min(MIN_EXECUTION_VIEWPORT_CANDLES, availableCount)}
+              onPress={() =>
+                updateViewport(
+                  zoomChartViewport(
+                    displayViewport,
+                    1.35,
+                    (displayViewport.startIndex + displayViewport.endIndex) / 2,
+                    bounds,
+                  ),
+                )
+              }
+              size="compact"
+              testID="paper-chart-zoom-in"
+              variant="ghost"
+            >
+              הגדלה +
+            </Button>
+            <Button
+              accessibilityLabel="הקטנת גרף הביצוע"
+              disabled={visibleCount >= availableCount}
+              onPress={() =>
+                updateViewport(
+                  zoomChartViewport(
+                    displayViewport,
+                    0.75,
+                    (displayViewport.startIndex + displayViewport.endIndex) / 2,
+                    bounds,
+                  ),
+                )
+              }
+              size="compact"
+              testID="paper-chart-zoom-out"
+              variant="ghost"
+            >
+              הקטנה −
+            </Button>
+            <LtrText
+              accessibilityLiveRegion="polite"
+              color="textMuted"
+              testID="paper-chart-viewport-range"
+              variant="caption"
+            >
+              {`#${displayViewport.startIndex}–#${displayViewport.endIndex}`}
+            </LtrText>
+          </View>
+        </View>
+      </Card>
+    </View>
+  );
+}
+
 function overlaysFor(session: PaperExecutionSession): readonly ExecutionChartOverlay[] {
   const overlays: ExecutionChartOverlay[] = [
     {
@@ -312,12 +473,15 @@ function NumericInput({
   readonly onBlur: () => void;
 }) {
   const theme = useTheme();
+  const testID = `paper-input-${field}`;
+  const accessoryId = `${testID}-keyboard-accessory`;
   return (
     <View style={{ flexGrow: 1, gap: 6, minWidth: 150 }}>
       <UiText variant="label">{label}</UiText>
       <TextInput
         accessibilityLabel={label}
         editable={editable}
+        inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         keyboardType="decimal-pad"
         onBlur={onBlur}
         onChangeText={onChange}
@@ -337,9 +501,26 @@ function NumericInput({
           textAlign: 'left',
           writingDirection: 'ltr',
         }}
-        testID={`paper-input-${field}`}
+        testID={testID}
         value={value}
       />
+      {Platform.OS === 'ios' && editable ? (
+        <InputAccessoryView nativeID={accessoryId}>
+          <View
+            style={{
+              alignItems: 'flex-end',
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
+              borderTopWidth: 1,
+              padding: 6,
+            }}
+          >
+            <Button onPress={Keyboard.dismiss} testID={`${testID}-keyboard-done`} variant="ghost">
+              סיום עריכה
+            </Button>
+          </View>
+        </InputAccessoryView>
+      ) : undefined}
     </View>
   );
 }
@@ -684,6 +865,7 @@ export function PaperExecutionScreen({
     <Screen
       accessibilityLabel="תרגול ביצוע על נייר"
       contentContainerStyle={{ gap: theme.spacing.xl, ...(management ? { maxWidth: 1180 } : {}) }}
+      keyboardDismissMode="on-drag"
       scroll
       testID="paper-execution-screen"
     >
@@ -730,13 +912,12 @@ export function PaperExecutionScreen({
           }}
         >
           <View testID={management ? 'paper-management-chart' : undefined}>
-            <OhlcvChart
-              allowAccessibleDataTable
+            <PaperExecutionChart
               chart={chart}
-              cutoffCandleIndex={cursor}
+              cursor={cursor}
               executionOverlays={overlays}
-              testID="paper-execution-chart"
               ticker={resolution.content.dataset.manifest.displaySymbol}
+              viewportKey={execution.sessionId}
             />
           </View>
           {management ? (
@@ -950,6 +1131,7 @@ export function PaperExecutionScreen({
                     minHeight: 52,
                     padding: 10,
                   }}
+                  testID="paper-confirmation"
                 >
                   <LtrText color={confirmed ? 'primary' : 'textMuted'} variant="label">
                     {confirmed ? '☑' : '☐'}
@@ -978,7 +1160,7 @@ export function PaperExecutionScreen({
           ) : undefined}
 
           {!editable && !management ? (
-            <Card variant="outlined">
+            <Card testID={`paper-execution-status-${execution.status}`} variant="outlined">
               <View style={{ gap: theme.spacing.sm }}>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   <Badge tone={execution.status === 'ambiguous' ? 'warning' : 'neutral'}>
@@ -986,6 +1168,7 @@ export function PaperExecutionScreen({
                   </Badge>
                   <LtrText
                     color="textMuted"
+                    testID={`paper-execution-processed-candle-${cursor}`}
                     variant="numeric"
                   >{`cursor ${cursor + 1}/${resolution.executionBoundary.lastCandleIndex + 1}`}</LtrText>
                 </View>

@@ -832,7 +832,7 @@ function CapstoneSession({
           }}
         >
           <Heading level={2}>תהליך 11 השלבים</Heading>
-          <LtrText color="primary" variant="numeric">
+          <LtrText color="primary" testID="capstone-answered-count" variant="numeric">
             {aggregate.answeredSteps}/11
           </LtrText>
         </View>
@@ -920,7 +920,7 @@ function CapstoneSession({
         })}
       </View>
 
-      <Card variant="accent">
+      <Card testID={`capstone-current-step-${activeIndex + 1}`} variant="accent">
         <View style={{ gap: theme.spacing.lg }}>
           <View style={{ gap: 6 }}>
             <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
@@ -951,6 +951,7 @@ function CapstoneSession({
                 disabled={!activeStepComplete || activeStepDisabled || activeStatus === 'submitted'}
                 fullWidth
                 onPress={submitActiveStep}
+                testID="capstone-submit-step"
               >
                 {activeStatus === 'invalidated'
                   ? 'הגשת השלב מחדש'

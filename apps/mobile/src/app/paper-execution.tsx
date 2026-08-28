@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { ErrorState } from '@/components/app-state';
 import { PaperExecutionScreen } from '@/components/paper-execution-screen';
+import { isInternalQaDeepLinkAllowed } from '@/lib/internal-reviewer-mode';
 
 export default function PaperExecutionRoute() {
   const { analysisSessionId, qa } = useLocalSearchParams<{
@@ -18,10 +19,10 @@ export default function PaperExecutionRoute() {
       />
     );
   }
-  if (qaValue === '1' && !__DEV__) {
+  if (!isInternalQaDeepLinkAllowed(qaValue === '1')) {
     return (
       <ErrorState
-        message="סשן ביצוע או ניהול QA פנימי אינו זמין בגרסת ייצור."
+        message="סשן ביצוע או ניהול QA פנימי זמין רק בבניית פיתוח עם מצב הסוקרים הפנימי פעיל."
         onRetry={() => router.back()}
       />
     );

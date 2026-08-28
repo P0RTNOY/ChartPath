@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   findNodeHandle,
+  InputAccessoryView,
+  Keyboard,
   Platform,
   Pressable,
   TextInput,
@@ -56,6 +58,7 @@ function PasswordField({
   readonly testID: string;
 }) {
   const theme = useTheme();
+  const accessoryId = `${testID}-keyboard-accessory`;
   return (
     <View style={{ gap: 6 }}>
       <UiText variant="label">{label}</UiText>
@@ -63,6 +66,7 @@ function PasswordField({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
+        inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         onChangeText={onChange}
         placeholder="לפחות 15 תווים"
         placeholderTextColor={theme.colors.textMuted}
@@ -80,6 +84,23 @@ function PasswordField({
         testID={testID}
         value={value}
       />
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={accessoryId}>
+          <View
+            style={{
+              alignItems: 'flex-end',
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
+              borderTopWidth: 1,
+              padding: 6,
+            }}
+          >
+            <Button onPress={Keyboard.dismiss} testID={`${testID}-keyboard-done`} variant="ghost">
+              סיום עריכה
+            </Button>
+          </View>
+        </InputAccessoryView>
+      ) : undefined}
       <UiText color="textMuted" variant="caption">
         הסיסמה אינה נשמרת ואינה ניתנת לשחזור. שמרו אותה בנפרד מהקובץ.
       </UiText>
@@ -90,9 +111,11 @@ function PasswordField({
 function CountSummary({
   counts,
   prefix,
+  testID,
 }: {
   readonly counts: RecoveryPayloadCountsV1;
   readonly prefix: string;
+  readonly testID?: string;
 }) {
   const rows = [
     ['הגדרות', counts.settings],
@@ -103,11 +126,12 @@ function CountSummary({
     ['רשומות הסגר', counts.quarantineRecords.total],
   ] as const;
   return (
-    <View style={{ gap: 4 }}>
-      {rows.map(([label, count]) => (
+    <View style={{ gap: 4 }} testID={testID}>
+      {rows.map(([label, count], index) => (
         <View
           key={label}
           style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+          testID={testID ? `${testID}-${index + 1}` : undefined}
         >
           <UiText color="textMuted" variant="caption">{`${prefix} ${label}:`}</UiText>
           <LtrText variant="numeric">{count}</LtrText>
@@ -184,6 +208,10 @@ export function RecoveryBundlePanel() {
   } | null>(null);
   const [importPayload, setImportPayload] = useState<RecoveryPayloadV1 | null>(null);
   const [importPlan, setImportPlan] = useState<RecoveryImportPlan | null>(null);
+  const [importResult, setImportResult] = useState<{
+    readonly applied: boolean;
+    readonly plan: RecoveryImportPlan;
+  } | null>(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const [working, setWorking] = useState<'export' | 'share' | 'preview' | 'apply' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -308,6 +336,7 @@ export function RecoveryBundlePanel() {
     setMessageIsError(false);
     setImportPayload(null);
     setImportPlan(null);
+    setImportResult(null);
     setConfirmImport(false);
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -336,6 +365,7 @@ export function RecoveryBundlePanel() {
     setMessageIsError(false);
     setImportPayload(null);
     setImportPlan(null);
+    setImportResult(null);
     setConfirmImport(false);
     try {
       const decrypted = await decryptRecoveryBundle(
@@ -405,6 +435,7 @@ export function RecoveryBundlePanel() {
         selectedCategories: importPlan.selectedCategories,
         expectedPlanToken: importPlan.planToken,
       });
+      setImportResult({ applied: result.applied, plan: result.plan });
       setMessage(
         result.applied
           ? 'היבוא הושלם. נוספו רק הרשומות שאושרו בתכנית; הרשומות המקומיות נשמרו.'
@@ -416,6 +447,7 @@ export function RecoveryBundlePanel() {
       setImportPlan(null);
     } catch (error) {
       setConfirmImport(false);
+      setImportResult(null);
       setMessage(localizedRecoveryError(error));
       setMessageIsError(true);
     } finally {
@@ -573,6 +605,67 @@ export function RecoveryBundlePanel() {
             <Card testID="recovery-import-summary" variant="subtle">
               <View style={{ gap: 8 }}>
                 <Heading level={3}>תכנית יבוא</Heading>
+                {importPayload ? (
+                  <Card testID="recovery-import-identity" variant="outlined">
+                    <View style={{ gap: 6 }}>
+                      <UiText variant="label">זהות הקובץ והתכנית</UiText>
+                      <UiText color="textMuted" variant="caption">
+                        מזהה חבילה
+                      </UiText>
+                      <LtrText testID="recovery-import-bundle-id" variant="caption">
+                        {importPlan.bundleId}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        זמן יצירה
+                      </UiText>
+                      <LtrText testID="recovery-import-created-at" variant="caption">
+                        {importPayload.createdAt}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        גרסת יישום מקור
+                      </UiText>
+                      <LtrText testID="recovery-import-source-app-version" variant="caption">
+                        {importPayload.source.appVersion}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        גרסת תוכן מקור
+                      </UiText>
+                      <LtrText testID="recovery-import-source-content-version" variant="caption">
+                        {importPayload.source.contentVersion}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        גרסת סכמת התמדה מקורית
+                      </UiText>
+                      <LtrText testID="recovery-import-source-persistence-schema" variant="caption">
+                        {importPayload.source.persistenceSchemaVersion}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        גרסת מקרן מקורית
+                      </UiText>
+                      <LtrText testID="recovery-import-source-projector-version" variant="caption">
+                        {importPayload.source.projectorVersion}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        טביעת מטען
+                      </UiText>
+                      <LtrText testID="recovery-import-payload-checksum" variant="caption">
+                        {importPlan.payloadChecksum}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        טביעת מצב מקומי בזמן הבדיקה
+                      </UiText>
+                      <LtrText testID="recovery-import-current-snapshot-checksum" variant="caption">
+                        {importPlan.currentSnapshotChecksum}
+                      </LtrText>
+                      <UiText color="textMuted" variant="caption">
+                        אסימון תכנית קשור־מצב
+                      </UiText>
+                      <LtrText testID="recovery-import-plan-token" variant="caption">
+                        {importPlan.planToken}
+                      </LtrText>
+                    </View>
+                  </Card>
+                ) : undefined}
                 <UiText variant="label">קטגוריות ליבוא בפועל</UiText>
                 <UiText color="textMuted" variant="caption">
                   העדפות כבויות כברירת מחדל כאשר קיימים נתוני לומד במכשיר. כל שינוי מריץ מחדש בדיקה
@@ -614,16 +707,59 @@ export function RecoveryBundlePanel() {
                 {importPayload?.privacy.containsQuarantinePayloads ? (
                   <Badge tone="warning">הקובץ כולל מטעני הסגר; ייובאו רק אם הקטגוריה מסומנת</Badge>
                 ) : undefined}
-                <CountSummary counts={importPlan.incoming} prefix="בקובץ" />
-                <CountSummary counts={importPlan.added} prefix="חדשות" />
-                <CountSummary counts={importPlan.unchanged} prefix="ללא שינוי" />
-                <Badge tone={importPlan.canApply ? 'success' : 'warning'}>
-                  {importPlan.canApply
-                    ? 'אין התנגשויות חוסמות'
-                    : `${importPlan.conflicts.length} התנגשויות חוסמות`}
-                </Badge>
+                <UiText variant="label">רשומות נכנסות בקובץ</UiText>
+                <CountSummary
+                  counts={importPlan.incoming}
+                  prefix="נכנסות"
+                  testID="recovery-import-counts-incoming"
+                />
+                <UiText variant="label">רשומות שיתווספו</UiText>
+                <CountSummary
+                  counts={importPlan.added}
+                  prefix="יתווספו"
+                  testID="recovery-import-counts-added"
+                />
+                <UiText variant="label">רשומות זהות שידולגו ללא שינוי</UiText>
+                <CountSummary
+                  counts={importPlan.unchanged}
+                  prefix="זהות וידולגו"
+                  testID="recovery-import-counts-unchanged"
+                />
+                <View style={{ gap: 6 }} testID="recovery-import-conflicts">
+                  <View
+                    style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+                  >
+                    <UiText color="textMuted" variant="caption">
+                      התנגשויות חוסמות:
+                    </UiText>
+                    <LtrText testID="recovery-import-conflict-count" variant="numeric">
+                      {importPlan.conflicts.length}
+                    </LtrText>
+                  </View>
+                  <View
+                    style={{ alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+                  >
+                    <UiText color="textMuted" variant="caption">
+                      רשומות עם שרשרת מקור חסרה:
+                    </UiText>
+                    <LtrText testID="recovery-import-missing-ancestry-count" variant="numeric">
+                      {
+                        importPlan.conflicts.filter(({ code }) => code === 'missing-ancestry')
+                          .length
+                      }
+                    </LtrText>
+                  </View>
+                  <Badge tone={importPlan.canApply ? 'success' : 'warning'}>
+                    {importPlan.canApply
+                      ? 'אין התנגשויות חוסמות'
+                      : `${importPlan.conflicts.length} התנגשויות חוסמות — היבוא לא יתבצע`}
+                  </Badge>
+                </View>
                 {importPlan.conflicts.map((conflict, index) => (
-                  <View key={`${conflict.category}:${conflict.stableId}:${conflict.code}`}>
+                  <View
+                    key={`${conflict.category}:${conflict.stableId}:${conflict.code}`}
+                    testID={`recovery-import-conflict-${index + 1}`}
+                  >
                     <LtrText
                       color="danger"
                       style={{ flexShrink: 1, width: '100%' }}
@@ -679,12 +815,40 @@ export function RecoveryBundlePanel() {
                   </Button>
                   <Button
                     disabled={working === 'apply'}
-                    onPress={() => setConfirmImport(false)}
+                    onPress={() => {
+                      setConfirmImport(false);
+                      setMessage('אישור היבוא בוטל. דבר לא נכתב למאגר.');
+                      setMessageIsError(false);
+                    }}
+                    testID="recovery-import-cancel"
                     variant="ghost"
                   >
                     ביטול
                   </Button>
                 </View>
+              </View>
+            </Card>
+          ) : undefined}
+          {importResult ? (
+            <Card testID="recovery-import-result" variant="subtle">
+              <View style={{ gap: 8 }}>
+                <Heading level={3}>תוצאת היבוא</Heading>
+                <Badge
+                  testID="recovery-import-result-status"
+                  tone={importResult.applied ? 'success' : 'neutral'}
+                >
+                  {importResult.applied ? 'היבוא הושלם' : 'היבוא היה זהה ולא שינה נתונים'}
+                </Badge>
+                <CountSummary
+                  counts={importResult.plan.added}
+                  prefix="נוספו בפועל"
+                  testID="recovery-import-result-added"
+                />
+                <CountSummary
+                  counts={importResult.plan.unchanged}
+                  prefix="דולגו כזהות"
+                  testID="recovery-import-result-unchanged"
+                />
               </View>
             </Card>
           ) : undefined}

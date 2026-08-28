@@ -139,4 +139,20 @@ describe('AnalysisLabHub historical replay', () => {
     expect(screen.queryByRole('button', { name: /המשך.*Replay/ })).toBeNull();
     expect(mockLearning.snapshot?.analysisSessions).toEqual([persisted]);
   });
+
+  it('does not expose persisted QA state when a dev build lacks the reviewer flag', async () => {
+    const previous = process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    const persisted = historicalSession();
+    mockLearning = learning([persisted]);
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <AnalysisLabHub />
+      </ChartPathThemeProvider>,
+    );
+    expect(screen.queryByTestId('historical-analysis-resume-card')).toBeNull();
+    expect(mockLearning.snapshot?.analysisSessions).toEqual([persisted]);
+    if (previous === undefined) delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    else process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE = previous;
+  });
 });

@@ -12,6 +12,7 @@ import {
   historicalSessionRequiresQa,
   resolveHistoricalAnalysisSession,
 } from '@/data/historical-replay';
+import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 import { useLearning } from '@/state/learning';
 
 function statusLabel(session: GuidedAnalysisSession): string {
@@ -37,7 +38,7 @@ function displayDate(timestamp: string): string {
 }
 
 export function AnalysisHistory({
-  developmentMode = __DEV__,
+  developmentMode = isInternalReviewerModeEnabled(),
 }: {
   readonly developmentMode?: boolean;
 } = {}) {

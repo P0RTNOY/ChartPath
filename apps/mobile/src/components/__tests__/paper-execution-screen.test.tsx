@@ -30,7 +30,12 @@ jest.mock('../ohlcv-chart', () => {
     OhlcvChart: (props: {
       readonly testID: string;
       readonly chart: { readonly candles: readonly unknown[] };
+      readonly cutoffCandleIndex: number;
       readonly executionOverlays: readonly unknown[];
+      readonly viewport: {
+        readonly startIndex: number;
+        readonly endIndex: number;
+      };
     }) => {
       mockChartProps(props);
       return (
@@ -316,6 +321,8 @@ describe('PaperExecutionScreen', () => {
     );
 
     expect(screen.getByLabelText('גרף ביצוע עם 3 נרות')).toBeTruthy();
+    expect(screen.getByTestId('paper-execution-status-working')).toBeTruthy();
+    expect(screen.getByTestId('paper-execution-processed-candle-2')).toBeTruthy();
     expect(screen.getByText(/מצב תנועה מופחת פעיל/)).toBeTruthy();
     expect(screen.getAllByText('ההוראה ממתינה לביצוע').length).toBeGreaterThan(0);
     await fireEvent.press(screen.getByTestId('paper-advance-one'));
@@ -326,6 +333,42 @@ describe('PaperExecutionScreen', () => {
         'qa-hypothetical-mechanics',
       ),
     );
+  });
+
+  it('keeps paper viewport pan and zoom inside the processed-candle boundary', async () => {
+    const extendedCandles = Array.from({ length: 24 }, (_, index) => ({
+      ...candles[index % candles.length]!,
+      index,
+      timestamp: `2026-08-25T${String(index).padStart(2, '0')}:00:00.000Z`,
+    }));
+    const execution = { ...submitted(), lastProcessedCandleIndex: 23 };
+    mockLearning(execution);
+    mockResolveExecution.mockReturnValue({
+      ...ready,
+      candles: extendedCandles,
+      executionBoundary: { afterDecisionCandleIndex: 2, lastCandleIndex: 23 },
+    });
+    const screen = await render(
+      <ChartPathThemeProvider mode="light">
+        <PaperExecutionScreen
+          accessMode="qa-hypothetical-mechanics"
+          analysisSessionId="analysis-final"
+        />
+      </ChartPathThemeProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('paper-chart-zoom-in'));
+    await fireEvent.press(screen.getByTestId('paper-chart-pan-later'));
+
+    const latestChartProps = mockChartProps.mock.calls.at(-1)?.[0] as {
+      readonly chart: { readonly candles: readonly { readonly index: number }[] };
+      readonly cutoffCandleIndex: number;
+      readonly viewport: { readonly startIndex: number; readonly endIndex: number };
+    };
+    expect(latestChartProps.cutoffCandleIndex).toBe(23);
+    expect(latestChartProps.viewport.endIndex).toBeLessThanOrEqual(23);
+    expect(Math.max(...latestChartProps.chart.candles.map(({ index }) => index))).toBe(23);
+    expect(screen.getByTestId('paper-chart-viewport-range')).toBeTruthy();
   });
 
   it('requires explicit confirmation before cancelling or abandoning active execution', async () => {
@@ -366,6 +409,7 @@ describe('PaperExecutionScreen', () => {
     );
 
     expect(screen.getByTestId('paper-execution-debrief')).toBeTruthy();
+    expect(screen.getByTestId('paper-execution-status-ambiguous')).toBeTruthy();
     expect(screen.getByTestId('paper-execution-ambiguous')).toBeTruthy();
     expect(screen.getByText('אין רצף תוך־נרי אמין')).toBeTruthy();
     expect(screen.getByText(/הסימולטור לא בחר תוצאה רווחית או הפסדית/)).toBeTruthy();

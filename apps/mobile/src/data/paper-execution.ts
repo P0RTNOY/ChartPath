@@ -15,6 +15,7 @@ import {
   type ResolvedAnalysisApplication,
   type TradePlanProcessEvidence,
 } from '@chartpath/domain';
+import { isInternalReviewerModeEnabled } from '@/lib/internal-reviewer-mode';
 
 import {
   resolveHistoricalAnalysisSession,
@@ -41,6 +42,8 @@ export interface PaperExecutionResolutionOptions {
   readonly accessMode?: PaperExecutionAccessMode;
   /** A proposed plan direction must agree with the completed analysis before allocation. */
   readonly proposedDirection?: AnalysisTradeDirection;
+  /** Test-only composition seam; runtime resolves the compile-time reviewer flag. */
+  readonly internalReviewerMode?: boolean;
 }
 
 export function internalPaperExecutionAccessAllowed(input: {
@@ -204,7 +207,7 @@ export function resolvePaperExecutionAnalysisSession(
     !internalPaperExecutionAccessAllowed({
       internalOnly,
       accessMode: options.accessMode,
-      developmentMode: __DEV__,
+      developmentMode: options.internalReviewerMode ?? isInternalReviewerModeEnabled(),
     })
   ) {
     return unavailable(
@@ -252,7 +255,8 @@ export function resolvePaperExecutionAnalysisSession(
   }
   if (
     configuration.mode === 'hypothetical-mechanics' &&
-    (options.accessMode !== 'qa-hypothetical-mechanics' || !__DEV__)
+    (options.accessMode !== 'qa-hypothetical-mechanics' ||
+      !(options.internalReviewerMode ?? isInternalReviewerModeEnabled()))
   ) {
     return unavailable(
       'hypothetical-mechanics-restricted',

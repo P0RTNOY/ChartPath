@@ -93,4 +93,25 @@ describe('AnalysisHistory historical replay', () => {
     expect(screen.getByText('עדיין אין ניתוחים')).toBeTruthy();
     expect(mockLearning.snapshot?.analysisSessions).toEqual([persisted]);
   });
+
+  it('defaults to the compile-time reviewer gate instead of bare development mode', async () => {
+    const previous = process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    const persisted = historicalSession('persisted-dev-without-reviewer-flag', 'finalized');
+    mockLearning = {
+      status: 'ready',
+      error: null,
+      snapshot: { analysisSessions: [persisted], quarantinedAnalysisSessions: [] },
+      reload: jest.fn(),
+    } as unknown as LearningContextValue;
+    const screen = await render(
+      <ChartPathThemeProvider direction="rtl" mode="light">
+        <AnalysisHistory />
+      </ChartPathThemeProvider>,
+    );
+    expect(screen.queryByTestId('historical-history-reveal')).toBeNull();
+    expect(screen.getByText('עדיין אין ניתוחים')).toBeTruthy();
+    if (previous === undefined) delete process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE;
+    else process.env.EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE = previous;
+  });
 });

@@ -16,6 +16,7 @@ export interface ScreenProps {
   padded?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  keyboardDismissMode?: ScrollViewProps['keyboardDismissMode'];
   keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps'];
   accessibilityLabel?: string;
   testID?: string;
@@ -27,6 +28,7 @@ export function Screen({
   padded = true,
   style,
   contentContainerStyle,
+  keyboardDismissMode = 'none',
   keyboardShouldPersistTaps = 'handled',
   accessibilityLabel,
   testID,
@@ -60,6 +62,7 @@ export function Screen({
         accessibilityLabel={accessibilityLabel}
         contentContainerStyle={contentStyle}
         contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode={keyboardDismissMode}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         style={rootStyle}
         testID={testID}

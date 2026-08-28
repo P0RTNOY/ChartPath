@@ -357,7 +357,7 @@ function GuidedDebrief({
       ) : undefined}
 
       {safeDecision ? (
-        <Card variant="subtle">
+        <Card testID="guided-analysis-no-trade-terminal" variant="subtle">
           <UiText variant="label">תועדה נכון גם החלטה לא לפעול.</UiText>
           <UiText color="textMuted" variant="bodySmall">
             ״אין עסקה״ היא תשובת תהליך מלאה במקרה הזה, ולא תחזית למחיר מאוחר יותר.
