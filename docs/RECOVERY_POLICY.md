@@ -3,7 +3,10 @@
 **Decision:** use a versioned, user-controlled, password-encrypted logical export/import bundle;
 keep the mutable SQLite store excluded from opaque platform backup
 
-**Status:** Milestone 8 implementation policy; recovery is local and user initiated, not cloud sync
+**Status:** Milestone 8 implementation policy plus Native Closure Pass UI contract; recovery is local
+and user initiated, not cloud sync. Automated component, repository, browser, crypto, and static
+native-policy evidence exists. A complete password-bearing native file export/import journey remains
+open unless a separate exact evidence record says otherwise.
 
 ## 1. Context
 
@@ -100,11 +103,22 @@ KDF salt and exact parameters, AEAD nonce/tag length, ciphertext byte length, ci
 Bundle ID, creation time, source versions, categories, counts, privacy flags, records, and the
 internal payload checksum are encrypted.
 
-The password is never logged, persisted, routed, included in errors, stored in a bundle, or retained
-after cancel/success/failure. Mutable password-byte, key, plaintext, and decrypted buffers are
-overwritten in `finally` paths where JavaScript permits. JavaScript strings, garbage-collected
-copies, native crypto objects, and async runtime frames cannot be guaranteed to be erased; the UI
-and policy do not claim otherwise.
+The password is never intentionally logged, persisted, routed, included in errors, or stored in a
+bundle. It exists transiently in the secure UI field while that recovery screen is active. The
+import password is cleared from UI state after a successful import; otherwise secure-field strings
+remain in component memory until changed or the screen is torn down. Mutable password-byte, key,
+plaintext, and decrypted buffers are overwritten in `finally` paths where JavaScript permits.
+JavaScript strings, garbage-collected copies, native crypto objects, UI state before screen teardown,
+and async runtime frames cannot be guaranteed to be erased; the UI and policy do not claim
+otherwise.
+
+Password-bearing native verification is manual-only until a runner is proven not to copy secrets
+into command arguments, environment dumps, Maestro reports, screenshots, shell history, or other
+evidence artifacts. A verifier enters a disposable test password directly into the secure native
+field, never dictates it in a recorded transcript, and captures evidence only while the field is
+obscured or off-screen. Test passwords, derived keys, and plaintext payloads must not be committed.
+An automation flow may drive password-free route and presentation checks, but it may not be cited as
+encrypted export/import evidence.
 
 Wrong password, modified header, salt, nonce, ciphertext, or tag yield the same public
 `RECOVERY_AUTHENTICATION_FAILED` result and no plaintext or partial record. Encryption establishes
@@ -134,13 +148,18 @@ avoid decompression bombs and ambiguous byte domains.
 Import is two phase:
 
 1. File selection and password entry decrypt and strictly validate the bundle.
-2. A dry run compares the complete logical bundle with the current snapshot and returns exact
-   imported, identical/no-op, conflicting, missing-reference, and quarantined counts by category.
+2. A dry run compares the selected logical categories with the current snapshot and returns exact
+   incoming, additive, identical/no-op, and blocking-conflict counts by category. Missing aggregate
+   ancestry is reported as a distinct count derived from the blocking conflicts. Existing
+   quarantine records are counted as records in their selected category; the current plan does not
+   invent or apply an automatic quarantine disposition for a missing ancestor.
 3. The learner chooses eligible categories and whether portable settings should replace local
    portable settings.
 4. Explicit confirmation applies the exact plan.
 5. The repository reads current state again, recomputes the plan inside one transaction, applies it
-   once, rebuilds projections, and performs a post-import readback.
+   once, rebuilds projections, and returns the transaction result. Native closure must verify the
+   committed result independently through the UI and a coherent SQLite readback; the in-memory
+   return value alone is not that evidence.
 
 Stable-ID rules are fail closed:
 
@@ -149,8 +168,8 @@ Stable-ID rules are fail closed:
 - duplicate identity inside one bundle: malformed bundle;
 - absent, valid aggregate with satisfied exact ancestry: additive import;
 - append-only attempts/events/journal: never rewrite, splice, renumber, or choose a longer suffix;
-- missing or mismatched analysis → paper → management ancestry: report and block/quarantine according
-  to the exact preview result; never manufacture an ancestor or dataset;
+- missing or mismatched analysis → paper → management ancestry: report and block the complete apply;
+  never manufacture or automatically quarantine an ancestor or dataset;
 - unsupported future schema: reject and instruct the learner to update the app; and
 - corrupt bundle/authentication: reject without partial mutation.
 
@@ -162,6 +181,22 @@ XP, mastery, or review schedule.
 Portable settings are not identity-merged. Local disclaimer acceptance always wins. Restoring the
 five portable settings is an explicit choice, defaulting off when the target already contains
 learner data.
+
+### Installed-content limitation
+
+The current repository import planner receives the installed content-version identifier but not the
+installed historical scenario/dataset registry. It can validate strict payload shape, pinned
+identities, stable IDs, and the combined analysis → paper → management ancestry graph. It cannot,
+during the dry run, independently prove that the target installation currently contains every
+referenced scenario/dataset version and checksum. Opening such a restored aggregate remains
+fail-closed through the historical resolver, but that later resolver failure is not equivalent to a
+pre-import missing-dataset count.
+
+Therefore the Native Closure Pass does not claim installed-registry validation or a complete
+missing-content inventory. Closing that gap requires passing an exact immutable registry/resolver
+boundary into preview and apply, binding its result into the plan token, and adding deterministic
+tests; it must not be approximated from content-version strings or silently converted into
+quarantine.
 
 ## 8. Transaction and persistence boundary
 
@@ -200,10 +235,15 @@ Settings and the dedicated Hebrew RTL recovery route provide:
 - category and sensitive-data selection;
 - password entry without storage, with clear minimum/limitations;
 - file selection/share using OS-controlled surfaces;
-- dry-run bundle summary and category counts;
+- a dry-run identity panel showing the LTR-isolated bundle ID, creation timestamp, source app/content
+  versions, persistence/projector versions, payload checksum, current-snapshot checksum, and
+  state-bound plan token;
+- separately labelled incoming, additive, identical/skipped, blocking-conflict, and missing-ancestry
+  counts with stable accessibility/test identifiers;
 - conflicts shown by safe category/stable ID and reason, never by dumping journal/raw payload text;
-- explicit confirmation and exact imported/skipped/conflicting counts; and
-- post-import verification, accessible live-region updates, focus movement/restoration, wrapped
+- explicit confirmation, a stable Cancel action that reports that no write occurred, and exact
+  imported/skipped result counts after apply; and
+- post-import result feedback, accessible live-region updates, focus movement/restoration, wrapped
   actions, 44-point targets, largest-text support, reduced-motion behavior, and LTR isolation for
   filenames, times, versions, counts, IDs, and hashes.
 
@@ -221,3 +261,25 @@ Native opaque backup remains excluded:
 
 The encrypted RecoveryBundle is the supported user-controlled portability mechanism. Enabling broad
 OS backup, copying SQLite/WAL files, or adding cloud sync requires a new architecture/privacy review.
+
+## 12. Native evidence boundary
+
+The current standalone iOS evidence establishes that the post-Milestone-8 Hebrew recovery route
+opens, that the complete mutable SQLite directory carries the required backup exclusion, and that a
+pre-secret native UI flow passed. That flow verified privacy/default category states, sensitive
+management opt-in and consent, secure-field keyboard dismissal, and a disabled create action with
+no password. Existing automated recovery evidence separately exercises
+crypto/repository/component/browser contracts. This policy does not claim that a password-bearing
+native export was created.
+
+That evidence does **not** establish a complete password-bearing native recovery journey. In
+particular, it does not establish that a verifier saved the generated file through the iOS share
+sheet, selected it through the native document picker, decrypted it with the Expo provider, reviewed
+and cancelled a native dry run, confirmed a native SQLite import, repeated the import, or completed
+the wrong-password/tamper/schema/conflict matrix. No physical-device, VoiceOver, Android, or
+TalkBack recovery result follows from this policy. Those claims remain open until exact named
+evidence records the actions actually performed without exposing a password.
+
+The versioned native runner refuses password-bearing import/apply flows with exit `78` and accepts
+no recovery-password environment variable. That refusal is an intentional evidence-integrity
+boundary, not an import result.

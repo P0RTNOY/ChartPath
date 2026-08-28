@@ -1,14 +1,16 @@
 # Native, accessibility, and backup verification
 
-Updated: 2026-08-26 (Asia/Jerusalem)
+Updated: 2026-08-28 (Asia/Jerusalem)
 
-This is the current Milestone 7 native evidence record. A standalone ChartPath development build
+This is the current Milestone 8 native evidence record. A standalone ChartPath development build
 compiled and ran on the named iOS simulator, and the actual standalone `Documents/SQLite` directory
 returned `isExcludedFromBackup=true` through an independent Foundation readback. A separately
-signed development build also compiled and installed on the connected iPhone 15 Pro Max. The phone
-was locked when launch was attempted, so no physical-device runtime, lifecycle, touch, persistence,
-or accessibility pass is claimed. VoiceOver, Android runtime, TalkBack, and the complete standalone
-candidate lifecycle remain open. Native distribution is therefore **NO-GO**.
+signed development build also compiled, installed, and launched on the connected iPhone 15 Pro Max.
+The phone was locked before manual interaction, so no physical-device touch journey, lifecycle,
+persistence, or accessibility pass is claimed. The standalone Long, Short, No-trade, and unfilled
+terminal states now have real SQLite evidence; password-bearing native recovery, native failure
+injection, VoiceOver, Android runtime, and TalkBack remain open. Native distribution is therefore
+**NO-GO**.
 
 `docs/NATIVE_ACCESSIBILITY_READINESS.md` preserves the Milestone 5 and 6 history. This document is
 the authoritative current boundary; source code, component tests, browser screenshots, Expo Go,
@@ -28,6 +30,43 @@ Screenshots establish only what is visible in the captured frame. Maestro assert
 the asserted route and state on their exact target. Neither is a substitute for listening to a
 screen reader or independently reading the filesystem backup resource value.
 
+## Native Closure evidence — 2026-08-28
+
+This section records only the additional evidence produced by the current native-closure work. It
+does not relabel earlier browser, simulator, or source-level checks as manual accessibility or
+lifecycle evidence.
+
+- **Cutoff-safe chart navigation:** Exact candidate analysis charts expose non-gesture pan/zoom
+  controls with stable default IDs `guided-analysis-chart-notebook-pan-earlier`,
+  `guided-analysis-chart-notebook-pan-later`, `guided-analysis-chart-notebook-zoom-in`,
+  `guided-analysis-chart-notebook-zoom-out`, and
+  `guided-analysis-chart-notebook-viewport-range`.
+- **Paper-execution chart navigation:** Paper execution exposes the equivalent controls as
+  `paper-chart-pan-earlier`, `paper-chart-pan-later`, `paper-chart-zoom-in`,
+  `paper-chart-zoom-out`, and `paper-chart-viewport-range`. Both chart surfaces clamp their
+  projected viewport to the current replay or processed-candle cutoff.
+- **Standalone simulator artifact:** A Debug reviewer build exists for the exact iPhone 17 Pro / iOS
+  `26.5` simulator. Its deterministic `.app` bundle-tree digest is
+  `631c358898b73fa5b701b0adae79bc45a97e8109ae5960447d9648ad8b418be3` (73 files,
+  138,795,172 bytes).
+- **Standalone lifecycle state:** Exact Long, Short, No-trade, and unfilled-order journeys reached
+  their intended native terminal states with real SQLite checkpoints. Long, Short, and No-trade
+  passed their complete flows; unfilled reached terminal in the complete run and passed its
+  bidi-tolerant expiry/relaunch assertions in a focused continuation. Exact checkpoints and the
+  remaining native recovery/failure-injection boundary are recorded in
+  `NATIVE_RELEASE_CLOSURE.md`.
+- **Signed physical-development artifact:** The signed physical-device artifact has deterministic
+  `.app` bundle-tree digest
+  `5bbeb9af04074d26c80e5eafa552cc215ab50889c325fa311228660bf885f0ee`. The app was installed and
+  launched on the connected physical iPhone.
+
+The physical phone was locked before the required manual interaction could proceed. No touch
+journey, focus-order observation, VoiceOver speech/action pass, physical persistence journey, or
+physical lifecycle completion is claimed. The currently open native-closure gates are manual
+interaction on the unlocked physical device, human VoiceOver verification, password-bearing native
+recovery, the disposable native failure-injection matrix, an authorized Android runtime, and human
+TalkBack verification.
+
 ## Exact audited environment
 
 The following facts were read locally on 2026-08-26. Availability is not a test result.
@@ -40,7 +79,7 @@ The following facts were read locally on 2026-08-26. Availability is not a test 
 | iOS simulator        | iPhone 17 Pro, iOS `26.5`, UDID `5A9AC632-0924-4BBF-ADF4-170831DC5A9E`, booted                                                                                               | Exact target for ChartPath simulator automation                                                                        |
 | Expo Go              | `57.0.9`, app ID `host.exp.Exponent`                                                                                                                                         | Supports bounded UI/SQLite evidence but cannot load the local backup-policy module                                     |
 | Unrelated simulator  | `Shiftty Beta Verification Clone`, UDID `73B7FFB2-1EC0-470C-B7E5-38D401BA4255`, also booted during the audit                                                                 | Never use `booted`; never stop, reuse, or inspect that unrelated workload                                              |
-| Physical iOS device  | `Portnoy`, iPhone 15 Pro Max (`iPhone16,2`), iOS `26.6` build `23G71`, CoreDevice ID `69DD73EC-5E11-54E7-AE07-1CD1D565DC7C`; paired, wired, Developer Mode enabled           | Signed ChartPath build installed; launch was blocked because the phone was locked                                      |
+| Physical iOS device  | `Portnoy`, iPhone 15 Pro Max (`iPhone16,2`), iOS `26.6` build `23G71`, CoreDevice ID `69DD73EC-5E11-54E7-AE07-1CD1D565DC7C`; paired, wired, Developer Mode enabled           | Current signed ChartPath build installed and launched; the locked phone blocked manual interaction and VoiceOver       |
 | Signing identity     | Apple Development identity for team `9R9UQ6GTQW`, expiring 2027-08-10; automatic signing created a ChartPath development profile                                             | Physical build signing and installation passed; this is not distribution signing                                       |
 | Installed profile    | `iOS Team Provisioning Profile: com.omerportnoy.chartpath`, expires `2026-09-02T14:12:37Z`                                                                                   | Exact app entitlement/profile was embedded in the installed development build                                          |
 | Maestro              | `2.8.0`; Accessibility Inspector is installed with Xcode                                                                                                                     | Syntax validation and exact-target flows are available; no M7 ChartPath flow has been recorded as passed               |
@@ -103,7 +142,7 @@ category-selective, additive, transactional, idempotent and fail-closed. Exact a
 post-Milestone 8 evidence are recorded in `RECOVERY_POLICY.md` and
 `NATIVE_RELEASE_CLOSURE.md`.
 
-## Current native and accessibility evidence
+## Prior Milestone 7 and 8 native and accessibility evidence
 
 | Required journey                                        | Actual 2026-08-27 status                                                                                                                                                                     |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -120,7 +159,7 @@ post-Milestone 8 evidence are recorded in `RECOVERY_POLICY.md` and
 | Android runtime and TalkBack                            | **Blocked by no device/emulator/toolchain; not run**                                                                                                                                         |
 | Signed standalone ChartPath build                       | **PARTIAL PASS.** Debug artifact compiled, signed and installed; bundle tree SHA-256 is recorded below; no launch or lifecycle pass                                                          |
 
-The simulator Debug `.app` bundle-tree digest was
+For the prior Milestone 7 run, the simulator Debug `.app` bundle-tree digest was
 `4ffe18130a38dbfa3470f66ea90929e23f762c2317c23ead0f1a5381b1504b05`. The signed physical-device
 Debug `.app` bundle-tree digest was
 `d12561c5269fa6ef1308562ce85fc4ac8e5ebd6c76b1b7b77d07e70282af71b7`. These are deterministic
@@ -209,7 +248,7 @@ largest-text, gesture, recovery, and lifecycle matrix. An Android JavaScript/Her
 satisfy this gate.
 
 The no-claim boundary is final: the exact results prove simulator compilation/runtime/resource
-readback and physical development compilation/signing/installation only. They do not prove a full
-standalone candidate lifecycle, physical-device runtime, VoiceOver speech/focus, Android/TalkBack,
-distribution signing, OS restore, or native release readiness. Each remains open until exact named
-evidence is captured and reviewed.
+readback and physical development compilation/signing/installation/launch only. They do not prove a
+full standalone candidate lifecycle, physical-device manual interaction or lifecycle behavior,
+VoiceOver speech/focus, Android/TalkBack, distribution signing, OS restore, or native release
+readiness. Each remains open until exact named evidence is captured and reviewed.

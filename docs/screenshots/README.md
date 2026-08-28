@@ -272,3 +272,39 @@ The other Milestone 8 images are deterministic browser presentation/accessibilit
 They do not establish native file sharing/import, standalone SQLite recovery, OS-level text
 settings, physical-device ergonomics, VoiceOver/TalkBack speech or focus, distribution signing,
 upload, or publication.
+
+## Native Closure evidence — 2026-08-28
+
+The current closure work added cutoff-safe, non-gesture pan/zoom controls to the exact candidate
+analysis chart and paper-execution chart. The stable default analysis IDs are
+`guided-analysis-chart-notebook-pan-earlier`, `guided-analysis-chart-notebook-pan-later`,
+`guided-analysis-chart-notebook-zoom-in`, `guided-analysis-chart-notebook-zoom-out`, and
+`guided-analysis-chart-notebook-viewport-range`. The paper IDs are `paper-chart-pan-earlier`,
+`paper-chart-pan-later`, `paper-chart-zoom-in`, `paper-chart-zoom-out`, and
+`paper-chart-viewport-range`. Their projected windows are bounded by the current replay or
+processed-candle cutoff, including the chart accessibility projection.
+
+The exact standalone artifact used by the current simulator work is a Debug reviewer build for the
+iPhone 17 Pro / iOS `26.5` simulator, with deterministic `.app` bundle-tree digest
+`631c358898b73fa5b701b0adae79bc45a97e8109ae5960447d9648ad8b418be3` (73 files,
+138,795,172 bytes). Exact Long, Short, No-trade, and unfilled-order terminal states were exercised
+with real SQLite checkpoints; the precise pass/follow-up boundary and checkpoint hashes are in
+`NATIVE_RELEASE_CLOSURE.md`.
+
+Four current-build native recovery frames were captured at original `1206×2622` resolution under
+the ephemeral evidence root `/tmp/chartpath-m8-native-closure-evidence/visual-accessibility/`:
+light/default, dark/default, dark/increased-contrast, and dark/maximum Dynamic Type. Visual
+inspection found clean RTL reflow and no horizontal clipping in the visible frames. Maximum Dynamic
+Type was a route-readiness/upper-surface check, not a completed control-by-control recovery journey.
+These files are not checked in because they include environment-specific simulator evidence; the
+authoritative evidence path and boundary are recorded in the closure document and final handoff.
+
+The signed physical-development artifact has deterministic `.app` bundle-tree digest
+`5bbeb9af04074d26c80e5eafa552cc215ab50889c325fa311228660bf885f0ee`. It was installed and launched
+on the connected physical iPhone, but the phone was locked before manual interaction and VoiceOver
+verification could proceed.
+
+Open gates remain: manual interaction on the unlocked physical device, human VoiceOver
+speech/focus/action verification, password-bearing native recovery, disposable native failure
+injection, an authorized Android runtime, and human TalkBack verification. No screenshot is treated
+as proof of any of those open gates.

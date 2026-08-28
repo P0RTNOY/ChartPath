@@ -1,170 +1,201 @@
 # Milestone 8 native release closure
 
-Updated: 2026-08-27 (Asia/Jerusalem)
+Updated: 2026-08-28 (Asia/Jerusalem)
 
-**Status:** `INTERNAL_REVIEW_BUILD_READY / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO`
+**Status:** `M8_NATIVE_MACHINE_OPEN / PHYSICAL_IOS_PARTIAL / VOICEOVER_PENDING / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO`
 
-This record distinguishes completed evidence from configuration, browser, export, simulator,
-physical-device, and human assistive-technology claims. Machine-resolvable release work may close
-while external review, licensing, VoiceOver, Android/TalkBack, physical-device runtime, signing,
-upload, and store submission remain open. No candidate is approved or published, no learner credit
-is enabled, and no Milestone 8 build is uploaded.
+This record separates completed standalone-iOS and SQLite evidence from physical-device,
+password-bearing recovery, human assistive-technology, external-review, licensing, Android-runtime,
+and distribution claims. The closure branch remains an internal, unpublished, no-credit review
+build. No candidate was approved or published, and no build was uploaded.
 
-## 1. Exact app and environment identities
+## 1. Exact identities and evidence boundary
 
-| Item          | Exact identity                                                                                                | Evidence boundary                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| App           | `ChartPath` `0.1.0` build `1`                                                                                 | Local development identity only                                     |
-| iOS bundle    | `com.omerportnoy.chartpath`                                                                                   | No App Store or TestFlight identity is claimed                      |
-| Apple team    | `9R9UQ6GTQW`                                                                                                  | Local Apple Development signing; not distribution signing           |
-| iOS simulator | iPhone 17 Pro, iOS `26.5`, UDID `5A9AC632-0924-4BBF-ADF4-170831DC5A9E`                                        | The only authorized ChartPath simulator target in this audit        |
-| Physical iOS  | iPhone 15 Pro Max (`iPhone16,2`), iOS `26.6` build `23G71`, CoreDevice `69DD73EC-5E11-54E7-AE07-1CD1D565DC7C` | App installation is confirmed; runtime remains blocked while locked |
-| Android       | Existing SDK path belongs to an unrelated Shiftty workload; no ChartPath-owned AVD or device is authorized    | Export is not runtime or TalkBack evidence                          |
+| Item         | Exact identity                                                                                                | Result boundary                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Branch start | `codex/external-review-native-release-closure` at `0b7909e24a229e2fa8fe5dcd7cef5cf6280b1e10`                  | Authorized base remains `b8a0c8a7e202aa4c0fcd95e6858b635f19f126e1`                                 |
+| App          | `ChartPath` `0.1.0` build `1`; bundle `com.omerportnoy.chartpath`                                             | Local development identity only                                                                    |
+| Apple team   | `9R9UQ6GTQW`                                                                                                  | Apple Development signing, not distribution signing                                                |
+| Simulator    | iPhone 17 Pro, iOS `26.5`, UDID `5A9AC632-0924-4BBF-ADF4-170831DC5A9E`                                        | Exact standalone native target                                                                     |
+| Physical iOS | iPhone 15 Pro Max (`iPhone16,2`), iOS `26.6` build `23G71`, CoreDevice `69DD73EC-5E11-54E7-AE07-1CD1D565DC7C` | Paired, trusted, wired, Developer Mode enabled; app installed and launched before the phone locked |
+| Android      | Static Expo export only                                                                                       | No ChartPath-owned device/AVD, runtime, SQLite, or TalkBack claim                                  |
 
-Never select an ambiguous `booted` simulator, stop or reuse the unrelated Shiftty simulator/AVD,
-or repeatedly retry the physical iPhone while it is locked.
+The signed physical artifact tree digest is
+`5bbeb9af04074d26c80e5eafa552cc215ab50889c325fa311228660bf885f0ee`.
+The current simulator Debug app contains 73 files / 138,795,172 bytes and has tree digest
+`631c358898b73fa5b701b0adae79bc45a97e8109ae5960447d9648ad8b418be3`.
+Build and install used the repository iOS workspace, `ChartPath` scheme, exact simulator destination,
+and `CODE_SIGNING_ALLOWED=NO`; the native build completed with only existing dependency/script-phase
+warnings.
 
-## 2. Backup and recovery closure
+## 2. Immutable candidate identities
 
-Opaque native backup remains excluded:
+| Decision | Candidate / scenario                                                      | Dataset / checksum                                                                                                      | Material checksum                                                         |
+| -------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Long     | `publication-candidate-long-v1`; `internal-long-range-breakout@2.1.0`     | `internal-long-range-breakout-dataset@2.0.0`; `sha256:f927f4758ad81c6bdc1b2da7c5d4948af21ea930a0094db2ac9d49ee69e7f7d2` | `sha256:5212b1d0aab4eb6a1b6fd028a2a8f8d1d87551f7cf7530720c6fed65551a7b54` |
+| Short    | `publication-candidate-short-v1`; `internal-short-double-top@2.0.0`       | `internal-short-double-top-dataset@2.0.0`; `sha256:357d1c59b511573583f40ee0ec332d737485fae2917ec3a3b7bec3564326967d`    | `sha256:15815a43ab08f9d3738331b00392ffe73afe62eb1ac481a53eb990001520ad6f` |
+| No trade | `publication-candidate-no-trade-v1`; `internal-no-trade-capstone-c@1.0.0` | `internal-no-trade-capstone-c-dataset@1.0.0`; `sha256:c0b58867716179d9050c896988729457f3ddef8d083f4f103c3f7e7b49833aa2` | `sha256:cc42ef15cd912ac99446c0d41f05023860cc0c0eda4f57739d4537bb18d17a72` |
 
-- iOS must set and independently read back `isExcludedFromBackup=true` on the complete mutable
-  `Documents/SQLite` directory before opening the standalone database.
-- Android remains configured with `android:allowBackup=false`.
+All remain reviewer-only, synthetic, no-credit, unapproved, and unpublished. The ordinary learner
+library stayed empty in production and native reviewer-isolation checks.
 
-The exact post-Milestone 8 simulator container was read independently after launch. The complete
-`Documents/SQLite` directory carried
-`com.apple.metadata:com_apple_backup_excludeItem: com.apple.MobileBackup` while containing the
-database, WAL and shared-memory files. This closes the bounded simulator readback only; it is not a
-physical-device or Android policy readback.
+## 3. Standalone lifecycle and actual SQLite evidence
 
-Milestone 8 adds a user-controlled logical recovery path instead of copying SQLite, WAL, caches, or
-internal QA artifacts. The format is password-encrypted and authenticated, defaults to portable
-settings plus attempts, requires explicit selection for simulated histories, and requires a second
-privacy consent for management/journal and quarantine data. Import is dry-run-first, additive,
-stable-ID bound, conflict-reporting, transactional, idempotent, and fail-closed. See
-`RECOVERY_POLICY.md` for the cryptographic, schema, privacy, and transaction contract.
+The native harness always targets the exact simulator UUID and bundle ID, waits for observable UI
+states, and refuses password-bearing import flows. Stable identifiers do not bypass analysis,
+grading, execution, persistence, future isolation, or no-credit validation.
 
-Native backup exclusion and logical recovery are separate gates. A successful encrypted bundle
-test does not prove native filesystem policy, and a successful backup-resource readback does not
-prove export/import usability.
+| Journey        | Standalone iOS result                                                                                                                                                                                                                                                                                                                                                         | Stopped-app SQLite checkpoint                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Long           | **PASS.** Complete 11-step analysis, order, fill, open management, submitted stop replacement, pending/relaunch restoration, process-once, stop terminal, journal/timeline/debrief, terminal relaunch                                                                                                                                                                         | `official-long-terminal-20260828-1830`; summary SHA-256 `ed3af140741cba982e4fd46d3c38b7ba7434ddcba4551d495bcbd235dfd54862`            |
+| Short          | **PASS.** Complete 11-step analysis, market fill, pending stop `96.00`, pending relaunch, process-once, later gap, stop terminal, journal/timeline/debrief, terminal relaunch                                                                                                                                                                                                 | `official-short-terminal-20260828-2236`; summary SHA-256 `8aa474ee72f9985fb28d72a81cf0f87c67e0b335c2e4f1979cf96f647b678530`           |
+| No trade       | **PASS.** Complete 11-step No-trade answer and rationale, positive No-trade terminal, relaunch restoration, no execution/management surface                                                                                                                                                                                                                                   | `official-no-trade-terminal-20260828-2259`; summary SHA-256 `d3efe961d1dad25916a11968cbb204d66a607f69004834c67c2d0d904be75416`        |
+| Unfilled limit | **PASS WITH ASSERTION FOLLOW-UP.** Working state survived relaunch, 32 deterministic advances reached expiry, and a focused continuation verified expiry text, absent advance action, and terminal relaunch. The full run's only failure was a literal selector that did not account for iOS bidi isolates around `Replay`; the persisted terminal state was already present. | `official-unfilled-expiry-terminal-20260828-2310`; summary SHA-256 `2d13f301c386ef4c7750609770cfcf74a5cea92047355952f3ec56482ac8e31e` |
 
-## 3. Lifecycle matrix
+The Long evidence directory is
+`/tmp/chartpath-m8-native-closure-evidence/m8-native-closure-candidate-11-long-lifecycle/2026-08-28_183223`.
+The final Short evidence is under the same evidence root at timestamp `2026-08-28_223644`, the final
+No-trade pass at `2026-08-28_225957`, and the unfilled terminal run at
+`2026-08-28_231033` plus `maestro-diagnostic/unfilled-expiry-tail`.
 
-The following table is updated only from exact named evidence. Browser and reducer coverage is
-listed separately and never relabelled as native lifecycle evidence.
+Every checkpoint reports `integrity_check=ok`, zero foreign-key violations, WAL journal mode, all
+five checksum-pinned migrations, and all append-only rejection triggers.
 
-| Journey                                                                                             | Machine/browser evidence                                                                   | Standalone iOS evidence                             | Physical iPhone        | Android                        |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------- | ---------------------- | ------------------------------ |
-| Long analysis → order → fill → management → pending relaunch → terminal debrief → terminal relaunch | Deterministic domain, persistence, Jest, Playwright, and versioned Maestro contracts       | Open; app build/launch is not this lifecycle        | Not run; device locked | Not run; no authorized runtime |
-| Short adverse-gap/management → terminal debrief                                                     | Deterministic domain, persistence, Jest, Playwright, and versioned Maestro contracts       | Open; app build/launch is not this lifecycle        | Not run                | Not run                        |
-| No-trade rationale → relaunch → debrief with no paper/management session and no hindsight regrade   | Deterministic domain, persistence, Jest, Playwright, and versioned Maestro contracts       | Open; app build/launch is not this lifecycle        | Not run                | Not run                        |
-| Working order → expiry → terminal relaunch                                                          | Deterministic domain, persistence, Jest, Playwright, and versioned Maestro contracts       | Open; app build/launch is not this lifecycle        | Not run                | Not run                        |
-| Dataset/checksum mismatch                                                                           | Unit/integration fail-closed coverage                                                      | Open                                                | Not run                | Not run                        |
-| Scenario-version mismatch                                                                           | Unit/integration fail-closed coverage                                                      | Open                                                | Not run                | Not run                        |
-| Corrupt-state quarantine/recovery                                                                   | Unit/integration coverage; never corrupt a primary evidence database to manufacture a pass | Open on a disposable app container                  | Not run                | Not run                        |
-| Unsupported schema                                                                                  | Unit/integration fail-closed coverage                                                      | Open                                                | Not run                | Not run                        |
-| Missing dataset                                                                                     | Unit/integration fail-closed coverage                                                      | Open                                                | Not run                | Not run                        |
-| Duplicate callback/retry                                                                            | Deterministic idempotency coverage                                                         | Open                                                | Not run                | Not run                        |
-| Encrypted export/import, dry-run, tamper rejection, duplicate import, sensitive opt-in              | Recovery unit/component/browser coverage                                                   | Recovery route opened and inspected; full flow open | Not run                | Not run                        |
+- Long and Short: one finalized analysis, one paper fill/open position, one management session, one
+  submitted action, one protective-stop replacement, one stop closure, and one journal entry.
+- No trade: one finalized analysis and zero paper, management, journal, or attempt rows.
+- Unfilled: one finalized analysis, one completed paper session, one `order-expired`, zero fills,
+  zero management/journal rows, and zero attempts.
+- No checkpoint contains ordinary course credit, XP, mastery, or review-schedule mutation.
 
-The post-Milestone 8 standalone iOS Release build completed for arm64 with signing disabled,
-installed and launched on the exact named simulator, and opened the Hebrew RTL recovery route. Its
-bundle tree contains 92 files, occupies 51,580 KiB, and has digest
-`71dd294e8b32ee9ece4ebec410653b7c00e7cbce2095e00d1c73f42dcb187a7d`. The exact recovery frame is
-`1206×2622`, SHA-256
-`4a07a19a2fa993fc28ff820aef0266b03dbf3294fb3d1a5696c3a89f48138829`, and is recorded as
-`screenshots/m8-native-ios-recovery-light.png`. It verifies one light-mode route presentation only;
-it is not an export/import, relaunch, VoiceOver, OS-setting, physical-device, signing or
-distribution pass. A bounded terminate/relaunch returned to the normal home route after the splash,
-as expected; no recovery-flow persistence claim is made.
+The inspector copies DB/WAL/SHM only after explicit exact-app termination and then inspects the
+coherent copy. It never calls `simctl` or accepts an ambiguous app/container target.
 
-## 4. Physical-device check actually performed
+## 4. Reviewer and chart isolation
 
-The exact signed development app is installed on the connected iPhone. The bounded recheck
-confirmed:
+The current standalone app passed:
 
-- name `ChartPath`;
-- bundle ID `com.omerportnoy.chartpath`;
-- marketing version `0.1.0`, build `1`;
-- developer app `true`; and
-- the device had been unlocked since boot but currently required the passcode.
+- an unauthorized reviewer deep link resolving only to `scenario-qa-unavailable`;
+- the ordinary scenario library showing its truthful empty state and no published list;
+- the authorized development-only route requiring explicit acknowledgement and preserving the
+  internal/synthetic/no-credit/unpublished warnings;
+- candidate evidence hidden until explicit reveal, followed by the explicit non-approval warning;
+- non-gesture chart pan/zoom transitions over the real 48-candle knowledge window:
+  `#16–#63` → `#22–#57` → `#18–#53` → `#22–#57` → `#16–#63`; and
+- continued visibility of the blind historical disclosure, with no access beyond candle `#63`.
 
-No launch, termination, reinstall, lifecycle interaction, screenshot, touch, orientation,
-persistence, large-text, dark-mode, or accessibility result is claimed for Milestone 8. The exact
-user action required is to unlock the phone, keep it awake, and authorize one bounded launch and
-relaunch window. Device security must not be bypassed and launch must not be retried while locked.
+## 5. Recovery result and privacy boundary
 
-## 5. VoiceOver and TalkBack boundary
+The native pre-secret recovery UI checkpoint **passed**. It confirmed settings and attempts selected
+by default; analysis, paper, and management histories excluded by default; explicit management
+selection; a second unchecked sensitive-data consent; native secure-field keyboard dismissal; and
+a disabled export action without a password.
 
-No human VoiceOver speech/focus pass has been completed. Accessibility labels, roles, automated
-queries, browser screenshots, and Accessibility Inspector availability do not close this gate. A
-valid pass requires a human to listen to and record focus order, spoken Hebrew names, values, hints,
-actions, announcements, errors, dialog focus/restoration, and completion without pointer-only
-gestures across:
+The runner deliberately returns exit `78` for password-bearing import/apply flows and accepts no
+password environment variable. This prevents secrets from entering shell arguments, environment
+dumps, Maestro reports, screenshots, or committed evidence.
 
-- onboarding, home, the explicitly gated reviewer catalog, and Settings;
-- blind chart and visible-only chart summary;
-- Guided Analysis, no-trade, order ticket, position and management actions;
-- before/after risk, journal, replay, event history, validation errors and debrief; and
-- encrypted recovery, import confirmation, conflicts, quarantine and deletion.
+The following therefore remain open and block machine closure: native file creation/share, native
+document selection, password-bearing dry-run/cancel/apply, UI/SQLite post-import readback,
+idempotent re-import, and native wrong-password/tamper/schema/stable-ID-conflict zero-mutation
+checks. Browser, crypto, repository, component, and E2E coverage passed but is not relabelled as
+native file/provider evidence. The planner's installed-registry limitation is documented in
+`RECOVERY_POLICY.md`.
 
-The pass must confirm that speech never reveals hidden ticker/date, future candles/extremes, the
-correct decision, private grader geometry, expected fill, stop/target outcome, or future P&L.
+iOS `Documents/SQLite` backup exclusion and Android `allowBackup=false` remain separate from logical
+recovery. SQLite, WAL, SHM, caches, datasets, reviewer state, and secrets are never recovery-bundle
+categories; journal/free text requires explicit sensitive-data consent.
 
-No authorized ChartPath Android runtime exists, so Android SQLite, lifecycle, backup-policy
-readback, and real TalkBack focus/speech/actions remain open. Installing a large SDK/emulator image
-or reusing another project's AVD requires separate authorization.
+## 6. Failure recovery and duplicate delivery
 
-## 6. Native OS accessibility matrix
+Deterministic domain/repository tests cover checksum/version/missing-dataset rejection, corrupt or
+unsupported persistence, quarantine, duplicate callbacks/fills/events/journal retries, recovery
+wrong-password/tamper/schema/conflict rejection, dry-run zero mutation, transactional apply, and
+idempotency. The actual lifecycle checkpoints independently show one fill/close/journal or one
+expiry as appropriate.
 
-| Setting or behavior                | Current evidence                                                                   | Remaining action                                         |
-| ---------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Light/dark                         | Existing standalone frames; post-M8 recovery light frame and browser coverage      | Recheck exact post-M8 native dark/reviewer states        |
-| Largest OS text                    | Existing standalone simulator layout frames; post-M8 largest-text browser coverage | Recheck exact post-M8 native recovery flow               |
-| Increased contrast                 | Existing standalone simulator visual frame                                         | Recheck exact post-M8 native states                      |
-| Bold text                          | Not run                                                                            | Enable in native Settings and inspect full critical path |
-| Reduced transparency               | Not run                                                                            | Enable in native Settings and inspect                    |
-| Reduced motion                     | App/browser contract coverage only                                                 | Enable at OS level and inspect native behavior           |
-| Portrait/landscape/tablet          | Browser phone/tablet layout; app orientation is `default`                          | Complete exact native orientation checks                 |
-| RTL focus/reading order            | Automated structure/browser evidence                                               | Complete human VoiceOver/TalkBack pass                   |
-| LTR numeric isolation              | Component/browser evidence                                                         | Listen to mixed Hebrew/numeric speech natively           |
-| Touch targets/gesture alternatives | Static/component/browser evidence                                                  | Complete physical ergonomics and screen-reader actions   |
-| Focus restoration/dialogs          | Component/browser evidence                                                         | Complete real screen-reader pass                         |
+The requested disposable native failure-injection matrix was **not executed**. No production-capable
+mutation or corruption seam was added merely to manufacture evidence. Dataset mismatch,
+scenario-version mismatch, missing dataset, corrupt state, unsupported schema, duplicate delivery,
+and quarantine/recovery therefore remain open as native-runtime injection claims.
 
-## 7. Internal reviewer configuration
+## 7. Physical iPhone and human accessibility boundary
 
-The reviewer surface requires all of:
+The signed `0.1.0` build `1` installed and launched on the exact iPhone 15 Pro Max. The phone then
+became passcode-locked. No repeated launch attempts or security bypass occurred. Installation and a
+launch event do **not** prove touch usability, RTL interaction, drawing, order/management controls,
+force-close restoration, persistence, dark mode, large text, orientation, focus, or speech.
 
-1. a development build (`__DEV__`);
-2. compile-time `EXPO_PUBLIC_CHARTPATH_REVIEWER_MODE=1`; and
-3. the explicit `developer=1` route flag and in-app acknowledgement gate.
+No human VoiceOver session occurred and no speech/focus observation is claimed. VoiceOver remains
+required across onboarding, ordinary/reviewer surfaces, blind chart, Guided Analysis, No-trade,
+paper execution, management, journal, debrief, recovery, errors, dialogs, and quarantine. It must
+also confirm that no hidden ticker/date, future candle/extreme, correct decision, grader geometry,
+fill, stop/target outcome, or future P&L is spoken.
 
-Production exports omit this access because `__DEV__` is false. The surface remains synthetic,
-internal, no-credit, and outside the ordinary learner catalog. It shows candidate/checksum/provenance
-evidence only after explicit reveal; it cannot trust a key, sign an attestation, approve, publish,
-upload, or grant credit. `pnpm mobile:reviewer:web` starts the local development configuration and
-`pnpm reviewer:export:web` creates a local development export for evidence only.
+## 8. Native OS accessibility evidence
 
-## 8. Release decision
+Original-resolution `1206×2622` simulator evidence was captured and visually inspected under
+`/tmp/chartpath-m8-native-closure-evidence/visual-accessibility/`:
 
-Machine gates can be closed while native verification remains partial. The deterministic preflight
-uses `publication-preflight-policy-v2`, reports category-specific gates and side effects, and must
-remain `PUBLICATION_NO_GO` until every required external and runtime gate is legitimately closed.
-The current valid summary is:
+- `simulator-recovery-light-default-ready.png`;
+- `simulator-recovery-dark-default-ready.png`;
+- `simulator-recovery-dark-increased-contrast-ready.png`; and
+- `simulator-recovery-dark-axxxl-ready.png`.
+
+Light, dark, and increased-contrast recovery surfaces were RTL-correct, readable, and unclipped in
+the inspected frames. Maximum Dynamic Type reflowed into a scroll-first layout without horizontal
+clipping; route readiness and the visible upper surface were verified, not every downstream action.
+Automated chart controls provide a keyboard/non-gesture alternative and the paper/management inputs
+expose native `Done` accessories. Bold Text, Reduce Transparency, Reduce Motion, landscape/tablet,
+modal focus restoration, physical touch targets, and human RTL reading order remain open.
+
+## 9. Final automated evidence
+
+The final authoritative counts and hashes must be read together with the command logs and final
+handoff; an export is bundle evidence, never runtime evidence.
+
+- `pnpm check`: **PASS**, 67 suites / 717 tests (UI 15, domain 211, historical-data 98,
+  chart-engine 57, content 98, mobile 238), plus formatting, lint, all workspace typechecks,
+  content validation, and packet byte verification. Two existing non-failing overlapping React
+  `act()` warnings remained.
+- Production browser E2E: **26/26 passed**, zero skips/retries.
+- Development QA E2E: **49 passed / 1 intentional iPad duplicate skipped**, zero failures/retries.
+- Historical validation: 96 candles, one gap, five intentional blockers.
+- Scenario validation: nine candidates (3/3/3), zero structural errors, 97 blockers; management
+  three variants / 13 cases / 39 blockers; combined 136; 12 datasets / 13 scenarios / zero credit.
+- Identity audit: 60 records, no issues, checksum
+  `sha256:ba7499f4977af92a78211f9c890ec6ea898776f2f747a524ac0b6b9ddcc67bd0`.
+- Review packets: two generations byte-identical, tree digest
+  `599738315e96a7231d350f68d4b985f00e04bc11bd46f4b46b05916e5e6cf878`.
+- Review verification: all three candidates have eight missing scopes and no approval records.
+- Preflight: 30 gates; 8 passed, 13 blocked, 9 not run; 22 blockers; `sideEffects:[]`;
+  `PUBLICATION_NO_GO`.
+- Web export: 79 files / 5,465,801 bytes; tree SHA-256
+  `1da5443f6121af94ea4b4968c345a114e80f74b57920e5c66832497f69e64205`.
+- iOS export: 25 files / 5,964,124 bytes; tree SHA-256
+  `fd5de2f69684a5dc4cbdf43a3a0d4cac26b131881d0657dbdd3159144f5e2ae5`.
+- Android static export: 29 files / 7,134,466 bytes; tree SHA-256
+  `b0a37d1fdd6ed02202ec39cdbb9a22aac1208670393801dbcb742a6c2d986c6d`.
+
+Expo/browser commands retain the known `NO_COLOR`/`FORCE_COLOR` warning. Native builds retain known
+dependency and script-phase warnings. Neither warning was hidden or treated as a release pass.
+
+## 10. Release decision and exact next actions
+
+The machine gate is still open because password-bearing native recovery and native failure
+injection were not completed. Physical-device and human VoiceOver gates are also open. Therefore:
 
 ```text
-MACHINE_GATES_CLOSED
-NATIVE_VERIFICATION_PARTIAL
+M8_NATIVE_MACHINE_CLOSED: NOT ACHIEVED
+PHYSICAL_IOS_PARTIAL
+VOICEOVER_PENDING
 EXTERNAL_REVIEW_PENDING
-INTERNAL_REVIEW_BUILD_READY
 PUBLICATION_NO_GO
 ```
 
-The production reviewer registry remains empty, all eight candidate review scopes remain missing,
-licensing/redistribution authorization is absent, distribution is unauthorized, and no real
-promotion command exists or was run.
-
-The authoritative uncontended final `pnpm check` passed formatting, lint, every workspace
-typecheck, 67 suites / 704 tests, content validation and exact packet verification. The only test
-output caveat was the existing pair of non-failing overlapping React `act()` warnings.
+Do not push solely on the strength of this partial closure record. The next authorized closure
+session must keep the phone unlocked and awake for one bounded physical journey and human VoiceOver
+session, use a reviewed secret-safe native recovery procedure with a disposable password, exercise
+the disposable native failure matrix, and repeat affected checks. Android/TalkBack, external review,
+licensing, distribution signing, TestFlight/App Store upload, publication, and learner credit remain
+future separately authorized work.

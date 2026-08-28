@@ -789,3 +789,50 @@ the unrelated Shiftty SDK/AVD was not touched. Human reviewers must be assigned 
 trusted, then sign all eight checksum-bound scopes. Licensing/redistribution requires a human rights
 decision and, if authorized, new immutable material plus regenerated packets and reviews.
 Distribution signing, upload and store submission remain separate, unauthorized actions.
+
+## Milestone 8 Native Closure Pass addendum — 2026-08-28
+
+The focused Native Closure Pass materially advances standalone iOS evidence but does not close the
+release. The exact status is
+`M8_NATIVE_MACHINE_OPEN / PHYSICAL_IOS_PARTIAL / VOICEOVER_PENDING / EXTERNAL_REVIEW_PENDING / PUBLICATION_NO_GO`.
+
+The exact iPhone 17 Pro / iOS 26.5 standalone app completed Long, Short, and No-trade native flows
+with terminate/relaunch restoration and stopped-app SQLite checkpoints. The unfilled limit flow
+reached deterministic expiry after 32 advances; a focused continuation passed the corrected
+bidi-tolerant expiry and terminal-relaunch assertions. Checkpoints report SQLite integrity `ok`,
+zero foreign-key violations, all checksum-pinned migrations and append-only triggers, exact terminal
+row counts, and zero ordinary attempts or credit. Native reviewer isolation and cutoff-safe chart
+pan/zoom also passed.
+
+The native recovery route passed its pre-secret privacy/default/consent/keyboard checkpoint. A
+password-bearing native export/import was deliberately not automated because the available runner
+would record environment/command/report metadata. Native file share/pick, dry-run/cancel/apply,
+SQLite readback, idempotent import, and the native failure matrix remain open. Browser and repository
+recovery tests do not replace those claims.
+
+Current bundle/export evidence:
+
+- standalone simulator app: 73 files / 138,795,172 bytes, tree SHA-256
+  `631c358898b73fa5b701b0adae79bc45a97e8109ae5960447d9648ad8b418be3`;
+- production web: 79 files / 5,465,801 bytes, tree SHA-256
+  `1da5443f6121af94ea4b4968c345a114e80f74b57920e5c66832497f69e64205`;
+- iOS export: 25 files / 5,964,124 bytes, tree SHA-256
+  `fd5de2f69684a5dc4cbdf43a3a0d4cac26b131881d0657dbdd3159144f5e2ae5`; and
+- Android static export: 29 files / 7,134,466 bytes, tree SHA-256
+  `b0a37d1fdd6ed02202ec39cdbb9a22aac1208670393801dbcb742a6c2d986c6d`.
+
+Production browser E2E passed 26/26. Development QA E2E passed 49 with one intentional iPad
+duplicate skipped. Current-build recovery frames were inspected at original `1206×2622` resolution
+in light, dark, increased contrast, and maximum Dynamic Type. Bold Text, Reduce Transparency,
+Reduce Motion, landscape/tablet, physical ergonomics, and human focus/speech remain open.
+
+The authoritative post-change `pnpm check` passed formatting, lint, every workspace typecheck,
+content/packet validation, and 67 suites / 717 tests: UI 15, domain 211, historical-data 98,
+chart-engine 57, content 98, and mobile 238. The two known non-failing overlapping React `act()`
+warnings remained.
+
+The signed build installed and launched on the exact iPhone 15 Pro Max / iOS 26.6, then the phone
+became passcode-locked before manual interaction. No physical touch/lifecycle/persistence or human
+VoiceOver claim is made. The branch must not be pushed under the specification's closure-only push
+authorization until password-bearing native recovery, native failure injection, the bounded
+physical journey, and real human VoiceOver are completed and affected verification is repeated.
