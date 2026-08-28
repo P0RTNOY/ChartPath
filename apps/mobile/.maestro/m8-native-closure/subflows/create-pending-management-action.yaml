@@ -1,0 +1,99 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: paper-management-action-replace-stop
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-management-action-replace-stop
+- scrollUntilVisible:
+    element:
+      id: paper-management-input-level
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-management-input-level
+- eraseText
+- inputText: ${CHARTPATH_MANAGEMENT_STOP_PRICE}
+- tapOn:
+    id: paper-management-input-level-keyboard-done
+- scrollUntilVisible:
+    element:
+      id: paper-management-input-rationale
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-management-input-rationale
+- inputText: qa-visible-evidence-only
+- tapOn:
+    id: paper-management-input-rationale-keyboard-done
+- scrollUntilVisible:
+    element:
+      id: paper-management-basis-risk-reduction
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: paper-management-basis-risk-reduction
+- assertVisible: 'radio button, checked'
+- scrollUntilVisible:
+    element:
+      id: paper-management-risk-reviewed
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: paper-management-risk-reviewed
+- assertVisible: 'checkbox, checked'
+- scrollUntilVisible:
+    element:
+      id: paper-management-tag-visible-price-evidence
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: paper-management-tag-visible-price-evidence
+- assertVisible: 'checkbox, checked'
+- scrollUntilVisible:
+    element:
+      id: paper-management-confirm
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- runFlow:
+    when:
+      visible:
+        id: paper-management-warning-confirmation
+    commands:
+      - tapOn:
+          id: paper-management-warning-confirmation
+- assertNotVisible:
+    id: paper-management-hard-error
+- assertVisible:
+    id: paper-management-confirm
+    enabled: true
+- tapOn:
+    id: paper-management-confirm
+- assertVisible: 'checkbox, checked'
+- tapOn:
+    id: paper-management-submit
+- scrollUntilVisible:
+    element:
+      id: paper-management-pending
+    direction: UP
+    timeout: 30000
+    speed: 40
+- scrollUntilVisible:
+    element:
+      id: paper-management-cancel-pending
+    direction: DOWN
+    timeout: 30000
+    speed: 40

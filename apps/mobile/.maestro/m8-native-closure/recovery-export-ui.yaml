@@ -1,0 +1,79 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native recovery defaults and manual password-entry checkpoint
+tags:
+  - m8-native-closure
+  - recovery
+  - export
+  - privacy
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- openLink: ${CHARTPATH_RECOVERY_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: recovery-center
+    timeout: 90000
+- assertVisible:
+    id: recovery-privacy
+- assertVisible:
+    id: recovery-export-category-settings
+    text: checkbox, checked
+- scrollUntilVisible:
+    element:
+      id: recovery-export-category-attempts
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: recovery-export-category-attempts
+    text: checkbox, checked
+- scrollUntilVisible:
+    element:
+      id: recovery-export-category-analysis-sessions
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: recovery-export-category-analysis-sessions
+    text: checkbox, unchecked
+- scrollUntilVisible:
+    element:
+      id: recovery-export-category-paper-execution-sessions
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: recovery-export-category-paper-execution-sessions
+    text: checkbox, unchecked
+- scrollUntilVisible:
+    element:
+      id: recovery-export-category-position-management-sessions
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: recovery-export-category-position-management-sessions
+    text: checkbox, unchecked
+- tapOn:
+    id: recovery-export-category-position-management-sessions
+- extendedWaitUntil:
+    visible:
+      id: recovery-export-consent-position-management-sessions
+    timeout: 30000
+- assertVisible:
+    id: recovery-export-consent-position-management-sessions
+    text: checkbox, unchecked
+- tapOn:
+    id: recovery-export-consent-position-management-sessions
+- tapOn:
+    id: recovery-export-password
+- assertVisible:
+    id: recovery-export-password-keyboard-done
+- tapOn:
+    id: recovery-export-password-keyboard-done
+- assertVisible:
+    id: recovery-export-create
+    enabled: false

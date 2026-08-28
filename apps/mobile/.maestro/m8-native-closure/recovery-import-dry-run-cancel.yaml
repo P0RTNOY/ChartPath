@@ -1,0 +1,40 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native recovery import reaches the manual password-entry checkpoint without recording secrets
+tags:
+  - m8-native-closure
+  - recovery
+  - import
+  - dry-run
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- openLink: ${CHARTPATH_RECOVERY_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: recovery-center
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: recovery-import-pick
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: recovery-import-pick
+- extendedWaitUntil:
+    visible: ${CHARTPATH_RECOVERY_BUNDLE_FILE_NAME}
+    timeout: 90000
+- tapOn: ${CHARTPATH_RECOVERY_BUNDLE_FILE_NAME}
+- extendedWaitUntil:
+    visible:
+      id: recovery-import-file
+    timeout: 90000
+- tapOn:
+    id: recovery-import-password
+- assertVisible:
+    id: recovery-import-password-keyboard-done
+- tapOn:
+    id: recovery-import-password-keyboard-done
+- assertVisible:
+    id: recovery-import-preview
+    enabled: false

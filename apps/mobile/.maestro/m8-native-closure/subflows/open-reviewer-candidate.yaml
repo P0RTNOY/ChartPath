@@ -1,0 +1,52 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- openLink: ${CHARTPATH_REVIEWER_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-gate
+    timeout: 90000
+- tapOn:
+    id: scenario-qa-ack
+- tapOn:
+    id: scenario-qa-enter
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-persistent-warning
+    timeout: 30000
+- assertVisible: 'ללא קרדיט'
+- assertVisible: 'לא פורסם'
+- scrollUntilVisible:
+    element:
+      id: scenario-qa-select-${CHARTPATH_CANDIDATE_KEY}
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: scenario-qa-select-${CHARTPATH_CANDIDATE_KEY}
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+    direction: DOWN
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 5000
+      - tapOn:
+          id: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: ${CHARTPATH_CANDIDATE_DESTINATION_TEST_ID}
+    timeout: 90000

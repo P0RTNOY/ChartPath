@@ -1,0 +1,7 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- tapOn:
+    id: paper-advance-one
+- extendedWaitUntil:
+    notVisible: מעבד את הנר…
+    timeout: 30000

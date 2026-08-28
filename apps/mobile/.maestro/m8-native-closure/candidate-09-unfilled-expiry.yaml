@@ -1,0 +1,97 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native candidate 09 unfilled limit order remains working across relaunch and expires terminally
+tags:
+  - m8-native-closure
+  - candidate-09
+  - unfilled
+  - expiry
+  - lifecycle
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- runFlow:
+    file: subflows/open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-09
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-candidate-09
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-session
+- runFlow:
+    file: subflows/complete-eleven-step-analysis.yaml
+    env:
+      CHARTPATH_ANALYSIS_DECISION_HE: עסקה לפי התכנית
+- runFlow:
+    file: subflows/open-and-submit-paper-order.yaml
+    env:
+      CHARTPATH_ORDER_TYPE_TEST_ID: paper-order-type-limit
+      CHARTPATH_PAPER_ENTRY: '100'
+      CHARTPATH_PAPER_STOP: '102'
+      CHARTPATH_PAPER_TARGET: '90'
+- assertVisible: ההוראה ממתינה לביצוע
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-09
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-candidate-09
+- scrollUntilVisible:
+    element:
+      id: paper-advance-one
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+- assertVisible:
+    id: paper-execution-status-working
+- assertVisible: ההוראה ממתינה לביצוע
+- repeat:
+    times: 31
+    commands:
+      - runFlow:
+          file: subflows/advance-paper-once-settled.yaml
+- scrollUntilVisible:
+    element:
+      id: paper-advance-one
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-advance-one
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+      enabled: false
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: paper-execution-status-completed
+    timeout: 90000
+- assertVisible: '.*פגה בסוף.*Replay.*'
+- assertNotVisible:
+    id: paper-advance-one
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-09
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-candidate-09
+- scrollUntilVisible:
+    element:
+      id: paper-execution-status-completed
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+- assertVisible: '.*פגה בסוף.*Replay.*'
+- assertNotVisible:
+    id: paper-advance-one

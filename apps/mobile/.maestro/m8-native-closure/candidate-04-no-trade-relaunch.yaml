@@ -1,0 +1,58 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native candidate 04 completes No-trade analysis and persists the no-execution terminal state
+tags:
+  - m8-native-closure
+  - candidate-04
+  - no-trade
+  - lifecycle
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- runFlow:
+    file: subflows/open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-04
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-candidate-04
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-session
+- runFlow:
+    file: subflows/complete-eleven-step-analysis.yaml
+    env:
+      CHARTPATH_ANALYSIS_DECISION_HE: אי־עסקה
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-no-trade-terminal
+    direction: UP
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- assertNotVisible:
+    id: paper-execution-launch
+- assertNotVisible:
+    id: paper-management-screen
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-finalized-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-04
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-candidate-04
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-no-trade-terminal
+    direction: UP
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- assertNotVisible:
+    id: paper-execution-launch
+- assertNotVisible:
+    id: paper-management-screen

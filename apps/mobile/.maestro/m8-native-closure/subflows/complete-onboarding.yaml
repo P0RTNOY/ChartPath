@@ -1,0 +1,69 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: onboarding-screen
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: onboarding-continue-guest
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: onboarding-continue-guest
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: onboarding-continue-guest
+    commands:
+      - tapOn:
+          id: onboarding-continue-guest
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding-disclaimer-ack
+    timeout: 30000
+- tapOn:
+    id: onboarding-disclaimer-ack
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: onboarding-continue-goal
+    direction: DOWN
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: onboarding-continue-goal
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding-goal-10
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: onboarding-goal-10
+    direction: DOWN
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: onboarding-goal-10
+- scrollUntilVisible:
+    element:
+      id: onboarding-finish
+    direction: DOWN
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: onboarding-finish
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: onboarding-screen
+    timeout: 90000

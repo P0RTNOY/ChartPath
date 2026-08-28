@@ -1,0 +1,65 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: ${CHARTPATH_ORDER_TYPE_TEST_ID}
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: ${CHARTPATH_ORDER_TYPE_TEST_ID}
+- scrollUntilVisible:
+    element:
+      id: paper-input-entry
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-input-entry
+- eraseText
+- inputText: ${CHARTPATH_PAPER_ENTRY}
+- tapOn:
+    id: paper-input-entry-keyboard-done
+- scrollUntilVisible:
+    element:
+      id: paper-input-stop
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-input-stop
+- eraseText
+- inputText: ${CHARTPATH_PAPER_STOP}
+- tapOn:
+    id: paper-input-stop-keyboard-done
+- scrollUntilVisible:
+    element:
+      id: paper-input-target
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-input-target
+- eraseText
+- inputText: ${CHARTPATH_PAPER_TARGET}
+- tapOn:
+    id: paper-input-target-keyboard-done
+- scrollUntilVisible:
+    element:
+      id: paper-submit-order
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- tapOn: אישור הבנת מגבלות הסימולטור
+- assertVisible: 'checkbox, checked'
+- tapOn:
+    id: paper-submit-order
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+    timeout: 90000

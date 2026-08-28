@@ -1,0 +1,33 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      text: '.*יש לנמק באמצעות הכלל שנקבע מראש ובלי תוצאה עתידית\.$'
+    direction: UP
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: '.*יש לנמק באמצעות הכלל שנקבע מראש ובלי תוצאה עתידית\.$'
+    retryTapIfNoChange: true
+- assertVisible:
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      id: capstone-submit-step
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: capstone-submit-step
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      text: 'כל.*11.*השלבים הוגשו'
+    direction: DOWN
+    timeout: 30000
+    speed: 40

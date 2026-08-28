@@ -1,0 +1,74 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-session
+    timeout: 90000
+- assertVisible:
+    id: historical-session-disclosure
+- assertVisible: '.*רגיל'
+- runFlow:
+    file: complete-first-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 2
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 3
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 4
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 5
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 6
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 7
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 8
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 9
+- runFlow:
+    file: complete-standard-analysis-step.yaml
+    env:
+      CHARTPATH_EXPECTED_NEXT_STEP_NUMBER: 10
+- runFlow:
+    file: complete-management-analysis-step.yaml
+    env:
+      CHARTPATH_ANALYSIS_DECISION_HE: ${CHARTPATH_ANALYSIS_DECISION_HE}
+- runFlow:
+    file: complete-final-standard-analysis-step.yaml
+- scrollUntilVisible:
+    element:
+      text: 'כל.*11.*השלבים הוגשו'
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn: סיום מפורש של הניתוח
+- extendedWaitUntil:
+    visible: אישור סיום הניתוח
+    timeout: 30000
+- tapOn: אישור וסיום
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-debrief
+    timeout: 90000
+- assertVisible:
+    id: historical-replay-reveal
+- scrollUntilVisible:
+    element:
+      id: historical-no-credit
+    direction: DOWN
+    timeout: 30000
+    speed: 40

@@ -1,0 +1,45 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      text: ${CHARTPATH_ANALYSIS_DECISION_HE}
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: ${CHARTPATH_ANALYSIS_DECISION_HE}
+    retryTapIfNoChange: true
+- assertVisible:
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      text: '.*ההחלטה נשענת על שילוב הקשר, אישור, ביטול ותגמול־סיכון שנקבע מראש\.$'
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: '.*ההחלטה נשענת על שילוב הקשר, אישור, ביטול ותגמול־סיכון שנקבע מראש\.$'
+    retryTapIfNoChange: true
+- assertVisible:
+    text: checkbox, checked
+- scrollUntilVisible:
+    element:
+      text: הגשת השלב
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: capstone-submit-step
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: capstone-current-step-11
+    timeout: 30000

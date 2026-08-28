@@ -1,0 +1,24 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: paper-advance-one
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-advance-one
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+      enabled: false
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'processed candle #${CHARTPATH_EXPECTED_CANDLE_INDEX}'
+    direction: UP
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true

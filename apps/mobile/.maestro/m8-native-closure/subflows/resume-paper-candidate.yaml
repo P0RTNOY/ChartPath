@@ -1,0 +1,20 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- runFlow:
+    file: resume-finalized-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: ${CHARTPATH_CANDIDATE_KEY}
+      CHARTPATH_CANDIDATE_START_TEST_ID: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+- scrollUntilVisible:
+    element:
+      id: paper-execution-launch
+    direction: UP
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: paper-execution-launch
+- extendedWaitUntil:
+    visible:
+      id: paper-execution-screen
+    timeout: 90000

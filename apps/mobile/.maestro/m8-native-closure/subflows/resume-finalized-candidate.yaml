@@ -1,0 +1,19 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- runFlow:
+    file: open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: ${CHARTPATH_CANDIDATE_KEY}
+      CHARTPATH_CANDIDATE_START_TEST_ID: ${CHARTPATH_CANDIDATE_START_TEST_ID}
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-debrief
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-debrief
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: historical-no-credit
+    direction: DOWN
+    timeout: 30000
+    speed: 40

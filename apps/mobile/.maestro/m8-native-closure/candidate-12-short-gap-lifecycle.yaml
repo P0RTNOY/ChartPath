@@ -1,0 +1,171 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native candidate 12 full Short analysis, later-gap management, terminal, and relaunch lifecycle
+tags:
+  - m8-native-closure
+  - candidate-12
+  - short
+  - gap
+  - lifecycle
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- runFlow:
+    file: subflows/open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-12
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-12
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-session
+- runFlow:
+    file: subflows/complete-eleven-step-analysis.yaml
+    env:
+      CHARTPATH_ANALYSIS_DECISION_HE: עסקה לפי התכנית
+- runFlow:
+    file: subflows/open-and-submit-paper-order.yaml
+    env:
+      CHARTPATH_ORDER_TYPE_TEST_ID: paper-order-type-market
+      CHARTPATH_PAPER_ENTRY: '94.96'
+      CHARTPATH_PAPER_STOP: '97'
+      CHARTPATH_PAPER_TARGET: '88'
+- runFlow:
+    file: subflows/advance-paper-once-settled.yaml
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-12
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-12
+- scrollUntilVisible:
+    element:
+      id: paper-management-position-summary
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+    centerElement: true
+- runFlow:
+    file: subflows/create-pending-management-action.yaml
+    env:
+      CHARTPATH_MANAGEMENT_STOP_PRICE: '96'
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-12
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-12
+- scrollUntilVisible:
+    element:
+      id: paper-management-pending
+    direction: DOWN
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: paper-advance-one
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-advance-one
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+      enabled: false
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'processed candle #65'
+    direction: UP
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      text: .*96\.00.*
+    direction: DOWN
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- runFlow:
+    file: subflows/advance-management-to-cursor.yaml
+    env:
+      CHARTPATH_EXPECTED_CANDLE_INDEX: '66'
+- runFlow:
+    file: subflows/advance-management-to-cursor.yaml
+    env:
+      CHARTPATH_EXPECTED_CANDLE_INDEX: '67'
+- scrollUntilVisible:
+    element:
+      id: paper-management-journal
+    direction: DOWN
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: paper-management-timeline
+    direction: DOWN
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: paper-management-debrief-marker
+    direction: DOWN
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-12
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-12
+- scrollUntilVisible:
+    element:
+      id: paper-management-journal
+    direction: DOWN
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: paper-management-timeline
+    direction: DOWN
+    timeout: 30000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: paper-management-debrief-marker
+    direction: DOWN
+    timeout: 90000
+    speed: 10
+    visibilityPercentage: 20
+    centerElement: true
+- assertNotVisible:
+    id: paper-management-submit

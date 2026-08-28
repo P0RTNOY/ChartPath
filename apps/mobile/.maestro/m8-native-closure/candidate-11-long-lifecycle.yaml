@@ -1,0 +1,97 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native candidate 11 full Long analysis, paper, pending management, relaunch, and terminal lifecycle
+tags:
+  - m8-native-closure
+  - candidate-11
+  - long
+  - lifecycle
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- runFlow:
+    file: subflows/open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-11
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-11
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-session
+- runFlow:
+    file: subflows/complete-eleven-step-analysis.yaml
+    env:
+      CHARTPATH_ANALYSIS_DECISION_HE: עסקה לפי התכנית
+- runFlow:
+    file: subflows/open-and-submit-paper-order.yaml
+    env:
+      CHARTPATH_ORDER_TYPE_TEST_ID: paper-order-type-market
+      CHARTPATH_PAPER_ENTRY: '106.14'
+      CHARTPATH_PAPER_STOP: '103'
+      CHARTPATH_PAPER_TARGET: '112'
+- runFlow:
+    file: subflows/advance-paper-once.yaml
+- scrollUntilVisible:
+    element:
+      id: internal-qa-boundary
+    direction: UP
+    timeout: 30000
+    speed: 40
+- scrollUntilVisible:
+    element:
+      id: management-metric-quantity
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- runFlow:
+    file: subflows/create-pending-management-action.yaml
+    env:
+      CHARTPATH_MANAGEMENT_STOP_PRICE: '104'
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-11
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-11
+- scrollUntilVisible:
+    element:
+      id: paper-management-pending
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- runFlow:
+    file: subflows/advance-until-management-terminal.yaml
+- stopApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+- runFlow:
+    file: subflows/resume-paper-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-11
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-11
+- scrollUntilVisible:
+    element:
+      id: paper-management-journal
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- scrollUntilVisible:
+    element:
+      id: paper-management-timeline
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- scrollUntilVisible:
+    element:
+      id: paper-management-debrief-marker
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertNotVisible:
+    id: paper-management-submit

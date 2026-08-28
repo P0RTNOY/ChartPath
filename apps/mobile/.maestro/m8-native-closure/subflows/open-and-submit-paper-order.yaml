@@ -1,0 +1,41 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: paper-execution-launch
+    direction: UP
+    timeout: 30000
+    speed: 40
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: paper-execution-launch
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: paper-execution-screen
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: paper-chart-zoom-in
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: paper-chart-zoom-in
+- tapOn:
+    id: paper-chart-pan-earlier
+- tapOn:
+    id: paper-chart-pan-later
+- tapOn:
+    id: paper-chart-zoom-out
+- assertVisible:
+    id: paper-chart-viewport-range
+- runFlow:
+    file: complete-paper-ticket.yaml
+    env:
+      CHARTPATH_ORDER_TYPE_TEST_ID: ${CHARTPATH_ORDER_TYPE_TEST_ID}
+      CHARTPATH_PAPER_ENTRY: ${CHARTPATH_PAPER_ENTRY}
+      CHARTPATH_PAPER_STOP: ${CHARTPATH_PAPER_STOP}
+      CHARTPATH_PAPER_TARGET: ${CHARTPATH_PAPER_TARGET}

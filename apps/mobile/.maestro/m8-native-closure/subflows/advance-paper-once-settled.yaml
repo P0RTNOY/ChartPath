@@ -1,0 +1,21 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: paper-advance-one
+    direction: DOWN
+    timeout: 90000
+    speed: 40
+    centerElement: true
+- tapOn:
+    id: paper-advance-one
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+      enabled: false
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: paper-advance-one
+      enabled: true
+    timeout: 90000

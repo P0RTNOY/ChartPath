@@ -1,0 +1,78 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native reviewer route remains explicit, unpublished, and no-credit
+tags:
+  - m8-native-closure
+  - reviewer
+  - isolation
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- openLink: ${CHARTPATH_REVIEWER_UNAUTHORIZED_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-unavailable
+    timeout: 90000
+- openLink: ${CHARTPATH_SCENARIO_LIBRARY_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: scenario-library-screen
+    timeout: 90000
+- assertVisible:
+    id: scenario-library-empty
+- assertNotVisible:
+    id: scenario-library-published-list
+- openLink: ${CHARTPATH_REVIEWER_ROUTE_URL}
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-gate
+    timeout: 90000
+- tapOn:
+    id: scenario-qa-ack
+- assertVisible: checkbox, checked
+- assertVisible:
+    id: scenario-qa-enter
+    enabled: true
+- tapOn:
+    id: scenario-qa-enter
+- extendedWaitUntil:
+    visible:
+      id: scenario-qa-persistent-warning
+    timeout: 30000
+- assertVisible: '.*פנימי'
+- assertVisible: 'נתונים סינתטיים'
+- assertVisible: 'ללא קרדיט'
+- assertVisible: 'לא פורסם'
+- scrollUntilVisible:
+    element:
+      id: scenario-qa-select-candidate-11
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: scenario-qa-select-candidate-11
+    retryTapIfNoChange: true
+- assertNotVisible:
+    id: scenario-qa-review-packet
+- scrollUntilVisible:
+    element:
+      id: scenario-qa-reveal-candidate-11
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: scenario-qa-reveal-candidate-11
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: scenario-qa-review-packet
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible: 'אינה אישור לפרסום'

@@ -1,0 +1,70 @@
+appId: ${CHARTPATH_NATIVE_APP_ID}
+name: M8 native chart pan and zoom controls preserve the blind analysis cutoff
+tags:
+  - m8-native-closure
+  - accessibility
+  - chart
+---
+- launchApp:
+    appId: ${CHARTPATH_NATIVE_APP_ID}
+    clearState: true
+- runFlow:
+    file: subflows/complete-onboarding.yaml
+- runFlow:
+    file: subflows/open-reviewer-candidate.yaml
+    env:
+      CHARTPATH_REVIEWER_ROUTE_URL: ${CHARTPATH_REVIEWER_ROUTE_URL}
+      CHARTPATH_CANDIDATE_KEY: candidate-11
+      CHARTPATH_CANDIDATE_START_TEST_ID: scenario-qa-start-full-lifecycle-candidate-11
+      CHARTPATH_CANDIDATE_DESTINATION_TEST_ID: guided-analysis-session
+- extendedWaitUntil:
+    visible:
+      id: guided-analysis-chart-notebook
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-chart-notebook-zoom-in
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: guided-analysis-chart-notebook-viewport-range
+- assertVisible: '#16–#63'
+- tapOn:
+    id: guided-analysis-chart-notebook-zoom-in
+- assertVisible: '#22–#57'
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-chart-notebook-pan-earlier
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: guided-analysis-chart-notebook-pan-earlier
+- assertVisible: '#18–#53'
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-chart-notebook-pan-later
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: guided-analysis-chart-notebook-pan-later
+- assertVisible: '#22–#57'
+- scrollUntilVisible:
+    element:
+      id: guided-analysis-chart-notebook-zoom-out
+    direction: DOWN
+    timeout: 30000
+    speed: 40
+- tapOn:
+    id: guided-analysis-chart-notebook-zoom-out
+- assertVisible: '#16–#63'
+- scrollUntilVisible:
+    element:
+      id: historical-session-disclosure
+    direction: UP
+    timeout: 30000
+    speed: 40
+- assertVisible:
+    id: historical-session-disclosure
